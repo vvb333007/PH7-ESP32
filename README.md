@@ -1,7 +1,8 @@
 PH7 - An Embedded Implementation of PHP (C Library), port for ESP32-family CPUs
 ===
 
-Small changes were made to make this compile and run in ESP-IDF environment
+NOTE: Small changes were made to make this compile and run in ESP-IDF environment
+NOTE: Upcoming changes: WIN32 support removed, FreeRTOS support added, VFS mmap() support added
 
 [![Build Status](https://travis-ci.org/symisc/PH7.svg?branch=master)](https://travis-ci.org/symisc/PH7)
 
