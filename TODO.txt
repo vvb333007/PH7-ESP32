@@ -1,6 +1,18 @@
-+++1. Deamalgamate
-2. Memory backend: must use PSRAM where available
-3. pthread-style mutexes must be refactored to use FreeRTOS mutexes
-4. POSIX's getuid() getpid() etc: implement where possible. At least getpid()
-5. Carefully look at vfs.c, UnixVfs: refactor to use tarfs as the main FS
-6. Strip WIN32 code off completely
+PH7 Porting Plan
+
+++++1. De-amalgamate the codebase and make it fully compilable in a Cygwin environment.
+
+2. Memory backend: use PSRAM whenever it is available.
+
+3. Refactor pthread-style mutexes to use FreeRTOS mutexes. Get rid of pthreads, FreeRTOS has native API for this
+
+4. Implement POSIX functions such as 'getuid()', 'getpid()', etc.** where practical. At minimum, implement 'getpid()'.
+
+5. Review and refactor 'vfs.c' and 'UnixVfs' to use TarFS as the primary filesystem backend.
+   PH7 relies on a number of POSIX filesystem functions that are implemented as no-ops or only 
+   partially supported in ESP-IDF. 
+
+   These functions should be carefully reviewed to determine which ones are actually required by 
+   PH7 and how they should be implemented on FreeRTOS.
+
+6. Remove all WIN32-specific code completely.
