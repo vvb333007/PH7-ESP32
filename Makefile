@@ -1,2 +1,62 @@
-ph7: ph7.c
-	cc -o ph7 ph7.c examples/ph7_intro.c -W -Wunused -Wall -I. -Ofast 
+# 
+# 
+.RECIPEPREFIX := >
+
+# Compiler
+CC      := gcc
+
+# Directories
+OBJDIR  := .
+
+# Flags
+CFLAGS  := -Wall -Os -I../src
+CFLAGS  += -DTEST_BUILD=1 -DESP32=1 -DPH7_UNIX_STATIC_BUILD=1
+CFLAGS += -MMD -MP 
+
+# Common sources
+COMMON_SRC := \
+api.c \
+builtin.c \
+compile.c \
+constant.c \
+hashmap.c \
+lex.c \
+lib.c \
+memobj.c \
+oo.c \
+parse.c \
+vfs.c \
+vm.c
+
+TEST_SRC := $(COMMON_SRC)
+TEST_OBJ := $(patsubst %.c,$(OBJDIR)/%.o,$(TEST_SRC))
+
+
+# Object files
+OBJ := $(patsubst %.c,$(OBJDIR)/%.o,$(SRC))
+
+# Target executable
+TARGETS := test
+
+.PHONY: all
+
+all: $(TARGETS)  clean
+
+test: $(TEST_OBJ)
+>$(CC) $^ -o $@
+
+
+$(OBJDIR)/%.o: %.c | $(OBJDIR)
+>$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR):
+>mkdir -p $(OBJDIR)
+
+clean:
+>rm -f *.o *.d
+
+-include $(OBJ:.o=.d)
+
+
+
+
