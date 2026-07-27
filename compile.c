@@ -1,4 +1,4 @@
-#ifdef PH7_AMALGAMATION
+
 /*
  * ----------------------------------------------------------
  * File: compile.c
@@ -967,8 +967,9 @@ PH7_PRIVATE sxi32 PH7_CompileString(ph7_gen_state *pGen, sxi32 iCompileFlag) {
  *  See the block-comment above for more information.
  */
 static sxi32 PH7_CompileHereDoc(ph7_gen_state *pGen, sxi32 iCompileFlag) {
-  sxi32 rc;
-  rc = GenStateCompileString(&(*pGen));
+//  sxi32 rc;
+//  rc = 
+  GenStateCompileString(&(*pGen));
   SXUNUSED(iCompileFlag); /* cc warning */
   /* Compilation result */
   return SXRET_OK;
@@ -1810,9 +1811,11 @@ static sxi32 PH7_CompileContinue(ph7_gen_state *pGen) {
 static sxi32 PH7_CompileBreak(ph7_gen_state *pGen) {
   GenBlock *pLoop; /* Target loop */
   sxi32 iLevel;    /* How many nesting loop to skip */
-  sxu32 nLine;
+  //sxu32 nLine;
   sxi32 rc;
-  nLine = pGen->pIn->nLine;
+
+  //nLine = pGen->pIn->nLine;
+
   iLevel = 0;
   /* Jump the 'break' keyword */
   pGen->pIn++;
@@ -3533,13 +3536,13 @@ static sxi32 GenStateProcessArgValue(ph7_gen_state *pGen, ph7_vm_func_arg *pArg,
  */
 static sxi32 GenStateCollectFuncArgs(ph7_vm_func *pFunc, ph7_gen_state *pGen, SyToken *pEnd) {
   ph7_vm_func_arg sArg; /* Current processed argument */
-  SyToken *pCur, *pIn;  /* Token stream */
+  SyToken /* *pCur,*/ *pIn;  /* Token stream */
   SyBlob sSig;          /* Function signature */
   char *zDup;           /* Copy of argument name */
   sxi32 rc;
 
   pIn = pGen->pIn;
-  pCur = 0;
+  //pCur = 0;
   SyBlobInit(&sSig, &pGen->pVm->sAllocator);
   /* Process arguments one after one */
   for (;;) {
@@ -6424,4 +6427,4 @@ PH7_PRIVATE sxi32 PH7_GenCompileError(ph7_gen_state *pGen, sxi32 nErrType, sxu32
   }
   return rc;
 }
-#endif
+

@@ -1,4 +1,4 @@
-#ifdef PH7_AMALGAMATION
+
 /*
  * ----------------------------------------------------------
  * File: api.c
@@ -870,7 +870,9 @@ int ph7_vm_config(ph7_vm *pVm, int iConfigOp, ...) {
   va_end(ap);
 #if defined(PH7_ENABLE_THREADS)
   /* Leave VM mutex */
-  SyMutexLeave(sMPGlobal.pMutexMethods, pVm->pMutex); /* NO-OP if sMPGlobal.nThreadingLevel != PH7_THREAD_LEVEL_MULTI */
+    //BUG:3
+//  SyMutexLeave(sMPGlobal.pMutexMethods, pVm->pMutex); /* NO-OP if sMPGlobal.nThreadingLevel != PH7_THREAD_LEVEL_MULTI */
+    SyMutexRelease(sMPGlobal.pMutexMethods,pVm->pMutex);
 #endif
   return rc;
 }
@@ -1867,14 +1869,15 @@ int ph7_value_string(ph7_value *pVal, const char *zString, int nLen) {
  */
 int ph7_value_string_format(ph7_value *pVal, const char *zFormat, ...) {
   va_list ap;
-  int rc;
+//  int rc;
   if ((pVal->iFlags & MEMOBJ_STRING) == 0) {
     /* Invalidate any prior representation */
     PH7_MemObjRelease(pVal);
     MemObjSetType(pVal, MEMOBJ_STRING);
   }
   va_start(ap, zFormat);
-  rc = SyBlobFormatAp(&pVal->sBlob, zFormat, ap);
+  //rc = 
+  SyBlobFormatAp(&pVal->sBlob, zFormat, ap);
   va_end(ap);
   return PH7_OK;
 }
@@ -2044,4 +2047,4 @@ int ph7_value_is_empty(ph7_value *pVal) {
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#endif
+

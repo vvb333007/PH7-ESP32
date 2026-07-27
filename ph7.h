@@ -67,10 +67,6 @@
 #  define ystr(s) #s
 #endif
 
-/* Common string literals */
-
-static char s_Space[] = { ' ', 0 };
-static char s_NaN[] = { 'N','a','N', 0 };
 
 
 /*

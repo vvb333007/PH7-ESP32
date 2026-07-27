@@ -1,4 +1,11 @@
-An ESP32 port of PH7
+
+An ESP32 port of PH7, WORK IN PROGRESS! ESTIMATED RELEASE DATE: OCTOBER 2026
+
+Breaking changes: code compiles in Cygwin environment only, as cygwin is the main development environment.
+
+posix_vfs.c layer was extracted from amalgamated sources
+
+
 ===
 
 NOTE: Small changes were made to make this compile and run in ESP-IDF environment, however

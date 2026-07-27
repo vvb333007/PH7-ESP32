@@ -1,4 +1,4 @@
-#ifdef PH7_AMALGAMATION
+
 /*
  * ----------------------------------------------------------
  * File: lib.c
@@ -29,121 +29,20 @@
 #ifndef PH7_AMALGAMATION
 #include "ph7int.h"
 #endif
-#if defined(__WINNT__)
-#include <Windows.h>
-#else
+
+/* Common string literals */
+
+static char s_Space[] = { ' ', 0 };
+static char s_NaN[] = { 'N','a','N', 0 };
+
+
 #include <stdlib.h>
-#endif
 #if defined(PH7_ENABLE_THREADS)
 /* SyRunTimeApi: sxmutex.c */
-#if defined(__WINNT__)
-struct SyMutex {
-  CRITICAL_SECTION sMutex;
-  sxu32 nType; /* Mutex type,one of SXMUTEX_TYPE_* */
-};
-/* Preallocated static mutex */
-static SyMutex aStaticMutexes[] = {
-  { { 0 }, SXMUTEX_TYPE_STATIC_1 },
-  { { 0 }, SXMUTEX_TYPE_STATIC_2 },
-  { { 0 }, SXMUTEX_TYPE_STATIC_3 },
-  { { 0 }, SXMUTEX_TYPE_STATIC_4 },
-  { { 0 }, SXMUTEX_TYPE_STATIC_5 },
-  { { 0 }, SXMUTEX_TYPE_STATIC_6 }
-};
-static BOOL winMutexInit = FALSE;
-static LONG winMutexLock = 0;
 
-static sxi32 WinMutexGlobaInit(void) {
-  LONG rc;
-  rc = InterlockedCompareExchange(&winMutexLock, 1, 0);
-  if (rc == 0) {
-    sxu32 n;
-    for (n = 0; n < SX_ARRAYSIZE(aStaticMutexes); ++n) {
-      InitializeCriticalSection(&aStaticMutexes[n].sMutex);
-    }
-    winMutexInit = TRUE;
-  } else {
-    /* Someone else is doing this for us */
-    while (winMutexInit == FALSE) {
-      Sleep(1);
-    }
-  }
-  return SXRET_OK;
-}
-static void WinMutexGlobalRelease(void) {
-  LONG rc;
-  rc = InterlockedCompareExchange(&winMutexLock, 0, 1);
-  if (rc == 1) {
-    /* The first to decrement to zero does the actual global release */
-    if (winMutexInit == TRUE) {
-      sxu32 n;
-      for (n = 0; n < SX_ARRAYSIZE(aStaticMutexes); ++n) {
-        DeleteCriticalSection(&aStaticMutexes[n].sMutex);
-      }
-      winMutexInit = FALSE;
-    }
-  }
-}
-static SyMutex *WinMutexNew(int nType) {
-  SyMutex *pMutex = 0;
-  if (nType == SXMUTEX_TYPE_FAST || nType == SXMUTEX_TYPE_RECURSIVE) {
-    /* Allocate a new mutex */
-    pMutex = (SyMutex *)HeapAlloc(GetProcessHeap(), 0, sizeof(SyMutex));
-    if (pMutex == 0) {
-      return 0;
-    }
-    InitializeCriticalSection(&pMutex->sMutex);
-  } else {
-    /* Use a pre-allocated static mutex */
-    if (nType > SXMUTEX_TYPE_STATIC_6) {
-      nType = SXMUTEX_TYPE_STATIC_6;
-    }
-    pMutex = &aStaticMutexes[nType - 3];
-  }
-  pMutex->nType = nType;
-  return pMutex;
-}
-static void WinMutexRelease(SyMutex *pMutex) {
-  if (pMutex->nType == SXMUTEX_TYPE_FAST || pMutex->nType == SXMUTEX_TYPE_RECURSIVE) {
-    DeleteCriticalSection(&pMutex->sMutex);
-    HeapFree(GetProcessHeap(), 0, pMutex);
-  }
-}
-static void WinMutexEnter(SyMutex *pMutex) {
-  EnterCriticalSection(&pMutex->sMutex);
-}
-static sxi32 WinMutexTryEnter(SyMutex *pMutex) {
-#ifdef _WIN32_WINNT
-  BOOL rc;
-  /* Only WindowsNT platforms */
-  rc = TryEnterCriticalSection(&pMutex->sMutex);
-  if (rc) {
-    return SXRET_OK;
-  } else {
-    return SXERR_BUSY;
-  }
-#else
-  return SXERR_NOTIMPLEMENTED;
-#endif
-}
-static void WinMutexLeave(SyMutex *pMutex) {
-  LeaveCriticalSection(&pMutex->sMutex);
-}
-/* Export Windows mutex interfaces */
-static const SyMutexMethods sWinMutexMethods = {
-  WinMutexGlobaInit,     /* xGlobalInit() */
-  WinMutexGlobalRelease, /* xGlobalRelease() */
-  WinMutexNew,           /* xNew() */
-  WinMutexRelease,       /* xRelease() */
-  WinMutexEnter,         /* xEnter() */
-  WinMutexTryEnter,      /* xTryEnter() */
-  WinMutexLeave          /* xLeave() */
-};
-PH7_PRIVATE const SyMutexMethods *SyMutexExportMethods(void) {
-  return &sWinMutexMethods;
-}
-#elif defined(__UNIXES__)
+
 #include <pthread.h>
+
 struct SyMutex {
   pthread_mutex_t sMutex;
   sxu32 nType;
@@ -210,7 +109,8 @@ static const SyMutexMethods sPthreadMutexMethods = {
 PH7_PRIVATE const SyMutexMethods *SyMutexExportMethods(void) {
   return &sPthreadMutexMethods;
 }
-#else
+
+#if 0
 /* Host application must register their own mutex subsystem if the target
  * platform is not an UNIX-like or windows systems.
  */
@@ -244,32 +144,22 @@ static const SyMutexMethods sDummyMutexMethods = {
 PH7_PRIVATE const SyMutexMethods *SyMutexExportMethods(void) {
   return &sDummyMutexMethods;
 }
-#endif /* __WINNT__ */
+#endif
 #endif /* PH7_ENABLE_THREADS */
+
+
 static void *SyOSHeapAlloc(sxu32 nByte) {
   void *pNew;
-#if defined(__WINNT__)
-  pNew = HeapAlloc(GetProcessHeap(), 0, nByte);
-#else
   pNew = malloc((size_t)nByte);
-#endif
   return pNew;
 }
 static void *SyOSHeapRealloc(void *pOld, sxu32 nByte) {
   void *pNew;
-#if defined(__WINNT__)
-  pNew = HeapReAlloc(GetProcessHeap(), 0, pOld, nByte);
-#else
   pNew = realloc(pOld, (size_t)nByte);
-#endif
   return pNew;
 }
 static void SyOSHeapFree(void *pPtr) {
-#if defined(__WINNT__)
-  HeapFree(GetProcessHeap(), 0, pPtr);
-#else
   free(pPtr);
-#endif
 }
 /* SyRunTimeApi:sxstr.c */
 PH7_PRIVATE sxu32 SyStrlen(const char *zSrc) {
@@ -1079,7 +969,7 @@ static sxi32 MemBackendRelease(SyMemBackend *pBackend) {
   return SXRET_OK;
 }
 PH7_PRIVATE sxi32 SyMemBackendRelease(SyMemBackend *pBackend) {
-  sxi32 rc;
+//  sxi32 rc;
 #if defined(UNTRUST)
   if (SXMEM_BACKEND_CORRUPT(pBackend)) {
     return SXERR_INVALID;
@@ -1088,7 +978,8 @@ PH7_PRIVATE sxi32 SyMemBackendRelease(SyMemBackend *pBackend) {
   if (pBackend->pMutexMethods) {
     SyMutexEnter(pBackend->pMutexMethods, pBackend->pMutex);
   }
-  rc = MemBackendRelease(&(*pBackend));
+//  rc = 
+  MemBackendRelease(&(*pBackend));
   if (pBackend->pMutexMethods) {
     SyMutexLeave(pBackend->pMutexMethods, pBackend->pMutex);
     SyMutexRelease(pBackend->pMutexMethods, pBackend->pMutex);
@@ -2781,7 +2672,7 @@ static sxi32 InternFormat(ProcConsumer xConsumer, void *pUserData, const char *z
   char prefix;             /* Prefix character."+" or "-" or " " or '\0'.*/
   sxu8 errorflag = 0;      /* True if an error is encountered */
   sxu8 xtype;              /* Conversion paradigm */
-  char *zExtra;
+  //char *zExtra;
   static char spaces[] = "                                                  ";
 #define etSPACESIZE ((int)sizeof(spaces) - 1)
 #ifndef SX_OMIT_FLOATINGPOINT
@@ -2901,7 +2792,7 @@ static sxi32 InternFormat(ProcConsumer xConsumer, void *pUserData, const char *z
         break;
       }
     }
-    zExtra = 0;
+    //zExtra = 0;
 
     /*
     ** At this point, variables are initialized as follows:
@@ -4624,25 +4515,29 @@ static sxi32 ArchiveHashInstallEntry(SyArchive *pArch, SyArchiveEntry *pEntry) {
   */
 static sxi32 ParseEndOfCentralDirectory(SyArchive *pArch, const unsigned char *zBuf) {
   sxu32 nMagic = 0; /* cc -O6 warning */
-  sxi32 rc;
+  //sxi32 rc;
 
   /* Sanity check */
-  rc = SyLittleEndianUnpack32(&nMagic, zBuf, sizeof(sxu32));
+  //rc = 
+  SyLittleEndianUnpack32(&nMagic, zBuf, sizeof(sxu32));
   if (/* rc != SXRET_OK || */ nMagic != SXZIP_END_CENTRAL_MAGIC) {
     return SXERR_CORRUPT;
   }
   /* # of entries */
-  rc = SyLittleEndianUnpack16((sxu16 *)&pArch->nEntry, &zBuf[8], sizeof(sxu16));
+  //rc = 
+  SyLittleEndianUnpack16((sxu16 *)&pArch->nEntry, &zBuf[8], sizeof(sxu16));
   if (/* rc != SXRET_OK || */ pArch->nEntry > SXI16_HIGH /* SXU16_HIGH */) {
     return SXERR_CORRUPT;
   }
   /* Size of central directory */
-  rc = SyLittleEndianUnpack32(&pArch->nCentralSize, &zBuf[12], sizeof(sxu32));
+  //rc = 
+  SyLittleEndianUnpack32(&pArch->nCentralSize, &zBuf[12], sizeof(sxu32));
   if (/*rc != SXRET_OK ||*/ pArch->nCentralSize > SXI32_HIGH) {
     return SXERR_CORRUPT;
   }
   /* Starting offset of central directory */
-  rc = SyLittleEndianUnpack32(&pArch->nCentralOfft, &zBuf[16], sizeof(sxu32));
+  //rc = 
+  SyLittleEndianUnpack32(&pArch->nCentralOfft, &zBuf[16], sizeof(sxu32));
   if (/*rc != SXRET_OK ||*/ pArch->nCentralSize > SXI32_HIGH) {
     return SXERR_CORRUPT;
   }
@@ -4961,43 +4856,14 @@ PH7_PRIVATE sxi32 SyArchiveGetNextEntry(SyArchive *pArch, SyArchiveEntry **ppEnt
 #include <sys/time.h>
 #endif
 static sxi32 SyOSUtilRandomSeed(void *pBuf, sxu32 nLen, void *pUnused) {
-  char *zBuf = (char *)pBuf;
-#ifdef __WINNT__
-  DWORD nProcessID; /* Yes,keep it uninitialized when compiling using the MinGW32 builds tools */
-#elif defined(__UNIXES__)
-  pid_t pid;
-  int fd;
-#else
-  char zGarbage[128]; /* Yes,keep this buffer uninitialized */
-#endif
+
+  //char *zBuf = (char *)pBuf;
+
   SXUNUSED(pUnused);
-#ifdef __WINNT__
-#ifndef __MINGW32__
-  nProcessID = GetProcessId(GetCurrentProcess());
-#endif
-  SyMemcpy((const void *)&nProcessID, zBuf, SXMIN(nLen, sizeof(DWORD)));
-  if ((sxu32)(&zBuf[nLen] - &zBuf[sizeof(DWORD)]) >= sizeof(SYSTEMTIME)) {
-    GetSystemTime((LPSYSTEMTIME)&zBuf[sizeof(DWORD)]);
-  }
-#elif defined(__UNIXES__)
-  fd = open("/dev/urandom", O_RDONLY);
-  if (fd >= 0) {
-    if (read(fd, zBuf, nLen) > 0) {
-      close(fd);
-      return SXRET_OK;
-    }
-    /* FALL THRU */
-  }
-  close(fd);
-  pid = getpid();
-  SyMemcpy((const void *)&pid, zBuf, SXMIN(nLen, sizeof(pid_t)));
-  if (&zBuf[nLen] - &zBuf[sizeof(pid_t)] >= (int)sizeof(struct timeval)) {
-    gettimeofday((struct timeval *)&zBuf[sizeof(pid_t)], 0);
-  }
-#else
-  /* Fill with uninitialized data */
-  SyMemcpy(zGarbage, zBuf, SXMIN(nLen, sizeof(zGarbage)));
-#endif
+
+  //SyMemcpy(zGarbage, zBuf, SXMIN(nLen, sizeof(zGarbage)));
+  // TODO: generate random bytes and copy it to the buffer
+
   return SXRET_OK;
 }
 PH7_PRIVATE sxi32 SyRandomnessInit(SyPRNGCtx *pCtx, ProcRandomSeed xSeed, void *pUserData) {
@@ -5299,7 +5165,7 @@ PH7_PRIVATE void MD5Final(unsigned char digest[16], MD5Context *ctx) {
   MD5Transform(ctx->buf, (sxu32 *)ctx->in);
   byteReverse((unsigned char *)ctx->buf, 4);
   SyMemcpy(ctx->buf, digest, 0x10);
-  SyZero(ctx, sizeof(ctx)); /* In case it's sensitive */
+  SyZero(ctx, sizeof(*ctx)); /* In case it's sensitive */ // BUG:2
 }
 #undef F1
 #undef F2
@@ -5906,4 +5772,4 @@ PH7_PRIVATE sxi32 SyBinToHexConsumer(const void *pIn, sxu32 nLen, ProcConsumer x
   return SXRET_OK;
 }
 #endif /* PH7_DISABLE_BUILTIN_FUNC */
-#endif
+

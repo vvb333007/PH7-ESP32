@@ -1,4 +1,4 @@
-#ifdef PH7_AMALGAMATION
+
 /*
  * ----------------------------------------------------------
  * File: hashmap.c
@@ -5680,4 +5680,4 @@ PH7_PRIVATE sxi32 PH7_HashmapWalk(
   /* All done */
   return SXRET_OK;
 }
-#endif
+

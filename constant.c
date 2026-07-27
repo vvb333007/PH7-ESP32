@@ -1,4 +1,4 @@
-#ifdef PH7_AMALGAMATION
+
 /*
  * ----------------------------------------------------------
  * File: constant.c
@@ -1891,4 +1891,4 @@ PH7_PRIVATE void PH7_RegisterBuiltInConstant(ph7_vm *pVm) {
     ph7_create_constant(&(*pVm), aBuiltIn[n].zName, aBuiltIn[n].xExpand, &(*pVm));
   }
 }
-#endif
+

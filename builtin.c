@@ -1,4 +1,4 @@
-#ifdef PH7_AMALGAMATION
+
 /*
  * ----------------------------------------------------------
  * File: builtin.c
@@ -21,6 +21,12 @@
 #ifndef PH7_AMALGAMATION
 #include "ph7int.h"
 #endif
+
+/* Common string literals */
+
+static char s_Space[] = { ' ', 0 };
+static char s_NaN[] = { 'N','a','N', 0 };
+
 /* This file implement built-in 'foreign' functions for the PH7 engine */
 /*
  * Section:
@@ -3861,7 +3867,7 @@ PH7_PRIVATE sxi32 PH7_InputFormat(
   ph7_value *pArg;                     /* Current processed argument */
   ph7_int64 iVal;
   int precision; /* Precision of the current field */
-  char *zExtra;
+  //char *zExtra;
   int c, rc, n;
   int length; /* Length of the field */
   int prefix;
@@ -3985,7 +3991,7 @@ PH7_PRIVATE sxi32 PH7_InputFormat(
     }
     zBuf = zWorker; /* Point to the working buffer */
     length = 0;
-    zExtra = 0;
+    //zExtra = 0;
     /*
       ** At this point, variables are initialized as follows:
       **
@@ -8763,4 +8769,4 @@ PH7_PRIVATE void PH7_RegisterBuiltInFunction(ph7_vm *pVm) {
   /* Register IO functions [i.e: fread(),fwrite(),chdir(),mkdir(),file(),...] */
   PH7_RegisterIORoutine(&(*pVm));
 }
-#endif
+

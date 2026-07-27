@@ -1,4 +1,4 @@
-#ifdef PH7_AMALGAMATION
+
 /*
  * ----------------------------------------------------------
  * File: vm.c
@@ -9406,7 +9406,7 @@ static sxi32 VmUncaughtException(
   ph7_class_instance *pThis /* Exception class instance [i.e: Exception $e] */
 ) {
   ph7_value *apArg[2], sArg;
-  int nArg = 1;
+  //int nArg = 1;
   sxi32 rc;
   if (pVm->nExceptDepth > 15) {
     /* Nesting limit reached */
@@ -9420,7 +9420,7 @@ static sxi32 VmUncaughtException(
     pThis->iRef++;
     MemObjSetType(&sArg, MEMOBJ_OBJ);
   } else {
-    nArg = 0;
+    //nArg = 0;
   }
   apArg[0] = &sArg;
   /* Call the exception handler if available */
@@ -14701,4 +14701,4 @@ static sxi32 VmHttpProcessRequest(ph7_vm *pVm, const char *zRequest, int nByte) 
   SyBlobRelease(&sWorker);
   return SXRET_OK;
 }
-#endif
+

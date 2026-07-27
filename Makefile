@@ -9,8 +9,8 @@ CC      := gcc
 OBJDIR  := .
 
 # Flags
-CFLAGS  := -Wall -Os -I../src
-CFLAGS  += -DTEST_BUILD=1 -DESP32=1 -DPH7_UNIX_STATIC_BUILD=1
+CFLAGS  := -Wall -Wno-char-subscripts -Os -Itarfs/
+CFLAGS  += -DTEST_BUILD=1 -DPH7_UNIX_STATIC_BUILD=1
 CFLAGS += -MMD -MP 
 
 # Common sources
@@ -26,6 +26,7 @@ memobj.c \
 oo.c \
 parse.c \
 vfs.c \
+posix_vfs.c \
 vm.c
 
 TEST_SRC := $(COMMON_SRC)

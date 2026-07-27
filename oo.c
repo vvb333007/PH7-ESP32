@@ -1,4 +1,4 @@
-#ifdef PH7_AMALGAMATION
+
 /*
  * ----------------------------------------------------------
  * File: oo.c
@@ -1127,4 +1127,4 @@ PH7_PRIVATE ph7_value *PH7_ClassInstanceFetchAttr(ph7_class_instance *pThis, con
   /* Return the attribute value */
   return ExtractClassAttrValue(pThis->pVm, pAttr);
 }
-#endif
+

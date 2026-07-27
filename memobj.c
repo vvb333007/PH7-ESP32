@@ -1,4 +1,4 @@
-#ifdef PH7_AMALGAMATION
+
 /*
  * ----------------------------------------------------------
  * File: memobj.c
@@ -1270,4 +1270,4 @@ PH7_PRIVATE sxi32 PH7_MemObjDump(
 #endif
   return rc;
 }
-#endif
+
