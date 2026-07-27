@@ -1,0 +1,6 @@
++++1. Deamalgamate
+2. Memory backend: must use PSRAM where available
+3. pthread-style mutexes must be refactored to use FreeRTOS mutexes
+4. POSIX's getuid() getpid() etc: implement where possible. At least getpid()
+5. Carefully look at vfs.c, UnixVfs: refactor to use tarfs as the main FS
+6. Strip WIN32 code off completely

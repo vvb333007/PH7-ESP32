@@ -4,6 +4,9 @@ PH7 - An Embedded Implementation of PHP (C Library), port for ESP32-family CPUs
 NOTE: Small changes were made to make this compile and run in ESP-IDF environment
 NOTE: Upcoming changes: WIN32 support removed, FreeRTOS support added, VFS mmap() support added
 
+
+Original README:
+
 [![Build Status](https://travis-ci.org/symisc/PH7.svg?branch=master)](https://travis-ci.org/symisc/PH7)
 
 PH7 is a in-process software C library which implements a highly-efficient embeddable bytecode compiler and a virtual machine for the PHP programming language. In other words, PH7 is a PHP engine which allow the host application to compile and execute PHP scripts in-process. PH7 is to PHP what SQLite is to SQL.
@@ -245,17 +248,17 @@ Running the interpreter with script arguments
 Useful links to start with
 ===========================
 
-[Download](http://ph7.symisc.net/downloads.html) 	:	Get a copy of the last public release of the PH7 engine, start embedding and enjoy programming with.
+[Download](http://ph7.symisc.net/downloads.html)  : Get a copy of the last public release of the PH7 engine, start embedding and enjoy programming with.
 
-[Distinctive Features](http://ph7.symisc.net/features.html): 	This document enumerates and describes some of the features and the powerfull extensions introduced by the PH7 engine.
-
-
-[Frequently Asked Questions](http://ph7.symisc.net/faq.html): 	FAQ: The title of the document says all...
+[Distinctive Features](http://ph7.symisc.net/features.html):  This document enumerates and describes some of the features and the powerfull extensions introduced by the PH7 engine.
 
 
-[Copyright/Licensing](http://ph7.symisc.net/licensing.html): 		PH7 is dual-licensed and is available free of charge for open source projects. Find more on the licensing situation there.
+[Frequently Asked Questions](http://ph7.symisc.net/faq.html):   FAQ: The title of the document says all...
 
-[Online Community Support](http://ph7.symisc.net/support.html): 	Need some help, join the PH7 online community.
+
+[Copyright/Licensing](http://ph7.symisc.net/licensing.html):    PH7 is dual-licensed and is available free of charge for open source projects. Find more on the licensing situation there.
+
+[Online Community Support](http://ph7.symisc.net/support.html):   Need some help, join the PH7 online community.
 
 PH7 Programming Interfaces
 ==========================
@@ -271,4 +274,4 @@ Documentation describing the APIs used to program PH7. Note that PH7 is very eas
 
 [Foreign Function Implementation](http://ph7.symisc.net/func_intro.html): Is a how-to guide on how to install C functions and invoke them from your PHP script.
 
-[Constant Expansion Mechanism](http://ph7.symisc.net/const_intro.html): 	Is a how-to guide on how to install foreign constants and expand their values from your PHP script.
+[Constant Expansion Mechanism](http://ph7.symisc.net/const_intro.html):   Is a how-to guide on how to install foreign constants and expand their values from your PHP script.

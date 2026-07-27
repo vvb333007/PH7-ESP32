@@ -1,5 +1,5 @@
 #include <Arduino.h>
-
+#include "espshell.h"
 
 #include <stdio.h>
 #include <stdlib.h>
