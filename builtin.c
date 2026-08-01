@@ -5666,13 +5666,8 @@ static int PH7_builtin_wordwrap(ph7_context *pCtx, int nArg, ph7_value **apArg) 
   }
   if (iBreaklen < 1) {
     /* Set a default column break */
-#ifdef __WINNT__
-    zBreak = "\r\n";
-    iBreaklen = (int)sizeof("\r\n") - 1;
-#else
     zBreak = "\n";
     iBreaklen = (int)sizeof(char);
-#endif
   }
   /* Perform the requested operation */
   zEnd = &zIn[iLen];
@@ -7094,41 +7089,9 @@ static int PH7_builtin_ctype_upper(ph7_context *pCtx, int nArg, ph7_value **apAr
  *    Devel.
  */
 #include <time.h>
-#ifdef __WINNT__
-/* GetSystemTime() */
-#include <Windows.h>
-#ifdef _WIN32_WCE
-/*
-** WindowsCE does not have a localtime() function.  So create a
-** substitute.
-** Taken from the SQLite3 source tree.
-** Status: Public domain
-*/
-struct tm *__cdecl localtime(const time_t *t) {
-  static struct tm y;
-  FILETIME uTm, lTm;
-  SYSTEMTIME pTm;
-  ph7_int64 t64;
-  t64 = *t;
-  t64 = (t64 + 11644473600) * 10000000;
-  uTm.dwLowDateTime = (DWORD)(t64 & 0xFFFFFFFF);
-  uTm.dwHighDateTime = (DWORD)(t64 >> 32);
-  FileTimeToLocalFileTime(&uTm, &lTm);
-  FileTimeToSystemTime(&lTm, &pTm);
-  y.tm_year = pTm.wYear - 1900;
-  y.tm_mon = pTm.wMonth - 1;
-  y.tm_wday = pTm.wDayOfWeek;
-  y.tm_mday = pTm.wDay;
-  y.tm_hour = pTm.wHour;
-  y.tm_min = pTm.wMinute;
-  y.tm_sec = pTm.wSecond;
-  return &y;
-}
-#endif /*_WIN32_WCE */
-#elif defined(__UNIXES__)
 #include <sys/time.h>
-#endif /* __WINNT__*/
-       /*
+
+ /*
   * int64 time(void)
   *  Current Unix timestamp
   * Parameters
@@ -7218,28 +7181,15 @@ static int PH7_builtin_getdate(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   ph7_value *pValue, *pArray;
   Sytm sTm;
   if (nArg < 1) {
-#ifdef __WINNT__
-    SYSTEMTIME sOS;
-    GetSystemTime(&sOS);
-    SYSTEMTIME_TO_SYTM(&sOS, &sTm);
-#else
     struct tm *pTm;
     time_t t;
     time(&t);
     pTm = localtime(&t);
     STRUCT_TM_TO_SYTM(pTm, &sTm);
-#endif
   } else {
     /* Use the given timestamp */
     time_t t;
     struct tm *pTm;
-#ifdef __WINNT__
-#ifdef _MSC_VER
-#if _MSC_VER >= 1400            /* Visual Studio 2005 and up */
-#pragma warning(disable : 4996) /* _CRT_SECURE...*/
-#endif
-#endif
-#endif
     if (ph7_value_is_int(apArg[0])) {
       t = (time_t)ph7_value_to_int64(apArg[0]);
       pTm = localtime(&t);
@@ -7548,13 +7498,6 @@ static sxi32 DateFormat(ph7_context *pCtx, const char *zIn, int nLen, Sytm *pTm)
         break;
       case 'I':
         /* Whether or not the date is in daylight saving time */
-#ifdef __WINNT__
-#ifdef _MSC_VER
-#ifndef _WIN32_WCE
-        _get_daylight(&pTm->tm_isdst);
-#endif
-#endif
-#endif
         ph7_result_string_format(pCtx, "%d", pTm->tm_isdst == 1);
         break;
       case 'r':
@@ -7879,17 +7822,11 @@ static int PH7_builtin_date(ph7_context *pCtx, int nArg, ph7_value **apArg) {
     ph7_result_string(pCtx, "", 0);
   }
   if (nArg < 2) {
-#ifdef __WINNT__
-    SYSTEMTIME sOS;
-    GetSystemTime(&sOS);
-    SYSTEMTIME_TO_SYTM(&sOS, &sTm);
-#else
     struct tm *pTm;
     time_t t;
     time(&t);
     pTm = localtime(&t);
     STRUCT_TM_TO_SYTM(pTm, &sTm);
-#endif
   } else {
     /* Use the given timestamp */
     time_t t;
@@ -7939,17 +7876,11 @@ static int PH7_builtin_strftime(ph7_context *pCtx, int nArg, ph7_value **apArg) 
     ph7_result_bool(pCtx, 0);
   }
   if (nArg < 2) {
-#ifdef __WINNT__
-    SYSTEMTIME sOS;
-    GetSystemTime(&sOS);
-    SYSTEMTIME_TO_SYTM(&sOS, &sTm);
-#else
     struct tm *pTm;
     time_t t;
     time(&t);
     pTm = localtime(&t);
     STRUCT_TM_TO_SYTM(pTm, &sTm);
-#endif
   } else {
     /* Use the given timestamp */
     time_t t;
@@ -8003,17 +7934,11 @@ static int PH7_builtin_gmdate(ph7_context *pCtx, int nArg, ph7_value **apArg) {
     ph7_result_string(pCtx, "", 0);
   }
   if (nArg < 2) {
-#ifdef __WINNT__
-    SYSTEMTIME sOS;
-    GetSystemTime(&sOS);
-    SYSTEMTIME_TO_SYTM(&sOS, &sTm);
-#else
     struct tm *pTm;
     time_t t;
     time(&t);
     pTm = gmtime(&t);
     STRUCT_TM_TO_SYTM(pTm, &sTm);
-#endif
   } else {
     /* Use the given timestamp */
     time_t t;
@@ -8063,17 +7988,11 @@ static int PH7_builtin_localtime(ph7_context *pCtx, int nArg, ph7_value **apArg)
   int isAssoc = 0;
   Sytm sTm;
   if (nArg < 1) {
-#ifdef __WINNT__
-    SYSTEMTIME sOS;
-    GetSystemTime(&sOS); /* TODO(chems): GMT not local */
-    SYSTEMTIME_TO_SYTM(&sOS, &sTm);
-#else
     struct tm *pTm;
     time_t t;
     time(&t);
     pTm = localtime(&t);
     STRUCT_TM_TO_SYTM(pTm, &sTm);
-#endif
   } else {
     /* Use the given timestamp */
     time_t t;
@@ -8165,13 +8084,6 @@ static int PH7_builtin_localtime(ph7_context *pCtx, int nArg, ph7_value **apArg)
     ph7_array_add_elem(pArray, 0 /* Automatic index */, pValue);
   }
   /* isdst */
-#ifdef __WINNT__
-#ifdef _MSC_VER
-#ifndef _WIN32_WCE
-  _get_daylight(&sTm.tm_isdst);
-#endif
-#endif
-#endif
   ph7_value_int(pValue, sTm.tm_isdst);
   if (isAssoc) {
     ph7_array_add_strkey_elem(pArray, "tm_isdst", pValue);
@@ -8231,17 +8143,11 @@ static int PH7_builtin_idate(ph7_context *pCtx, int nArg, ph7_value **apArg) {
     ph7_result_int(pCtx, -1);
   }
   if (nArg < 2) {
-#ifdef __WINNT__
-    SYSTEMTIME sOS;
-    GetSystemTime(&sOS);
-    SYSTEMTIME_TO_SYTM(&sOS, &sTm);
-#else
     struct tm *pTm;
     time_t t;
     time(&t);
     pTm = localtime(&t);
     STRUCT_TM_TO_SYTM(pTm, &sTm);
-#endif
   } else {
     /* Use the given timestamp */
     time_t t;
@@ -8278,13 +8184,6 @@ static int PH7_builtin_idate(ph7_context *pCtx, int nArg, ph7_value **apArg) {
       break;
     case 'I':
       /*  returns 1 if DST is activated, 0 otherwise */
-#ifdef __WINNT__
-#ifdef _MSC_VER
-#ifndef _WIN32_WCE
-      _get_daylight(&sTm.tm_isdst);
-#endif
-#endif
-#endif
       iVal = sTm.tm_isdst;
       break;
     case 'L':

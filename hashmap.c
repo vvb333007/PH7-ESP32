@@ -5585,11 +5585,7 @@ PH7_PRIVATE sxi32 PH7_HashmapDump(SyBlob *pOut, ph7_hashmap *pMap, int ShowType,
   }
   /* Total entries */
   SyBlobFormat(&(*pOut), "%u) {", pMap->nEntry);
-#ifdef __WINNT__
-  SyBlobAppend(&(*pOut), "\r\n", sizeof("\r\n") - 1);
-#else
   SyBlobAppend(&(*pOut), "\n", sizeof(char));
-#endif
   for (;;) {
     if (n >= pMap->nEntry) {
       break;
@@ -5604,11 +5600,7 @@ PH7_PRIVATE sxi32 PH7_HashmapDump(SyBlob *pOut, ph7_hashmap *pMap, int ShowType,
       SyBlobFormat(&(*pOut), "[%.*s] =>",
                    SyBlobLength(&pEntry->xKey.sKey), SyBlobData(&pEntry->xKey.sKey));
     }
-#ifdef __WINNT__
-    SyBlobAppend(&(*pOut), "\r\n", sizeof("\r\n") - 1);
-#else
     SyBlobAppend(&(*pOut), "\n", sizeof(char));
-#endif
     /* Dump node value */
     pObj = HashmapExtractNodeValue(pEntry);
     isRef = 0;

@@ -16,3 +16,6 @@ PH7 Porting Plan
    PH7 and how they should be implemented on FreeRTOS.
 
 6. Remove all WIN32-specific code completely.
+
+7. chdir(): find all references to *chdir*(). Add an extra arguement to gain access
+   to ph7_vm instance where cwd is stored

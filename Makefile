@@ -10,7 +10,7 @@ OBJDIR  := .
 
 # Flags
 CFLAGS  := -Wall -Wno-char-subscripts -Os -Itarfs/
-CFLAGS  += -DTEST_BUILD=1 -DPH7_UNIX_STATIC_BUILD=1
+CFLAGS  += -DTEST_BUILD=1 -DPH7_UNIX_STATIC_BUILD=1 -D__UNIXES__=1
 CFLAGS += -MMD -MP 
 
 # Common sources

@@ -948,6 +948,14 @@ int ph7_vm_release(ph7_vm *pVm) {
     return PH7_ABORT; /* Another thread have released this instance */
   }
 #endif
+
+  /* Delete CWD */
+  if (pVm->pCwd != NULL) {
+
+    free((void *)pVm->pCwd);
+    pVm->pCwd = NULL;
+  }
+
   pEngine = pVm->pEngine;
   rc = PH7_VmRelease(&(*pVm));
 #if defined(PH7_ENABLE_THREADS)

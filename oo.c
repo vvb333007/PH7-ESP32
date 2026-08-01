@@ -881,11 +881,7 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceDump(SyBlob *pOut, ph7_class_instance *pThis,
   }
   /* Append class name */
   SyBlobFormat(&(*pOut), "%z) {", &pThis->pClass->sName);
-#ifdef __WINNT__
-  SyBlobAppend(&(*pOut), "\r\n", sizeof("\r\n") - 1);
-#else
   SyBlobAppend(&(*pOut), "\n", sizeof(char));
-#endif
   /* Dump object attributes */
   SyHashResetLoopCursor(&pThis->hAttr);
   while ((pEntry = SyHashGetNextEntry(&pThis->hAttr)) != 0) {
@@ -898,11 +894,7 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceDump(SyBlob *pOut, ph7_class_instance *pThis,
       pValue = ExtractClassAttrValue(pThis->pVm, pVmAttr);
       if (pValue) {
         SyBlobFormat(&(*pOut), "['%z'] =>", &pVmAttr->pAttr->sName);
-#ifdef __WINNT__
-        SyBlobAppend(&(*pOut), "\r\n", sizeof("\r\n") - 1);
-#else
         SyBlobAppend(&(*pOut), "\n", sizeof(char));
-#endif
         rc = PH7_MemObjDump(&(*pOut), pValue, ShowType, nTab + 1, nDepth, 0);
         if (rc == SXERR_LIMIT) {
           break;

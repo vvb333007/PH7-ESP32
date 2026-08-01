@@ -28,6 +28,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <stdint.h>
+
+
 /* TARFS is the only FS on ESP32 which supports mmap(), so TARFS is used for scripts.
  * TARFS is READ-ONLY, so for generic file IO there must be SECOND FS mounted (e.g. LittleFS)  
  */
@@ -42,26 +45,37 @@
 
 
 
+
 /* int (*xchdir)(const char *) */
-static int UnixVfs_chdir(const char *zPath) {
-  int rc;
-  rc = chdir(zPath);
-  return rc == 0 ? PH7_OK : -1;
+static int UnixVfs_chdir(ph7_context *pCtx, const char *zPath) {
+
+  if (pCtx && pCtx->pVm) {
+
+    if (pCtx->pVm->pCwd != NULL)
+      free((void *)pCtx->pVm->pCwd); // TODO: use memory backend
+
+    pCtx->pVm->pCwd = strdup(zPath); // TODO: use memory backend
+
+    return pCtx->pVm->pCwd == NULL ? -1 : PH7_OK;
+  }
+  return -1;
 }
 
 
 
 /* int (*xGetcwd)(ph7_context *) */
 static int UnixVfs_getcwd(ph7_context *pCtx) {
-  char zBuf[4096];
-  char *zDir;
-  /* Get the current directory */
-  zDir = getcwd(zBuf, sizeof(zBuf));
-  if (zDir == 0) {
-    return -1;
+
+  if (pCtx && pCtx->pVm) {
+
+    const char *zDir = pCtx->pVm->pCwd ? pCtx->pVm->pCwd : "/";
+
+    ph7_result_string(pCtx, zDir, -1 /*Compute length automatically*/);
+
+    return PH7_OK;
   }
-  ph7_result_string(pCtx, zDir, -1 /*Compute length automatically*/);
-  return PH7_OK;
+
+  return -1;
 }
 
 
@@ -115,7 +129,25 @@ static int UnixVfs_Realpath(const char *zPath, ph7_context *pCtx) {
 }
 /* int (*xSleep)(unsigned int) */
 static int UnixVfs_Sleep(unsigned int uSec) {
+#if ESP32
+
+  /* milliseconds are done by FreeRTOS */
+  if (usec >= 1000) {
+
+    TickType_t ticks = pdMS_TO_TICKS(usec / 1000);
+
+    if (ticks > 0)
+      vTaskDelay(ticks);
+
+    usec %= 1000;
+  }
+
+  /* The rest, if any , done by ROM as busy-wait */
+  if (usec > 0)
+    esp_rom_delay_us(usec);
+#else
   usleep(uSec);
+#endif
   return PH7_OK;
 }
 /* int (*xUnlink)(const char *) */
@@ -125,6 +157,7 @@ static int UnixVfs_unlink(const char *zPath) {
   return rc == 0 ? PH7_OK : -1;
 }
 /* int (*xFileExists)(const char *) */
+// TODO: refactor to use stat() call
 static int UnixVfs_FileExists(const char *zPath) {
   int rc;
   rc = access(zPath, F_OK);
@@ -140,6 +173,7 @@ static ph7_int64 UnixVfs_FileSize(const char *zPath) {
   }
   return (ph7_int64)st.st_size;
 }
+
 /* int (*xTouch)(const char *,ph7_int64,ph7_int64) */
 static int UnixVfs_Touch(const char *zPath, ph7_int64 touch_time, ph7_int64 access_time) {
   struct utimbuf ut;
@@ -233,6 +267,7 @@ static int UnixVfs_lStat(const char *zPath, ph7_value *pArray, ph7_value *pWorke
   struct stat st;
   int rc;
 #ifdef ESP32
+  // TODO: use tarfs' lstat()
   rc = stat(zPath, &st);
 #else
   rc = lstat(zPath, &st);

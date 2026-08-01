@@ -1813,6 +1813,9 @@ PH7_PRIVATE sxi32 SyStrToInt64(const char *zSrc, sxu32 nLen, void *pOutVal, cons
   }
   return (zSrc >= zEnd) ? SXRET_OK : SXERR_SYNTAX;
 }
+
+
+// TODO: refactor
 PH7_PRIVATE sxi32 SyHexToint(sxi32 c) {
   switch (c) {
     case '0': return 0;
@@ -4855,15 +4858,20 @@ PH7_PRIVATE sxi32 SyArchiveGetNextEntry(SyArchive *pArch, SyArchiveEntry **ppEnt
 #include <time.h>
 #include <sys/time.h>
 #endif
-static sxi32 SyOSUtilRandomSeed(void *pBuf, sxu32 nLen, void *pUnused) {
 
-  //char *zBuf = (char *)pBuf;
+
+static sxi32 SyOSUtilRandomSeed(void *pBuf, sxu32 nLen, void *pUnused) {
 
   SXUNUSED(pUnused);
 
-  //SyMemcpy(zGarbage, zBuf, SXMIN(nLen, sizeof(zGarbage)));
-  // TODO: generate random bytes and copy it to the buffer
-
+  /* TODO: check error code and provide a fallback */
+#if ESP32
+  esp_fill_random(pBuf, nLen);
+#else
+  unsigned char *p = pBuf;
+  for (int i = 0; i < nLen; i++)
+    *p++ = rand();
+#endif
   return SXRET_OK;
 }
 PH7_PRIVATE sxi32 SyRandomnessInit(SyPRNGCtx *pCtx, ProcRandomSeed xSeed, void *pUserData) {

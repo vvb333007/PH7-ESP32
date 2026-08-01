@@ -87,7 +87,8 @@ static int PH7_vfs_chdir(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   /* Point to the desired directory */
   zPath = ph7_value_to_string(apArg[0], 0);
   /* Perform the requested operation */
-  rc = pVfs->xChdir(zPath);
+
+  rc = pVfs->xChdir(pCtx, zPath);
   /* IO return value */
   ph7_result_bool(pCtx, rc == PH7_OK);
   return PH7_OK;
@@ -5417,7 +5418,7 @@ static int PH7_builtin_zip_entry_compressionmethod(ph7_context *pCtx, int nArg, 
 static const ph7_vfs null_vfs = {
   "null_vfs",
   PH7_VFS_VERSION,
-  0, /* int (*xChdir)(const char *) */
+  0, /* int (*xChdir)(ph7_context *, const char *) */
   0, /* int (*xChroot)(const char *); */
   0, /* int (*xGetcwd)(ph7_context *) */
   0, /* int (*xMkdir)(const char *,int,int) */
@@ -5529,17 +5530,6 @@ static ph7_stream_data *PHPStreamDataInit(ph7_vm *pVm, int iType) {
     /* Point to the default VM consumer routine. */
     pData->x.sConsumer = pVm->sVmConsumer;
   } else {
-#ifdef __WINNT__
-    DWORD nChannel;
-    switch (iType) {
-      case PH7_IO_STREAM_STDOUT: nChannel = STD_OUTPUT_HANDLE; break;
-      case PH7_IO_STREAM_STDERR: nChannel = STD_ERROR_HANDLE; break;
-      default:
-        nChannel = STD_INPUT_HANDLE;
-        break;
-    }
-    pData->x.pHandle = GetStdHandle(nChannel);
-#else
     /* Assume an UNIX system */
     int ifd = STDIN_FILENO;
     switch (iType) {
@@ -5549,7 +5539,6 @@ static ph7_stream_data *PHPStreamDataInit(ph7_vm *pVm, int iType) {
         break;
     }
     pData->x.pHandle = SX_INT_TO_PTR(ifd);
-#endif
   }
   pData->pVm = pVm;
   return pData;
@@ -5601,18 +5590,7 @@ static ph7_int64 PHPStreamData_Read(void *pHandle, void *pBuffer, ph7_int64 nDat
     /* Forbidden */
     return -1;
   }
-#ifdef __WINNT__
-  {
-    DWORD nRd;
-    BOOL rc;
-    rc = ReadFile(pData->x.pHandle, pBuffer, (DWORD)nDatatoRead, &nRd, 0);
-    if (!rc) {
-      /* IO error */
-      return -1;
-    }
-    return (ph7_int64)nRd;
-  }
-#elif defined(__UNIXES__)
+#if defined(__UNIXES__)
   {
     ssize_t nRd;
     int fd;
@@ -5646,18 +5624,7 @@ static ph7_int64 PHPStreamData_Write(void *pHandle, const void *pBuf, ph7_int64 
     }
     return nWrite;
   }
-#ifdef __WINNT__
-  {
-    DWORD nWr;
-    BOOL rc;
-    rc = WriteFile(pData->x.pHandle, pBuf, (DWORD)nWrite, &nWr, 0);
-    if (!rc) {
-      /* IO error */
-      return -1;
-    }
-    return (ph7_int64)nWr;
-  }
-#elif defined(__UNIXES__)
+#if defined(__UNIXES__)
   {
     ssize_t nWr;
     int fd;
@@ -5844,9 +5811,7 @@ PH7_PRIVATE sxi32 PH7_RegisterIORoutine(ph7_vm *pVm) {
   }
 #ifndef PH7_DISABLE_DISK_IO
   /* Register the file stream if available */
-#ifdef __WINNT__
-  pFileStream = &sWinFileStream;
-#elif defined(__UNIXES__)
+#if defined(__UNIXES__)
   pFileStream = &sUnixFileStream;
 #endif
   /* Install the php:// stream */

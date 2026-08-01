@@ -1263,11 +1263,7 @@ PH7_PRIVATE sxi32 PH7_MemObjDump(
       }
     }
   }
-#ifdef __WINNT__
-  SyBlobAppend(&(*pOut), "\r\n", sizeof("\r\n") - 1);
-#else
   SyBlobAppend(&(*pOut), "\n", sizeof(char));
-#endif
   return rc;
 }
 

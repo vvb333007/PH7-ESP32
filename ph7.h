@@ -58,13 +58,21 @@
 
 
 #include <stdarg.h> /* needed for the definition of va_list */
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef ESP32
-#  include "FreeRTOS.h"
-#  include "task.h"
+
+#  include "freertos/FreeRTOS.h"
+#  include "freertos/task.h"
+#  include "freertos/semphr.h"
+#  include "esp_err.h"
+#  include "esp_heap_caps.h"
+#  include "esp_rom_sys.h"
 
 #  define xstr(s) ystr(s)
 #  define ystr(s) #s
+
 #endif
 
 
@@ -189,31 +197,15 @@ extern "C" {
 /* Symisc public definitions */
 #if !defined(SYMISC_STANDARD_DEFS)
 #define SYMISC_STANDARD_DEFS
-#if defined(_WIN32) || defined(WIN32) || defined(__MINGW32__) || defined(_MSC_VER) || defined(_WIN32_WCE)
-/* Windows Systems */
-#if !defined(__WINNT__)
-#define __WINNT__
-#endif
-#else
-/*
- * By default we will assume that we are compiling on a UNIX systems.
- * Otherwise the OS_OTHER directive must be defined.
- */
-#if !defined(OS_OTHER)
+
+
 #if !defined(__UNIXES__)
 #define __UNIXES__
 #endif /* __UNIXES__ */
-#else
-#endif /* OS_OTHER */
-#endif /* __WINNT__/__UNIXES__ */
 
-#if defined(_MSC_VER) || defined(__BORLANDC__)
-  typedef signed __int64 sxi64;   /* 64 bits(8 bytes) signed int64 */
-  typedef unsigned __int64 sxu64; /* 64 bits(8 bytes) unsigned int64 */
-#else
   typedef signed long long int sxi64;   /* 64 bits(8 bytes) signed int64 */
   typedef unsigned long long int sxu64; /* 64 bits(8 bytes) unsigned int64 */
-#endif /* _MSC_VER */
+
   /* Signature of the consumer routine */
   typedef int (*ProcConsumer)(const void *, unsigned int, void *);
   /* Forward reference */
@@ -225,14 +217,8 @@ extern "C" {
   typedef struct Sytm Sytm;
   /* Scatter and gather array. */
   struct syiovec {
-#if defined(__WINNT__)
-    /* Same fields type and offset as WSABUF structure defined one winsock2 header */
-    unsigned long nLen;
-    char *pBase;
-#else
     void *pBase;
     unsigned long nLen;
-#endif
   };
   struct SyString {
     const char *zString; /* Raw string (may not be null terminated) */
@@ -508,7 +494,8 @@ typedef double ph7_real;
     const char *zName; /* Underlying VFS name [i.e: FreeBSD/Linux/Windows...] */
     int iVersion;      /* Current VFS structure version [default 2] */
     /* Directory functions */
-    int (*xChdir)(const char *);                   /* Change directory */
+    // ESP32: 
+    int (*xChdir)(ph7_context *, const char *);                   /* Change directory */
     int (*xChroot)(const char *);                  /* Change the root directory */
     int (*xGetcwd)(ph7_context *);                 /* Get the current working directory */
     int (*xMkdir)(const char *, int, int);         /* Make directory */

@@ -31,21 +31,17 @@ static void PH7_VER_Const(ph7_value *pVal, void *pUnused) {
   SXUNUSED(pUnused);
   ph7_value_string(pVal, ph7_lib_signature(), -1 /*Compute length automatically*/);
 }
-#ifdef __WINNT__
-#include <Windows.h>
-#elif defined(__UNIXES__)
 #if (__has_include(<sys/utsname.h>))
 #include <sys/utsname.h>
-#endif
 #endif
 /*
  * PHP_OS
  *  Expand the name of the host Operating System.
  */
 static void PH7_OS_Const(ph7_value *pVal, void *pUnused) {
-#if defined(__WINNT__)
+
   ph7_value_string(pVal, "WINNT", (int)sizeof("WINNT") - 1);
-#elif defined(__UNIXES__)
+#if defined(__UNIXES__)
   struct utsname sInfo;
   if (uname(&sInfo) != 0) {
     ph7_value_string(pVal, "Unix", (int)sizeof("Unix") - 1);
@@ -63,11 +59,7 @@ static void PH7_OS_Const(ph7_value *pVal, void *pUnused) {
  */
 static void PH7_EOL_Const(ph7_value *pVal, void *pUnused) {
   SXUNUSED(pUnused);
-#ifdef __WINNT__
-  ph7_value_string(pVal, "\r\n", (int)sizeof("\r\n") - 1);
-#else
   ph7_value_string(pVal, "\n", (int)sizeof(char));
-#endif
 }
 /*
  * PHP_INT_MAX
@@ -92,11 +84,7 @@ static void PH7_INTSIZE_Const(ph7_value *pVal, void *pUnused) {
  */
 static void PH7_DIRSEP_Const(ph7_value *pVal, void *pUnused) {
   SXUNUSED(pUnused);
-#ifdef __WINNT__
-  ph7_value_string(pVal, "\\", (int)sizeof(char));
-#else
   ph7_value_string(pVal, "/", (int)sizeof(char));
-#endif
 }
 /*
  * PATH_SEPARATOR.
@@ -104,32 +92,20 @@ static void PH7_DIRSEP_Const(ph7_value *pVal, void *pUnused) {
  */
 static void PH7_PATHSEP_Const(ph7_value *pVal, void *pUnused) {
   SXUNUSED(pUnused);
-#ifdef __WINNT__
-  ph7_value_string(pVal, ";", (int)sizeof(char));
-#else
   ph7_value_string(pVal, ":", (int)sizeof(char));
-#endif
 }
-#ifndef __WINNT__
 #include <time.h>
-#endif
 /*
  * __TIME__
  *  Expand the current time (GMT).
  */
 static void PH7_TIME_Const(ph7_value *pVal, void *pUnused) {
   Sytm sTm;
-#ifdef __WINNT__
-  SYSTEMTIME sOS;
-  GetSystemTime(&sOS);
-  SYSTEMTIME_TO_SYTM(&sOS, &sTm);
-#else
   struct tm *pTm;
   time_t t;
   time(&t);
   pTm = gmtime(&t);
   STRUCT_TM_TO_SYTM(pTm, &sTm);
-#endif
   SXUNUSED(pUnused); /* cc warning */
   /* Expand */
   ph7_value_string_format(pVal, "%02d:%02d:%02d", sTm.tm_hour, sTm.tm_min, sTm.tm_sec);
@@ -140,17 +116,11 @@ static void PH7_TIME_Const(ph7_value *pVal, void *pUnused) {
  */
 static void PH7_DATE_Const(ph7_value *pVal, void *pUnused) {
   Sytm sTm;
-#ifdef __WINNT__
-  SYSTEMTIME sOS;
-  GetSystemTime(&sOS);
-  SYSTEMTIME_TO_SYTM(&sOS, &sTm);
-#else
   struct tm *pTm;
   time_t t;
   time(&t);
   pTm = gmtime(&t);
   STRUCT_TM_TO_SYTM(pTm, &sTm);
-#endif
   SXUNUSED(pUnused); /* cc warning */
   /* Expand */
   ph7_value_string_format(pVal, "%04d-%02d-%02d", sTm.tm_year, sTm.tm_mon + 1, sTm.tm_mday);
@@ -200,11 +170,7 @@ static void PH7_DIR_Const(ph7_value *pVal, void *pUserData) {
  *  Expand shared library suffix.
  */
 static void PH7_PHP_SHLIB_SUFFIX_Const(ph7_value *pVal, void *pUserData) {
-#ifdef __WINNT__
-  ph7_value_string(pVal, "dll", (int)sizeof("dll") - 1);
-#else
   ph7_value_string(pVal, "so", (int)sizeof("so") - 1);
-#endif
   SXUNUSED(pUserData); /* cc warning */
 }
 /*

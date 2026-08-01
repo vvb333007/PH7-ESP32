@@ -53,16 +53,7 @@ typedef struct ph7_class ph7_class;
 /* Symisc Standard types */
 #if !defined(SYMISC_STD_TYPES)
 #define SYMISC_STD_TYPES
-#ifdef __WINNT__
-/* Disable nuisance warnings on Borland compilers */
-#if defined(__BORLANDC__)
-#pragma warn - rch /* unreachable code */
-#pragma warn - ccc /* Condition is always true or false */
-#pragma warn - aus /* Assigned value is never used */
-#pragma warn - csu /* Comparing signed and unsigned */
-#pragma warn - spa /* Suspicious pointer arithmetic */
-#endif
-#endif
+
 typedef signed char sxi8;         /* signed char */
 typedef unsigned char sxu8;       /* unsigned char */
 typedef signed short int sxi16;   /* 16 bits(2 bytes) signed integer */
@@ -1324,16 +1315,21 @@ struct ph7_switch {
  * for more information on how to register an error_log consumer().
  */
 typedef void (*ProcErrLog)(const char *, int, const char *, const char *);
+
 /* 
  * An instance of the following structure hold the bytecode instructions
  * resulting from compiling a PHP script.
  * This structure contains the complete state of the virtual machine.
+ *
+ * Current working directory is a pointer which initially is set to NULL. During VM execution, the bytecode
+ * can change its CWD via chdir(); Once VM is finished, its cwd must be freed (via memory backend)
  */
 struct ph7_vm {
   SyMemBackend sAllocator; /* Memory backend */
 #if defined(PH7_ENABLE_THREADS)
   SyMutex *pMutex; /* Recursive mutex associated with VM. */
 #endif
+  const char *pCwd;                /* ESP32: Current working directory; Set by chdir(), read by getcwd() */
   ph7 *pEngine;                    /* Interpreter that own this VM */
   SySet aByteCode;                 /* Default bytecode container */
   SySet *pByteContainer;           /* Current bytecode container */

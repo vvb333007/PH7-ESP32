@@ -1259,7 +1259,7 @@ PH7_PRIVATE sxi32 PH7_VmInit(
   PH7_MemObjInit(&(*pVm), &pVm->aErrCB[1]);
   PH7_MemObjInit(&(*pVm), &pVm->sAssertCallback);
   /* Set a default recursion limit */
-#if defined(__WINNT__) || defined(__UNIXES__)
+#if defined(__UNIXES__)
   pVm->nMaxDepth = 32;
 #else
   pVm->nMaxDepth = 16;
@@ -1820,9 +1820,6 @@ PH7_PRIVATE sxi32 PH7_VmConfigure(
 #endif
         SyStringInitFromBuf(&sPath, zPath, SyStrlen(zPath));
         /* Remove trailing slashes and backslashes */
-#ifdef __WINNT__
-        SyStringTrimTrailingChar(&sPath, '\\');
-#endif
         SyStringTrimTrailingChar(&sPath, '/');
         /* Remove leading and trailing white spaces */
         SyStringFullTrim(&sPath);
@@ -2140,11 +2137,7 @@ static sxi32 VmCallErrorHandler(ph7_vm *pVm, SyBlob *pMsg) {
   ph7_output_consumer *pCons = &pVm->sVmConsumer;
   sxi32 rc = SXRET_OK;
   /* Append a new line */
-#ifdef __WINNT__
-  SyBlobAppend(pMsg, "\r\n", sizeof("\r\n") - 1);
-#else
   SyBlobAppend(pMsg, "\n", sizeof(char));
-#endif
   /* Invoke the output consumer callback */
   rc = pCons->xConsumer(SyBlobData(pMsg), SyBlobLength(pMsg), pCons->pUserData);
   if (pCons->xConsumer != VmObConsumer) {
@@ -9719,13 +9712,7 @@ static int vm_builtin_ph7_credits(ph7_context *pCtx, int nArg, ph7_value **apArg
     pVm->pEngine->pVfs ? pVm->pEngine->pVfs->zName : "null_vfs",
     SyHashTotalEntry(&pVm->hFunction) + SyHashTotalEntry(&pVm->hHostFunction), /* # built-in functions */
     SyHashTotalEntry(&pVm->hClass),
-#ifdef __WINNT__
-    "Windows NT"
-#elif defined(__UNIXES__)
     "UNIX-Like"
-#else
-    "Other OS"
-#endif
   );
   ph7_context_output(pCtx, PH7_HTML_PAGE_FOOTER, (int)sizeof(PH7_HTML_PAGE_FOOTER) - 1);
   SXUNUSED(nArg); /* cc warning */
@@ -10439,9 +10426,6 @@ static int VmIsIncludedFile(ph7_vm *pVm, SyString *pFile) {
 PH7_PRIVATE sxi32 PH7_VmPushFilePath(ph7_vm *pVm, const char *zPath, int nLen, sxu8 bMain, sxi32 *pNew) {
   SyString sPath;
   char *zDup;
-#ifdef __WINNT__
-  char *zCur;
-#endif
   sxi32 rc;
   if (nLen < 0) {
     nLen = SyStrlen(zPath);
@@ -10451,24 +10435,6 @@ PH7_PRIVATE sxi32 PH7_VmPushFilePath(ph7_vm *pVm, const char *zPath, int nLen, s
   if (zDup == 0) {
     return SXERR_MEM;
   }
-#ifdef __WINNT__
-  /* Normalize path on windows
-   * Example:
-   *    Path/To/File.php
-   * becomes
-   *   path\to\file.php
-   */
-  zCur = zDup;
-  while (zCur[0] != 0) {
-    if (zCur[0] == '/') {
-      zCur[0] = '\\';
-    } else if ((unsigned char)zCur[0] < 0xc0 && SyisUpper(zCur[0])) {
-      int c = SyToLower(zCur[0]);
-      zCur[0] = (char)c; /* MSVC stupidity */
-    }
-    zCur++;
-  }
-#endif
   /* Install the file path */
   SyStringInitFromBuf(&sPath, zDup, nLen);
   if (!bMain) {
@@ -10567,12 +10533,8 @@ static int vm_builtin_get_include_path(ph7_context *pCtx, int nArg, ph7_value **
   SyString *aEntry;
   int dir_sep;
   sxu32 n;
-#ifdef __WINNT__
-  dir_sep = ';';
-#else
   /* Assume UNIX path separator */
   dir_sep = ':';
-#endif
   SXUNUSED(nArg); /* cc warning */
   SXUNUSED(apArg);
   /* Point to the list of import paths */
@@ -10612,9 +10574,6 @@ static int vm_builtin_get_included_files(ph7_context *pCtx, int nArg, ph7_value 
     return PH7_OK;
   }
   c = d = '/';
-#ifdef __WINNT__
-  d = '\\';
-#endif
   /* Iterate throw entries */
   SySetResetCursor(pFiles);
   while (SXRET_OK == SySetGetNextEntry(pFiles, (void **)&pEntry)) {
