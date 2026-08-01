@@ -40,7 +40,6 @@ static char s_NaN[] = { 'N','a','N', 0 };
 #if defined(PH7_ENABLE_THREADS)
 /* SyRunTimeApi: sxmutex.c */
 
-
 #include <pthread.h>
 
 struct SyMutex {
@@ -110,41 +109,6 @@ PH7_PRIVATE const SyMutexMethods *SyMutexExportMethods(void) {
   return &sPthreadMutexMethods;
 }
 
-#if 0
-/* Host application must register their own mutex subsystem if the target
- * platform is not an UNIX-like or windows systems.
- */
-struct SyMutex {
-  sxu32 nType;
-};
-static SyMutex *DummyMutexNew(int nType) {
-  static SyMutex sMutex;
-  SXUNUSED(nType);
-  return &sMutex;
-}
-static void DummyMutexRelease(SyMutex *pMutex) {
-  SXUNUSED(pMutex);
-}
-static void DummyMutexEnter(SyMutex *pMutex) {
-  SXUNUSED(pMutex);
-}
-static void DummyMutexLeave(SyMutex *pMutex) {
-  SXUNUSED(pMutex);
-}
-/* Export the dummy mutex interfaces */
-static const SyMutexMethods sDummyMutexMethods = {
-  0,                 /* xGlobalInit() */
-  0,                 /* xGlobalRelease() */
-  DummyMutexNew,     /* xNew() */
-  DummyMutexRelease, /* xRelease() */
-  DummyMutexEnter,   /* xEnter() */
-  0,                 /* xTryEnter() */
-  DummyMutexLeave    /* xLeave() */
-};
-PH7_PRIVATE const SyMutexMethods *SyMutexExportMethods(void) {
-  return &sDummyMutexMethods;
-}
-#endif
 #endif /* PH7_ENABLE_THREADS */
 
 
@@ -161,6 +125,14 @@ static void *SyOSHeapRealloc(void *pOld, sxu32 nByte) {
 static void SyOSHeapFree(void *pPtr) {
   free(pPtr);
 }
+
+
+
+
+
+
+
+
 /* SyRunTimeApi:sxstr.c */
 PH7_PRIVATE sxu32 SyStrlen(const char *zSrc) {
   register const char *zIn = zSrc;
@@ -399,6 +371,12 @@ static sxu32 Systrcpy(char *zDest, sxu32 nDestLen, const char *zSrc, sxu32 nLen)
   zBuf[0] = 0;
   return (sxu32)(zBuf - (unsigned char *)zDest);
 }
+
+
+
+
+
+
 /* SyRunTimeApi:sxmem.c */
 PH7_PRIVATE void SyZero(void *pSrc, sxu32 nSize) {
   register unsigned char *zSrc = (unsigned char *)pSrc;
@@ -1210,6 +1188,26 @@ PH7_PRIVATE sxi32 SyBlobSearch(const void *pBlob, sxu32 nLen, const void *pPatte
   return SXERR_NOTFOUND;
 }
 #endif /* PH7_DISABLE_BUILTIN_FUNC */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* SyRunTimeApi:sxds.c */
 PH7_PRIVATE sxi32 SySetInit(SySet *pSet, SyMemBackend *pAllocator, sxu32 ElemSize) {
   pSet->nSize = 0;
@@ -1611,6 +1609,23 @@ PH7_PRIVATE SyHashEntry *SyHashLastEntry(SyHash *pHash) {
   /* Last inserted entry */
   return (SyHashEntry *)pHash->pList;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* SyRunTimeApi:sxutils.c */
 PH7_PRIVATE sxi32 SyStrIsNumeric(const char *zSrc, sxu32 nLen, sxu8 *pReal, const char **pzTail) {
   const char *zCur, *zEnd;
@@ -4849,7 +4864,7 @@ PH7_PRIVATE sxi32 SyArchiveGetNextEntry(SyArchive *pArch, SyArchiveEntry **ppEnt
  *  number generator) not as an encryption device.
  */
 #define SXPRNG_MAGIC 0x13C4
-#ifdef __UNIXES__
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -4857,7 +4872,7 @@ PH7_PRIVATE sxi32 SyArchiveGetNextEntry(SyArchive *pArch, SyArchiveEntry **ppEnt
 #include <errno.h>
 #include <time.h>
 #include <sys/time.h>
-#endif
+
 
 
 static sxi32 SyOSUtilRandomSeed(void *pBuf, sxu32 nLen, void *pUnused) {

@@ -198,11 +198,6 @@ extern "C" {
 #if !defined(SYMISC_STANDARD_DEFS)
 #define SYMISC_STANDARD_DEFS
 
-
-#if !defined(__UNIXES__)
-#define __UNIXES__
-#endif /* __UNIXES__ */
-
   typedef signed long long int sxi64;   /* 64 bits(8 bytes) signed int64 */
   typedef unsigned long long int sxu64; /* 64 bits(8 bytes) unsigned int64 */
 

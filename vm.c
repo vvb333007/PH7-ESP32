@@ -1259,11 +1259,9 @@ PH7_PRIVATE sxi32 PH7_VmInit(
   PH7_MemObjInit(&(*pVm), &pVm->aErrCB[1]);
   PH7_MemObjInit(&(*pVm), &pVm->sAssertCallback);
   /* Set a default recursion limit */
-#if defined(__UNIXES__)
+
   pVm->nMaxDepth = 32;
-#else
-  pVm->nMaxDepth = 16;
-#endif
+
   /* Default assertion flags */
   pVm->iAssertFlags = PH7_ASSERT_WARNING; /* Issue a warning for each failed assertion */
   /* JSON return status */

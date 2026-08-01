@@ -41,16 +41,13 @@ static void PH7_VER_Const(ph7_value *pVal, void *pUnused) {
 static void PH7_OS_Const(ph7_value *pVal, void *pUnused) {
 
   ph7_value_string(pVal, "WINNT", (int)sizeof("WINNT") - 1);
-#if defined(__UNIXES__)
+
   struct utsname sInfo;
   if (uname(&sInfo) != 0) {
     ph7_value_string(pVal, "Unix", (int)sizeof("Unix") - 1);
   } else {
     ph7_value_string(pVal, sInfo.sysname, -1);
   }
-#else
-  ph7_value_string(pVal, "Host OS", (int)sizeof("Host OS") - 1);
-#endif
   SXUNUSED(pUnused);
 }
 /*

@@ -7128,17 +7128,12 @@ static int PH7_builtin_time(ph7_context *pCtx, int nArg, ph7_value **apArg) {
 static int PH7_builtin_microtime(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   int bFloat = 0;
   sytime sTime;
-#if defined(__UNIXES__)
+
   struct timeval tv;
   gettimeofday(&tv, 0);
   sTime.tm_sec = (long)tv.tv_sec;
   sTime.tm_usec = (long)tv.tv_usec;
-#else
-  time_t tt;
-  time(&tt);
-  sTime.tm_sec = (long)tt;
-  sTime.tm_usec = (long)(tt % SX_USEC_PER_SEC);
-#endif /* __UNIXES__ */
+
   if (nArg > 0) {
     bFloat = ph7_value_to_bool(apArg[0]);
   }
@@ -7268,17 +7263,12 @@ static int PH7_builtin_getdate(ph7_context *pCtx, int nArg, ph7_value **apArg) {
 static int PH7_builtin_gettimeofday(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   int bFloat = 0;
   sytime sTime;
-#if defined(__UNIXES__)
+
   struct timeval tv;
   gettimeofday(&tv, 0);
   sTime.tm_sec = (long)tv.tv_sec;
   sTime.tm_usec = (long)tv.tv_usec;
-#else
-  time_t tt;
-  time(&tt);
-  sTime.tm_sec = (long)tt;
-  sTime.tm_usec = (long)(tt % SX_USEC_PER_SEC);
-#endif /* __UNIXES__ */
+
   if (nArg > 0) {
     bFloat = ph7_value_to_bool(apArg[0]);
   }

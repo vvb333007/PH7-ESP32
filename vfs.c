@@ -5590,7 +5590,7 @@ static ph7_int64 PHPStreamData_Read(void *pHandle, void *pBuffer, ph7_int64 nDat
     /* Forbidden */
     return -1;
   }
-#if defined(__UNIXES__)
+
   {
     ssize_t nRd;
     int fd;
@@ -5601,9 +5601,9 @@ static ph7_int64 PHPStreamData_Read(void *pHandle, void *pBuffer, ph7_int64 nDat
     }
     return (ph7_int64)nRd;
   }
-#else
-  return -1;
-#endif
+
+
+
 }
 /* ph7_int64 (*xWrite)(void *,const void *,ph7_int64) */
 static ph7_int64 PHPStreamData_Write(void *pHandle, const void *pBuf, ph7_int64 nWrite) {
@@ -5624,7 +5624,7 @@ static ph7_int64 PHPStreamData_Write(void *pHandle, const void *pBuf, ph7_int64 
     }
     return nWrite;
   }
-#if defined(__UNIXES__)
+
   {
     ssize_t nWr;
     int fd;
@@ -5635,9 +5635,9 @@ static ph7_int64 PHPStreamData_Write(void *pHandle, const void *pBuf, ph7_int64 
     }
     return (ph7_int64)nWr;
   }
-#else
-  return -1;
-#endif
+
+
+
 }
 /* void (*xClose)(void *) */
 static void PHPStreamData_Close(void *pHandle) {
@@ -5811,9 +5811,9 @@ PH7_PRIVATE sxi32 PH7_RegisterIORoutine(ph7_vm *pVm) {
   }
 #ifndef PH7_DISABLE_DISK_IO
   /* Register the file stream if available */
-#if defined(__UNIXES__)
+
   pFileStream = &sUnixFileStream;
-#endif
+
   /* Install the php:// stream */
   ph7_vm_config(pVm, PH7_VM_CONFIG_IO_STREAM, &sPHP_Stream);
 #endif /* PH7_DISABLE_DISK_IO */
