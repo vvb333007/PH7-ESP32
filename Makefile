@@ -32,18 +32,21 @@ vm.c
 TEST_SRC := $(COMMON_SRC)
 TEST_OBJ := $(patsubst %.c,$(OBJDIR)/%.o,$(TEST_SRC))
 
+INTER_SRC := $(COMMON_SRC) ph7_interp.c
+INTER_OBJ := $(patsubst %.c,$(OBJDIR)/%.o,$(INTER_SRC))
+
 
 # Object files
 OBJ := $(patsubst %.c,$(OBJDIR)/%.o,$(SRC))
 
 # Target executable
-TARGETS := test
+TARGETS := inter
 
 .PHONY: all
 
 all: $(TARGETS)  clean
 
-test: $(TEST_OBJ)
+inter: $(INTER_OBJ)
 >$(CC) $^ -o $@
 
 

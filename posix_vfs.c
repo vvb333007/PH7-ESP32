@@ -129,8 +129,8 @@ static int UnixVfs_Realpath(const char *zPath, ph7_context *pCtx) {
 }
 /* int (*xSleep)(unsigned int) */
 static int UnixVfs_Sleep(unsigned int uSec) {
-#if ESP32
 
+#if ESP32
   /* milliseconds are done by FreeRTOS */
   if (usec >= 1000) {
 

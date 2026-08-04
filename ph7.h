@@ -69,6 +69,7 @@
 #  include "esp_err.h"
 #  include "esp_heap_caps.h"
 #  include "esp_rom_sys.h"
+#  include "esp_random.h"
 
 #  define xstr(s) ystr(s)
 #  define ystr(s) #s
@@ -491,8 +492,7 @@ typedef double ph7_real;
     const char *zName; /* Underlying VFS name [i.e: FreeBSD/Linux/Windows...] */
     int iVersion;      /* Current VFS structure version [default 2] */
     /* Directory functions */
-    // ESP32: 
-    int (*xChdir)(ph7_context *, const char *);                   /* Change directory */
+    int (*xChdir)(ph7_context *, const char *);    /* Change directory */
     int (*xChroot)(const char *);                  /* Change the root directory */
     int (*xGetcwd)(ph7_context *);                 /* Get the current working directory */
     int (*xMkdir)(const char *, int, int);         /* Make directory */
