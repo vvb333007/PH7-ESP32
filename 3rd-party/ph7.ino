@@ -76,6 +76,8 @@ int engine_test() {
     0 /* NULL: Callback Private data */
     );
 
+  ph7_config(pEngine,PH7_CONFIG_TEMPDIR,"/ffat/tmp" );
+
   /* Now,it's time to compile our PHP file */
   rc = ph7_compile(pEngine, prog, strlen(prog), &pVm);
 

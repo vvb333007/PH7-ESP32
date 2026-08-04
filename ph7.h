@@ -403,6 +403,8 @@ typedef double ph7_real;
 #define PH7_VM_CONFIG_ARGV_ENTRY 19      /* ONE ARGUMENT: const char *zValue */
 #define PH7_VM_CONFIG_EXTRACT_OUTPUT 20  /* TWO ARGUMENTS: const void **ppOut,unsigned int *pOutputLen */
 #define PH7_VM_CONFIG_ERR_LOG_HANDLER 21 /* ONE ARGUMENT: void (*xErrLog)(const char *,int,const char *,const char *) */
+/* ESP32 additions */
+#define PH7_VM_CONFIG_TEMPDIR 22          /* ONE ARGUMENT: const char *zPath */
 /*
  * Global Library Configuration Commands.
  *

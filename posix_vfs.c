@@ -157,7 +157,6 @@ static int UnixVfs_unlink(const char *zPath) {
   return rc == 0 ? PH7_OK : -1;
 }
 /* int (*xFileExists)(const char *) */
-// TODO: refactor to use stat() call
 static int UnixVfs_FileExists(const char *zPath) {
   int rc;
   rc = access(zPath, F_OK);
@@ -267,7 +266,7 @@ static int UnixVfs_lStat(const char *zPath, ph7_value *pArray, ph7_value *pWorke
   struct stat st;
   int rc;
 #ifdef ESP32
-  // TODO: use tarfs' lstat()
+  /* TODO: tarfs has lstat() */ 
   rc = stat(zPath, &st);
 #else
   rc = lstat(zPath, &st);
@@ -474,36 +473,19 @@ static void UnixVfs_Unmap(void *pView, ph7_int64 nSize) {
 
 /* void (*xTempDir)(ph7_context *) */
 static void UnixVfs_TempDir(ph7_context *pCtx) {
-  static const char *azDirs[] = {
-    "/var/tmp",
-    "/usr/tmp",
-    "/usr/local/tmp"
-  };
-  unsigned int i;
-  struct stat buf;
-  const char *zDir;
-  zDir = getenv("TMPDIR");
-  if (zDir && zDir[0] != 0 && !access(zDir, 07)) {
-    ph7_result_string(pCtx, zDir, -1);
-    return;
+
+  if (pCtx && pCtx->pVm) {
+    const char *zPath = pCtx->pVm->pTmp ? pCtx->pVm->pTmp : "/tmp";
+    ph7_result_string(pCtx, zPath, strlen(zPath) - 1);
   }
-  for (i = 0; i < sizeof(azDirs) / sizeof(azDirs[0]); i++) {
-    zDir = azDirs[i];
-    if (zDir == 0) continue;
-    if (stat(zDir, &buf)) continue;
-    if (!S_ISDIR(buf.st_mode)) continue;
-    if (access(zDir, 07)) continue;
-    /* Got one */
-    ph7_result_string(pCtx, zDir, -1);
-    return;
-  }
-  /* Default temp dir */
-  ph7_result_string(pCtx, "/tmp", (int)sizeof("/tmp") - 1);
 }
+
 /* unsigned int (*xProcessId)(void) */
 static unsigned int UnixVfs_ProcessId(void) {
 #if ESP32
-  return 0;
+  TaskHandle_t tid = xTaskGetCurrentTaskHandle();
+  /* tid is a pointer; ESP32 is 32 bit arch where unsigned int is 32bit */
+  return (unsigned int)(uintptr_t)tid;
 #else
   return (unsigned int)getpid();
 #endif
@@ -548,7 +530,7 @@ static void UnixVfs_Username(ph7_context *pCtx) {
   /* Return the username */
   ph7_result_string(pCtx, pwd->pw_name, -1);
 #else
-  ph7_result_string(pCtx, "Unknown", -1);
+  ph7_result_string(pCtx, "root", -1);
 #endif /* PH7_UNIX_STATIC_BUILD */
   return;
 }
@@ -596,8 +578,8 @@ static const ph7_vfs sUnixVfs = {
   UnixVfs_Chmod,        /*int (*xChmod)(const char *,int)*/
   UnixVfs_Chown,        /*int (*xChown)(const char *,const char *)*/
   UnixVfs_Chgrp,        /*int (*xChgrp)(const char *,const char *)*/
-  0,                    /* ph7_int64 (*xFreeSpace)(const char *) */
-  0,                    /* ph7_int64 (*xTotalSpace)(const char *) */
+  0,                    /* TODO: ph7_int64 (*xFreeSpace)(const char *) */
+  0,                    /* TODO: ph7_int64 (*xTotalSpace)(const char *) */
   UnixVfs_FileSize,     /* ph7_int64 (*xFileSize)(const char *) */
   UnixVfs_FileAtime,    /* ph7_int64 (*xFileAtime)(const char *) */
   UnixVfs_FileMtime,    /* ph7_int64 (*xFileMtime)(const char *) */

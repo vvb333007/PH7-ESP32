@@ -1323,13 +1323,15 @@ typedef void (*ProcErrLog)(const char *, int, const char *, const char *);
  *
  * Current working directory is a pointer which initially is set to NULL. During VM execution, the bytecode
  * can change its CWD via chdir(); Once VM is finished, its cwd must be freed (via memory backend)
+ *
  */
 struct ph7_vm {
   SyMemBackend sAllocator; /* Memory backend */
 #if defined(PH7_ENABLE_THREADS)
   SyMutex *pMutex; /* Recursive mutex associated with VM. */
 #endif
-  const char *pCwd;                /* ESP32: Current working directory; Set by chdir(), read by getcwd() */
+  const char *pCwd;                /* ESP32: Current working directory; Set by chdir(), read by getcwd(), free()d by the VM destructor */
+  const char *pTmp;                /* ESP32: System writeable TMP directory (e.g. "/ffat/tmp") */
   ph7 *pEngine;                    /* Interpreter that own this VM */
   SySet aByteCode;                 /* Default bytecode container */
   SySet *pByteContainer;           /* Current bytecode container */

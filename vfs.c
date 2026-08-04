@@ -29,6 +29,8 @@ extern const ph7_io_stream sUnixFileStream;
 /*
  * This file implement a virtual file systems (VFS) for the PH7 engine.
  */
+
+
 /*
  * Given a string containing the path of a file or directory, this function 
  * return the parent directory's path.

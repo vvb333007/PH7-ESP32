@@ -11,7 +11,7 @@
  *   https://github.com/vvb333007/tarfs
  *
  * @file posix.h
- * @brief POSIX extensions API
+ * @brief POSIX extensions API for TARFS (mmap(), sendfile() etc)
  */
 
 #pragma once
@@ -116,6 +116,8 @@ int munmap(void *addr, size_t length);
  */
 DIR *fdopendir(int fd);
 #endif /* CONFIG_TARFS_HAVE_FDOPENDIR */
+
+
 
 #if CONFIG_TARFS_HAVE_DUPFD
 /**

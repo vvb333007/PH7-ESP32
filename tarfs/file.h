@@ -93,6 +93,31 @@ struct tarfs_fp {
 
 
 
+ /**
+  * @brief Check the accessibility of a file or directory in the TarFS filesystem.
+  *
+  * This function checks whether the specified path exists in the mounted TarFS
+  * filesystem and whether the requested access mode is supported.
+  *
+  * TarFS is a read-only filesystem and does not support file execution.
+  * Therefore, requests containing X_OK always fail with EPERM, while requests
+  * containing W_OK always fail with EROFS.
+  *
+  * @note For regular files, F_OK and R_OK are supported. For directories, only F_OK
+  *       is supported, as directories cannot be read using the regular read()
+  *       interface.
+  *
+  * @param[in] ctx   TarFS filesystem context.
+  * @param[in] path  Path to the file or directory to check.
+  * @param[in] amode Access mode to check. May be F_OK, R_OK, W_OK, X_OK,
+  *                  or a combination of these flags.
+  *
+  * @return 0 if the requested access is permitted.
+  * @return -1 if the requested access is not permitted or the path does not
+  *         exist. In case of failure, errno is set accordingly.
+  */
+int tarf_access(void* ctx, const char *path, int amode);
+
 
 /* close()
  * FS has at least 1 extra ref, because of open()

@@ -12,6 +12,7 @@
  *
  * @file inode.h
  * @brief Public inode API
+ *
  */
 
 
@@ -59,7 +60,7 @@
  *                    enumeration and prefix scans.
  */
 
-struct tarfs_inode  {
+typedef struct tarfs_inode  {
 
   uint32_t   in_hash;    /*!< Hash of full path of the entry */
   uintptr_t  in_path;    /*!< Pointer to the full pathname. The pathname is not guaranteed to be NUL-terminated. It may end at '\0', '\r' or '\n', therefore tar_strcmp() must be used. */
@@ -68,7 +69,7 @@ struct tarfs_inode  {
   struct tarfs_inode *in_next;   /*!< Next inode in lexicographical pathname order.
                                       The original inode array is never reordered. Sorting is achieved
                                       solely by relinking inodes through this field. */
-};
+} tarfs_inode_t;
 
 
 
@@ -98,10 +99,17 @@ tart_t inode_getinfo(struct tarfs_inode const * const *index,
                      time_t *mtime);
 
 /* 
- * variant of inode_type() which works with raw pointers to inodes 
+ * variant of inode_getinfo() which works with raw pointers to inodes 
+ * Not MT-Safe. Must be called under addref protocol only
+ */
+tart_t inode_type(struct tarfs_inode const *ino);
+
+/* 
+ * variant of inode_type() which returns raw type (i.e. it can be TART_SYMLINK and TART_HARDLINK)
  * Not MT-Safe. Must be called under addref protocol only
  */
 tart_t inode_rawtype(struct tarfs_inode const *ino);
+
 
 /* Check if inode (raw inode pointer) is one of two link-type inodes
  * Not MT-Safe. Must be called under addref protocol only

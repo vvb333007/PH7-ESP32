@@ -11,10 +11,8 @@
  *   https://github.com/vvb333007/tarfs
  *
  * @file tar.h
- * @brief Public tar file API
+ * @brief Public tar file API 
  */
-
-
 #pragma once 
 
 #include "config.h"
@@ -46,9 +44,6 @@ typedef enum __attribute__((packed)) {
   TART_BAD       = 255,
 
 } tart_t;
-
-_Static_assert(sizeof(tart_t) == 1, "sizeof(tar_type_t) != 1, code review is required");
-
 
 /**
  * For TAR files with modified PADDING field (see tarsum.c TARFS Checksum Utility):
@@ -87,8 +82,6 @@ struct tarhdr {
 } __attribute__((packed));
 
 typedef struct tarhdr tarhdr_t;
-
-_Static_assert(sizeof(tarhdr_t) == 512, "sizeof(tarhdr_t) != 512, code review is required");
 
 #ifdef __cplusplus
 extern "C" {
@@ -303,3 +296,6 @@ int tar_addsum(uint8_t *tar_start, size_t tar_length);
 #ifdef __cplusplus
 };
 #endif
+
+_Static_assert(sizeof(tarhdr_t) == 512, "sizeof(tarhdr_t) != 512, code review is required");
+_Static_assert(sizeof(tart_t) == 1, "sizeof(tar_type_t) != 1, code review is required");

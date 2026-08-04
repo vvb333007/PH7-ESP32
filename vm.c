@@ -1788,6 +1788,20 @@ PH7_PRIVATE sxi32 PH7_VmConfigure(
 ) {
   sxi32 rc = SXRET_OK;
   switch (nOp) {
+    case PH7_VM_CONFIG_TEMPDIR:
+      {
+        const char *zPath = va_arg(ap, const char *);
+        /* VM TMPDIR */
+#ifdef UNTRUST
+        if (zPath == NULL) {
+          rc = SXERR_CORRUPT;
+          break;
+        }
+#endif
+        pVm->pTmp = zPath;
+        break;
+      }
+
     case PH7_VM_CONFIG_OUTPUT:
       {
         ProcConsumer xConsumer = va_arg(ap, ProcConsumer);

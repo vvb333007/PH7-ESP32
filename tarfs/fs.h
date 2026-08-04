@@ -29,13 +29,6 @@
 #define TARFS_MAX_FS  CONFIG_TARFS_MAX_FS
 #define TARFS_MAX_FDS CONFIG_TARFS_MAX_FDS
 
-#if CONFIG_TARFS_LOG
-#  define log( Format_, ... ) do { printf( "%s(): " Format_, __func__,  ##__VA_ARGS__ ); } while(0)
-#else
-#  define log( Format_, ... ) do {} while(0)
-#endif
-#define logerr( Format_, ... ) do { printf( "%s(): " Format_, __func__,  ##__VA_ARGS__ ); } while(0)
-
 #include "refc.h"
 #include "file.h"
 #include "inode.h"
@@ -78,8 +71,14 @@ struct tarfs_stats {
   unsigned int links;    /*!< Number of links */
   unsigned int dirs;     /*!< Number of directories */
   unsigned int ram;      /*!< Total RAM used by the FS */
-
+#if CONFIG_TARFS_INTEGRITY
+  unsigned int badcrc;   /*!< Number of bad CRC entries */
+#endif
 };
+
+#if CONFIG_TARFS_LOG
+extern bool g_tarfs_log; /*!< Global flag to enable or disable logging */
+#endif
 
 
 /**
@@ -100,12 +99,12 @@ struct tarfs_fs {
   size_t                        fs_dsize;             /*!< Data size: Partition size minus size of all TARFS headers */
   size_t                        fs_size;              /*!< Total size: Partition size */
   uint32_t                      fs_nino;              /*!< Number of entries in fs_ino array */
-  struct tarfs_inode const * const *fs_ino;           /*!< Sorted (in_hash) array of pointers to inodes. */
-  struct tarfs_inode const *    fs_root;              /*!< First record of alphasorted (in_path) list of entries (linked via in_next) */
+  tarfs_inode_t const * const * fs_ino;               /*!< INDEX. Sorted (in_hash) array of pointers to inodes. */
+  tarfs_inode_t const *         fs_root;              /*!< First record of alphasorted (in_path) list of entries (linked via in_next) */
   _Atomic(uint32_t)             fs_usedfd;            /*!< A bitmask for fs_fd[] array: 0100 means FD #2 is 
                                                            used. Indicates which elements of fs_fd[] array are used */
   struct tarfs_fp               fs_fd[TARFS_MAX_FDS]; /*!< Open files descriptors */
-  time_t                        fs_mtime;             /*!< time() at mount. Used by stat()/fstat() to populate mtime field (mtime does not change on ROFS) */
+  time_t                        fs_mtime;             /*!< Read from the root directory entry or, if unavailable, time(NULL) is used instead */
   uint16_t                      fs_opencrc:1;         /*!< A flag to enable/disable CRC64 verification on open() */
   uint16_t                      fs_reserved:15;       /*!< Reserved for future extensions */
   struct tarfs_stats            fs_stats;             /*!< FS immutable statistics */
@@ -114,11 +113,13 @@ struct tarfs_fs {
   uint64_t                      fs_bread;             /*!< Number of bytes read by read() (sum of all read() and pread() ) */
   uint32_t                      fs_nfail;             /*!< Number of failed open() calls */
 #endif
-
   char                          fs_mountpoint[];      /*!< Mount point */
 };
 
 
+#if CONFIG_TARFS_HAVE_STATVFS_H
+#  include <sys/statvfs.h>
+#else
 /**
  * enum for statvfs
  */
@@ -147,7 +148,7 @@ struct statvfs {
   size_t   f_blocks;   /* Size of fs in f_frsize units */
   size_t   f_bfree;    /* Number of free blocks */
   size_t   f_bavail;   /* Number of free blocks for unprivileged users */
-  size_t   f_files;    /* Number of inodes */
+  size_t   f_files;    /* Number of files */
   size_t   f_ffree;    /* Number of free inodes */
   size_t   f_favail;   /* Number of free inodes for unprivileged users */
   size_t   f_fsid;     /* Filesystem ID */
@@ -163,8 +164,9 @@ struct statvfs {
   size_t   f_links;     /*!< Number of links */
   size_t   f_dirs;      /*!< Number of directories */
   size_t   f_ram;       /*!< Total RAM used by the FS */
+  size_t   f_badcrc;    /*!< Number of files with bad CRC */
 };
-
+#endif
 
 
 #ifdef __cplusplus
@@ -262,6 +264,25 @@ int  tarfs_unmount(const char *mountpoint);
  *         "failed etries"
  */
 unsigned int tarfs_fsck(const char *label);
+
+
+/**
+ * @brief Enables or disables CRC64 integrity verification for TARFS archives.
+ *
+ * If the TARFS library is compiled with `CONFIG_TARFS_INTEGRITY` enabled,
+ * archives without a valid CRC64 checksum are treated as corrupted.
+ *
+ * If a system uses both CRC64-protected and unprotected archives, CRC64
+ * verification can be enabled or disabled as needed. This function must
+ * be called before `tarfs_mount()`.
+ *
+ * The setting is global and affects all subsequent calls to `tarfs_mount()`.
+ *
+ * @param en  0 to disable CRC64 verification, 1 to enable it, or -1 to
+ *         leave the current setting unchanged.
+ * @return    The previous CRC64 verification setting.
+ */
+int tarfs_integrity(int en);
 
 
 /**
@@ -400,6 +421,31 @@ char *tarfs_strdup(char const *str);
 static inline void tarfs_lock()   { tarfs_os_acquire_mutex(); }
 static inline void tarfs_unlock() { tarfs_os_release_mutex(); }
 static inline void tarfs_init()   { tarfs_os_init(); }
+
+/* Logging, used internally by the tarfs library; Must be enabled in config.h (see CONFIG_TARFS_LOG macro)
+ *
+ * log() macro does all output (printf-like)
+ * tarfs_logging() controls output of log() macro.
+ *
+ */
+#if CONFIG_TARFS_LOG
+
+#define log( Format_, ... ) do { if (g_tarfs_log) printf( "%s(): " Format_, __func__,  ##__VA_ARGS__ ); } while(0)
+
+static inline void tarfs_logging(bool en) {
+
+  g_tarfs_log = en;
+  log("tarfs core logging enabled\r\n"); /* if it is disabled we don't see it */
+
+}
+#else
+
+/* No-ops when logging is not compiled in 
+ */
+#define log( Format_, ... ) do {} while(0)
+#define tarfs_logging( X_ ) do {} while(0)
+
+#endif /* CONFIG_TARFS_LOG */
 
 
 #ifdef __cplusplus
