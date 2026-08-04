@@ -15,7 +15,7 @@ if ($handle = opendir($dir) ) {
     echo "Files:\n";
 
     while (false !== ($file = readdir($handle))) {
-        echo "$file  :".size_format("123").PHP_EOL;
+        echo "$file  :".size_format(filesize($file)).PHP_EOL;
     }
 
     closedir($handle);

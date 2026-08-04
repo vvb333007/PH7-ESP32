@@ -3,8 +3,8 @@
 function outputCSV($data) {
     $outstream = fopen("php://output", 'w');
     array_walk(
-	$data,
-	function (&$vals, $key, $filehandler) {   /* Annonymous function */
+  $data,
+  function (&$vals, $key, $filehandler) {   /* Annonymous function */
            fputcsv($filehandler, $vals, ';', '"');
      },
     $outstream

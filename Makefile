@@ -6,10 +6,10 @@
 CC      := gcc
 
 # Directories
-OBJDIR  := .
+OBJDIR  := ./o
 
 # Flags
-CFLAGS  := -Wall -Wno-char-subscripts -Os -Itarfs/
+CFLAGS  := -Wall -Wno-char-subscripts -O3 -Itarfs/
 CFLAGS  += -DTEST_BUILD=1 -DPH7_UNIX_STATIC_BUILD=1 -D__UNIXES__=1
 CFLAGS += -MMD -MP 
 
@@ -44,7 +44,7 @@ TARGETS := inter
 
 .PHONY: all
 
-all: $(TARGETS)  clean
+all: $(TARGETS)
 
 inter: $(INTER_OBJ)
 >$(CC) $^ -o $@

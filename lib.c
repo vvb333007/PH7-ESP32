@@ -5281,7 +5281,7 @@ PH7_PRIVATE sxi32 SyMD5Compute(const void *pIn, sxu32 nLen, unsigned char zDiges
 #define d qq[3]
 #define e qq[4]
 
-static void SHA1Transform(unsigned int state[5], const unsigned char buffer[64]) {
+static void SHA1Transform(unsigned int *state, const unsigned char *buffer) {
   unsigned int qq[5]; /* a, b, c, d, e; */
   static int one = 1;
   unsigned int block[16];
@@ -5436,7 +5436,7 @@ PH7_PRIVATE void SHA1Update(SHA1Context *context, const unsigned char *data, uns
     (void)SyMemcpy(data, &context->buffer[j], (i = 64 - j));
     SHA1Transform(context->state, context->buffer);
     for (; i + 63 < len; i += 64)
-      SHA1Transform(context->state, &data[i]);
+      SHA1Transform(context->state, data + i);
     j = 0;
   } else {
     i = 0;

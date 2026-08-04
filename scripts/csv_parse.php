@@ -7,7 +7,7 @@ if( count($argv) > 0 ){
  $file = $argv[0]; 
 }else{
  /* Use the test file */
- $file = 'scripts/test.csv';
+ $file = 'test.csv';
  }
 if (($handle = fopen($file, "r")) !== FALSE) {
     while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
