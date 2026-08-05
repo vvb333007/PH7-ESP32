@@ -70,7 +70,7 @@
 #  include "esp_heap_caps.h"
 #  include "esp_rom_sys.h"
 #  include "esp_random.h"
-
+#  include "tarfs/tarfs.h"
 #  define xstr(s) ystr(s)
 #  define ystr(s) #s
 

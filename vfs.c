@@ -22,7 +22,10 @@
 #include "ph7int.h"
 #endif
 
-#include "tarfs/tarfs.h"
+//#include "tarfs/tarfs.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 
 extern const ph7_io_stream sUnixFileStream;
 

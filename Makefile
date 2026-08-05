@@ -9,7 +9,7 @@ CC      := gcc
 OBJDIR  := ./o
 
 # Flags
-CFLAGS  := -Wall -Wno-char-subscripts -O3 -Itarfs/
+CFLAGS  := -Wall -Wno-char-subscripts -O3 -Itarfs/ -L.
 CFLAGS  += -DTEST_BUILD=1 -DPH7_UNIX_STATIC_BUILD=1 -D__UNIXES__=1
 CFLAGS += -MMD -MP 
 
@@ -47,7 +47,7 @@ TARGETS := inter
 all: $(TARGETS)
 
 inter: $(INTER_OBJ)
->$(CC) $^ -o $@
+>$(CC) $(CFLAGS)  $^ -o $@
 
 
 $(OBJDIR)/%.o: %.c | $(OBJDIR)
@@ -57,7 +57,7 @@ $(OBJDIR):
 >mkdir -p $(OBJDIR)
 
 clean:
->rm -f *.o *.d
+>rm -f $(OBJDIR)/*.[od]
 
 -include $(OBJ:.o=.d)
 

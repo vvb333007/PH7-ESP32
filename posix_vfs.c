@@ -16,10 +16,16 @@
 
 #include <sys/types.h>
 #include <limits.h>
+#include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
+#if ESP32
+/* mmap() is included in tarfs/tarfs.h, which is included in ph7int.h */
+#else
+# include <sys/mman.h>
+#endif
 #include <sys/file.h>
 #include <pwd.h>
 #include <grp.h>
@@ -34,7 +40,7 @@
 /* TARFS is the only FS on ESP32 which supports mmap(), so TARFS is used for scripts.
  * TARFS is READ-ONLY, so for generic file IO there must be SECOND FS mounted (e.g. LittleFS)  
  */
-#include "tarfs/tarfs.h"
+//#include "tarfs/tarfs.h"
 
 
 /**
