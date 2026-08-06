@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "espshell.h"
+//#include "espshell.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -76,10 +76,11 @@ int engine_test() {
     0 /* NULL: Callback Private data */
     );
 
-  ph7_config(pEngine,PH7_CONFIG_TEMPDIR,"/ffat/tmp" );
+  ph7_config(pEngine,PH7_VM_CONFIG_TEMPDIR,"/ffat/tmp" );
 
   /* Now,it's time to compile our PHP file */
-  rc = ph7_compile(pEngine, prog, strlen(prog), &pVm);
+  //rc = ph7_compile(pEngine, prog, strlen(prog), &pVm);
+  rc = ph7_compile_file(pEngine, "/scripts/hello_world.php", &pVm, 0);
 
   if( rc != PH7_OK ){ /* Compile error */
     if( rc == PH7_IO_ERR ){
@@ -130,11 +131,21 @@ int engine_test() {
 void setup() {
   
   Serial.begin(115200);
+
+  delay(1000);
+
+  tarfs_init();
+  int fs = tarfs_mount("tarfs", NULL, NULL, NULL);
+  if (fs < 0)
+    Serial.printf("Filesystem is not mounted\r\n");
+  else
+    Serial.printf("Filesystem mounted, FS index is %d\r\n", fs);
+
 }
 
 
 void loop() {
 
-  delay(1000);
+  delay(1000);  
   engine_test();
 }
