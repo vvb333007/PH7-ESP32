@@ -2175,17 +2175,8 @@ static int PH7_vfs_getmygid(ph7_context *pCtx, int nArg, ph7_value **apArg) {
 #if (__has_include(<sys/utsname.h>))
 #    include <sys/utsname.h>
 #  else
-struct utsname {
 
-  const char *sysname;
-  const char *nodename;
-  const char *release;
-  const char *version;
-  const char *machine;
-};
-
-
-static int uname(struct utsname *out) {
+int uname(struct utsname *out) {
 
   if (out == NULL)
     return -1;

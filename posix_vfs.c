@@ -22,7 +22,10 @@
 #include <sys/uio.h>
 #include <sys/stat.h>
 #if ESP32
-/* mmap() is included in tarfs/tarfs.h, which is included in ph7int.h */
+/* TARFS is the only FS on ESP32 which supports mmap(), so TARFS is used for scripts.
+ * TARFS is READ-ONLY, so for generic file IO there must be SECOND FS mounted (e.g. LittleFS)  
+ */
+# include "tarfs.h"
 #else
 # include <sys/mman.h>
 #endif
@@ -35,12 +38,6 @@
 #include <stdlib.h>
 
 #include <stdint.h>
-
-
-/* TARFS is the only FS on ESP32 which supports mmap(), so TARFS is used for scripts.
- * TARFS is READ-ONLY, so for generic file IO there must be SECOND FS mounted (e.g. LittleFS)  
- */
-//#include "tarfs/tarfs.h"
 
 
 /**
@@ -326,41 +323,15 @@ static int UnixVfs_Chmod(const char *zPath, int mode) {
 }
 /* int (*xChown)(const char *,const char *) */
 static int UnixVfs_Chown(const char *zPath, const char *zUser) {
-#ifndef PH7_UNIX_STATIC_BUILD
-  struct passwd *pwd;
-  uid_t uid;
-  int rc;
-  pwd = getpwnam(zUser); /* Try getting UID for username */
-  if (pwd == 0) {
-    return -1;
-  }
-  uid = pwd->pw_uid;
-  rc = chown(zPath, uid, -1);
-  return rc == 0 ? PH7_OK : -1;
-#else
   SXUNUSED(zPath);
   SXUNUSED(zUser);
   return -1;
-#endif /* PH7_UNIX_STATIC_BUILD */
 }
 /* int (*xChgrp)(const char *,const char *) */
 static int UnixVfs_Chgrp(const char *zPath, const char *zGroup) {
-#ifndef PH7_UNIX_STATIC_BUILD
-  struct group *group;
-  gid_t gid;
-  int rc;
-  group = getgrnam(zGroup);
-  if (group == 0) {
-    return -1;
-  }
-  gid = group->gr_gid;
-  rc = chown(zPath, -1, gid);
-  return rc == 0 ? PH7_OK : -1;
-#else
   SXUNUSED(zPath);
   SXUNUSED(zGroup);
   return -1;
-#endif /* PH7_UNIX_STATIC_BUILD */
 }
 /* int (*xIsfile)(const char *) */
 static int UnixVfs_isfile(const char *zPath) {
@@ -525,19 +496,7 @@ static int UnixVfs_Umask(int new_mask) {
 }
 /* void (*xUsername)(ph7_context *) */
 static void UnixVfs_Username(ph7_context *pCtx) {
-#ifndef PH7_UNIX_STATIC_BUILD
-  struct passwd *pwd;
-  uid_t uid;
-  uid = getuid();
-  pwd = getpwuid(uid); /* Try getting UID for username */
-  if (pwd == 0) {
-    return;
-  }
-  /* Return the username */
-  ph7_result_string(pCtx, pwd->pw_name, -1);
-#else
   ph7_result_string(pCtx, "root", -1);
-#endif /* PH7_UNIX_STATIC_BUILD */
   return;
 }
 /* int (*xLink)(const char *,const char *,int) */

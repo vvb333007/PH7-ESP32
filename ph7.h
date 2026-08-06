@@ -70,9 +70,20 @@
 #  include "esp_heap_caps.h"
 #  include "esp_rom_sys.h"
 #  include "esp_random.h"
-#  include "tarfs/tarfs.h"
+#  include "tarfs.h"
 #  define xstr(s) ystr(s)
 #  define ystr(s) #s
+
+struct utsname {
+
+  const char *sysname;
+  const char *nodename;
+  const char *release;
+  const char *version;
+  const char *machine;
+};
+
+int uname(struct utsname *out);
 
 #endif
 

@@ -9,9 +9,7 @@ CC      := gcc
 OBJDIR  := ./o
 
 # Flags
-CFLAGS  := -Wall -Wno-char-subscripts -O3 -Itarfs/ -L.
-CFLAGS  += -DTEST_BUILD=1 -DPH7_UNIX_STATIC_BUILD=1 -D__UNIXES__=1
-CFLAGS += -MMD -MP 
+CFLAGS  := -Wall -Wno-char-subscripts -O3 -MMD -MP 
 
 # Common sources
 COMMON_SRC := \

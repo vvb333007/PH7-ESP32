@@ -1,3 +1,4 @@
+#if defined( __CYGWIN__ ) || defined ( __linux__ )
 /*
  * Compile this file together with the ph7 engine source code to generate
  * the simple PH7 interpreter executable. For example: 
@@ -225,3 +226,4 @@ int main(int argc,char **argv)
   ph7_release(pEngine);
   return 0;
 }
+#endif
