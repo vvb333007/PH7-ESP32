@@ -1,5 +1,5 @@
 #include <Arduino.h>
-//#include "espshell.h"
+#include "espshell.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,7 +48,7 @@ const char *prog = "\r\n"
 "?>\r\n";
 
 
-int engine_test() {
+int engine_test(const char *path) {
 
   
   ph7 *pEngine; /* PH7 engine */
@@ -80,48 +80,30 @@ int engine_test() {
 
   /* Now,it's time to compile our PHP file */
   //rc = ph7_compile(pEngine, prog, strlen(prog), &pVm);
-  rc = ph7_compile_file(pEngine, "/scripts/hello_world.php", &pVm, 0);
+  rc = ph7_compile_file(pEngine, path , &pVm, 0);
 
-  if( rc != PH7_OK ){ /* Compile error */
-    if( rc == PH7_IO_ERR ){
-      Fatal("IO error while opening the target file");
-    }else if( rc == PH7_VM_ERR ){
-      Fatal("VM initialization error");
-    }else{
-      /* Compile-time error, your output (STDOUT) should display the error messages */
-      Fatal("Compile error");
-    }
-  }
-  /*
-   * Now we have our script compiled,it's time to configure our VM.
-   * We will install the VM output consumer callback defined above
-   * so that we can consume the VM output and redirect it to STDOUT.
-   */
-  rc = ph7_vm_config(pVm,
-    PH7_VM_CONFIG_OUTPUT,
-    Output_Consumer,    /* Output Consumer callback */
-    0                   /* Callback private data */
-    );
-  if( rc != PH7_OK ){
-    Fatal("Error while installing the VM output consumer callback");
-  }
-
-  if( dump_vm ){
-    /* Dump PH7 byte-code instructions */
-    ph7_vm_dump_v2(pVm,
-      Output_Consumer, /* Dump consumer callback */
-      0
+  if( rc == PH7_OK ){ 
+    /*
+     * Now we have our script compiled,it's time to configure our VM.
+    * We will install the VM output consumer callback defined above
+    * so that we can consume the VM output and redirect it to STDOUT.
+    */
+    rc = ph7_vm_config(pVm,
+      PH7_VM_CONFIG_OUTPUT,
+      Output_Consumer,    /* Output Consumer callback */
+      0                   /* Callback private data */
       );
+
+    /*
+    * And finally, execute our program. Note that your output (STDOUT in our case)
+    * should display the result.
+    */
+    ph7_vm_exec(pVm,0);
+    /* All done, cleanup the mess left behind.
+    */
+    ph7_vm_release(pVm);
+    ph7_release(pEngine);
   }
-  /*
-   * And finally, execute our program. Note that your output (STDOUT in our case)
-   * should display the result.
-   */
-  ph7_vm_exec(pVm,0);
-  /* All done, cleanup the mess left behind.
-  */
-  ph7_vm_release(pVm);
-  ph7_release(pEngine);
   return 0;
 }
 
@@ -132,20 +114,23 @@ void setup() {
   
   Serial.begin(115200);
 
-  delay(1000);
-
-  tarfs_init();
-  int fs = tarfs_mount("tarfs", NULL, NULL, NULL);
-  if (fs < 0)
-    Serial.printf("Filesystem is not mounted\r\n");
-  else
-    Serial.printf("Filesystem mounted, FS index is %d\r\n", fs);
-
 }
+
+
+
+SHELL_USER_HANDLER(argc, argv);
+SHELL_USER_HANDLER(argc, argv) {
+
+  
+  if (argc > 1) {
+      engine_test(argv[1]);
+  }
+  return 0;
+}
+
 
 
 void loop() {
 
   delay(1000);  
-  engine_test();
 }

@@ -13,7 +13,7 @@ Goal of this project is to port PH7 PHP engine to ESP32
 ### STATUS: compiles and works in Cygwin; compiles and works in ESP-IDF
 
 
-When compiled for ESP32 - [ requires TARFS](http://github.com/vvb333007/tarfs/)
+When compiled for ESP32 - [ requires TARFS v0.1.5 or higher](http://github.com/vvb333007/tarfs/)
 
 To compile in Cygwin/Linux - type `make`; This should produce a standalone PHP interpreter
 
