@@ -1,3 +1,10 @@
+/*
+ * Requires: ESPShell, TARFS, PH7
+ *
+ *
+ */
+
+
 #include <Arduino.h>
 #include "espshell.h"
 
