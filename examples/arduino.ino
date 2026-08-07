@@ -1,130 +1,74 @@
-/*
- * Requires: ESPShell, TARFS, PH7
- *
- *
- */
-
-
 #include <Arduino.h>
-#include "espshell.h"
-
 #include <stdio.h>
 #include <stdlib.h>
-#include "ph7.h"
-/* 
- * Display an error message and exit.
- */
-static void Fatal(const char *zMsg)
-{
-  puts(zMsg);
-  /* Shutdown the library */
-  ph7_lib_shutdown();
-  /* Exit immediately */
-  exit(0);
-}
 #include <unistd.h>
 
+#include "espshell.h"
+#include "ph7.h"
+
+
+
 /*
- * VM output consumer callback.
- * Each time the virtual machine generates some outputs,the following
- * function gets called by the underlying virtual machine to consume
- * the generated output.
- * All this function does is redirecting the VM output to STDOUT.
- * This function is registered later via a call to ph7_vm_config()
- * with a configuration verb set to: PH7_VM_CONFIG_OUTPUT.
+ * Когда виртуальная машина выводит что-либо (вызывая, echo или printf ), весь ее вывод попадает в эту функцию.
+ * Все, что делает эта функция - перенаправляет весь вход на экран (на stdout)
  */
-static int Output_Consumer(const void *pOutput,unsigned int nOutputLen,void *pUserData /* Unused */)
-{
+static int output_callback(const void *pOutput,unsigned int nOutputLen,void *pUserData /* Unused */) {
+
   ssize_t nWr;
+
   nWr = write(1,pOutput,nOutputLen);
-  if( nWr < 0 ){
-    /* Abort processing */
+  if( nWr < 0 )
     return PH7_ABORT;
-  }
-  /* All done,VM output was redirected to STDOUT */
+  
   return PH7_OK;
 }
-/*
- * Main program: Compile and execute the PHP file. 
+
+
+/* Запустить PHP скрипт с таким-то именем. Скрипты должны быть расположены на смонтированной файловой 
+ * системе TARFS, т.к. другие файловые системы не поддерживают вызов mmap(), которые необходим для работы PH7
  */
-const char *prog = "\r\n"
-"<?php\r\n"
-" echo 'Welcome guest'.PHP_EOL;\r\n"
-" echo 'Current system time is: '.date('Y-m-d H:i:s').PHP_EOL;\r\n"
-" echo 'and you are running '.php_uname();\r\n"
-"?>\r\n";
-
-
 int engine_test(const char *path) {
 
   
   ph7 *pEngine; /* PH7 engine */
   ph7_vm *pVm;  /* Compiled PHP program */
   int rc;
-  int dump_vm = 0;    /* Dump VM instructions if TRUE */
-  int err_report = 1; /* Report run-time errors if TRUE */
-  int n;              /* Script arguments */
 
-
-  /* Allocate a new PH7 engine instance */
   rc = ph7_init(&pEngine);
-  if( rc != PH7_OK ){
-    /*
-     * If the supplied memory subsystem is so sick that we are unable
-     * to allocate a tiny chunk of memory,there is no much we can do here.
-     */
-    Fatal("Error while allocating a new PH7 engine instance");
-  }
-  /* Set an error log consumer callback. This callback [Output_Consumer()] will
-   * redirect all compile-time error messages to STDOUT.
-   */
-  ph7_config(pEngine,PH7_CONFIG_ERR_OUTPUT,
-    Output_Consumer, /* Error log consumer */
-    0 /* NULL: Callback Private data */
-    );
 
+  if( rc != PH7_OK ){
+    Serial.printf("Error while allocating a new PH7 engine instance\r\n");
+    return -1;
+  }
+
+  ph7_config(pEngine,PH7_CONFIG_ERR_OUTPUT, output_callback, 0); // Ошибки - на экран
   ph7_config(pEngine,PH7_VM_CONFIG_TEMPDIR,"/ffat/tmp" );
 
-  /* Now,it's time to compile our PHP file */
-  //rc = ph7_compile(pEngine, prog, strlen(prog), &pVm);
+  // Можно компилировать файлики. Можно сразу несколько скомпилировать и исполнять их по надобности
+  // На одной Engine может висеть несколько виртуальных машин
   rc = ph7_compile_file(pEngine, path , &pVm, 0);
 
-  if( rc == PH7_OK ){ 
-    /*
-     * Now we have our script compiled,it's time to configure our VM.
-    * We will install the VM output consumer callback defined above
-    * so that we can consume the VM output and redirect it to STDOUT.
-    */
-    rc = ph7_vm_config(pVm,
-      PH7_VM_CONFIG_OUTPUT,
-      Output_Consumer,    /* Output Consumer callback */
-      0                   /* Callback private data */
-      );
+  if( rc == PH7_OK ) { 
 
-    /*
-    * And finally, execute our program. Note that your output (STDOUT in our case)
-    * should display the result.
-    */
+    // сообщения - на экран
+    rc = ph7_vm_config(pVm, PH7_VM_CONFIG_OUTPUT, output_callback, 0 );
+
+    // Запустили скомпилированный код
     ph7_vm_exec(pVm,0);
-    /* All done, cleanup the mess left behind.
-    */
+
+    // Позакрывали все
     ph7_vm_release(pVm);
     ph7_release(pEngine);
+
+    return 0;
   }
-  return 0;
+
+  return -1;
 }
 
-
-
-
-void setup() {
-  
-  Serial.begin(115200);
-
-}
-
-
-
+/* Добавим пользовательскую команду в шелл: "misc ИМЯ_ФАЙЛА", для исполнения выбранных файлов
+ *
+ */
 SHELL_USER_HANDLER(argc, argv);
 SHELL_USER_HANDLER(argc, argv) {
 
@@ -136,8 +80,15 @@ SHELL_USER_HANDLER(argc, argv) {
 }
 
 
+void setup() {
+  
+  Serial.begin(115200);
+
+}
+
 
 void loop() {
 
   delay(1000);  
+
 }
