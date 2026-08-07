@@ -271,3 +271,4 @@ Documentation describing the APIs used to program PH7. Note that PH7 is very eas
 [Foreign Function Implementation](http://ph7.symisc.net/func_intro.html): Is a how-to guide on how to install C functions and invoke them from your PHP script.
 
 [Constant Expansion Mechanism](http://ph7.symisc.net/const_intro.html):   Is a how-to guide on how to install foreign constants and expand their values from your PHP script.
+
