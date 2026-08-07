@@ -871,8 +871,8 @@ int ph7_vm_config(ph7_vm *pVm, int iConfigOp, ...) {
 #if defined(PH7_ENABLE_THREADS)
   /* Leave VM mutex */
     //BUG:3 TODO: review
-//  SyMutexLeave(sMPGlobal.pMutexMethods, pVm->pMutex); /* NO-OP if sMPGlobal.nThreadingLevel != PH7_THREAD_LEVEL_MULTI */
-    SyMutexRelease(sMPGlobal.pMutexMethods,pVm->pMutex);
+  SyMutexLeave(sMPGlobal.pMutexMethods, pVm->pMutex); /* NO-OP if sMPGlobal.nThreadingLevel != PH7_THREAD_LEVEL_MULTI */
+//    SyMutexRelease(sMPGlobal.pMutexMethods,pVm->pMutex);
 #endif
   return rc;
 }

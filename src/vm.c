@@ -9305,6 +9305,11 @@ static int vm_builtin_debug_backtrace(ph7_context *pCtx, int nArg, ph7_value **a
    */
   return PH7_OK;
 }
+
+
+
+
+
 /* 
  * Generate a small backtrace.
  * Store the generated dump in the given BLOB
@@ -9374,10 +9379,12 @@ static int vm_builtin_debug_print_backtrace(ph7_context *pCtx, int nArg, ph7_val
   return PH7_OK;
 }
 
-
+/* Merged from another fork */
 int ph7_context_print_backtrace(ph7_context *pCtx) {
+
   return vm_builtin_debug_print_backtrace(pCtx, 0, 0);
 }
+
 
 /*
  * string debug_string_backtrace()
