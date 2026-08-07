@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 /* Make sure this header file is available.*/
-#include "../src/ph7.h"
+#include "../../src/ph7.h"
 //#include "tarfs/tarfs.h"
 /* 
  * Display an error message and exit.
