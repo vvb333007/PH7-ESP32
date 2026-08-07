@@ -9,7 +9,8 @@ CC      := gcc
 OBJDIR  := .
 
 # Flags
-CFLAGS  := -Wall -Wno-char-subscripts -O3 -MMD -MP 
+CFLAGS  := -Wall -Wno-char-subscripts -O3 -MMD -MP -DPH7_ENABLE_THREADS=1 -DPH7_ENABLE_MATH_FUNC=1
+
 
 # Common sources
 COMMON_SRC := \
