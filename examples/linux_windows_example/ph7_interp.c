@@ -165,13 +165,13 @@ puts("ph7_init()");
   /* Set an error log consumer callback. This callback [Output_Consumer()] will
    * redirect all compile-time error messages to STDOUT.
    */
-puts("ph7_config()");
+
   ph7_config(pEngine,PH7_CONFIG_ERR_OUTPUT,
     Output_Consumer, /* Error log consumer */
     0 /* NULL: Callback Private data */
     );
   /* Now,it's time to compile our PHP file */
-puts("ph7_compile_file()");
+
   rc = ph7_compile_file(
     pEngine, /* PH7 Engine */
     argv[n], /* Path to the PHP file to compile */
@@ -180,7 +180,7 @@ puts("ph7_compile_file()");
     );
 
 
-puts("ph7_compile_file()");
+
   rc = ph7_compile_file(
     pEngine, /* PH7 Engine */
     argv[n], /* Path to the PHP file to compile */
@@ -207,7 +207,7 @@ puts("ph7_compile_file()");
    * We will install the VM output consumer callback defined above
    * so that we can consume the VM output and redirect it to STDOUT.
    */
-  puts("ph7_vm_config()");
+
   rc = ph7_vm_config(pVm,
     PH7_VM_CONFIG_OUTPUT,
     Output_Consumer,    /* Output Consumer callback */
@@ -220,12 +220,12 @@ puts("ph7_compile_file()");
    * array from the compiled PHP program.
    */
   for( n = n + 1; n < argc ; ++n ){
-    puts("ph7_vm_config()");
+
     ph7_vm_config(pVm,PH7_VM_CONFIG_ARGV_ENTRY,argv[n]/* Argument value */);
   }
   if( err_report ){
     /* Report script run-time errors */
-    puts("ph7_vm_config()");
+
     ph7_vm_config(pVm,PH7_VM_CONFIG_ERR_REPORT);
   }
   if( dump_vm ){
@@ -239,17 +239,17 @@ puts("ph7_compile_file()");
    * And finally, execute our program. Note that your output (STDOUT in our case)
    * should display the result.
    */
-  puts("ph7_vm_exec()");
+
   ph7_vm_exec(pVm,0);
   /* All done, cleanup the mess left behind.
   */
-  puts("ph7_vm_release()");
+
   ph7_vm_release(pVm);
 
-  puts("ph7_release()");
+
   ph7_release(pEngine);
 
-  puts("ph7_lib_shutdown()");
+
   ph7_lib_shutdown();
   return 0;
 }
