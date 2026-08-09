@@ -1855,8 +1855,14 @@ PH7_PRIVATE sxi32 SyStrToInt64(const char *zSrc, sxu32 nLen, void *pOutVal, cons
 }
 
 
-// TODO: refactor
+
 PH7_PRIVATE sxi32 SyHexToint(sxi32 c) {
+
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a';
+  if (c >= 'A' && c <= 'F') return c - 'A';
+
+#if 0
   switch (c) {
     case '0': return 0;
     case '1': return 1;
@@ -1881,6 +1887,8 @@ PH7_PRIVATE sxi32 SyHexToint(sxi32 c) {
     case 'F':
     case 'f': return 15;
   }
+#endif
+
   return -1;
 }
 PH7_PRIVATE sxi32 SyHexStrToInt64(const char *zSrc, sxu32 nLen, void *pOutVal, const char **zRest) {

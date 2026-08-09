@@ -529,7 +529,6 @@ static int UnixVfs_link(const char *zSrc, const char *zTarget, int is_sym) {
 /* int (*xChroot)(const char *) */
 static int UnixVfs_chroot(const char *zRootDir) {
 #ifdef ESP32
-  // TODO: have to verify carefully how critical chroot() is
   // TODO: must be implemented as a struct ph7_vm::zRoot; VFS must take rootdir into account
   return 0;
 #else
