@@ -60,6 +60,7 @@ static SyMutex *UnixMutexNew(int nType) {
   if (nType == SXMUTEX_TYPE_FAST || nType == SXMUTEX_TYPE_RECURSIVE) {
     pthread_mutexattr_t sRecursiveAttr;
     /* Allocate a new mutex */
+    // TODO: allocate in SRAM if possible
     pMutex = (SyMutex *)malloc(sizeof(SyMutex));
     if (pMutex == 0) {
       return 0;
@@ -113,17 +114,41 @@ PH7_PRIVATE const SyMutexMethods *SyMutexExportMethods(void) {
 
 
 static void *SyOSHeapAlloc(sxu32 nByte) {
-  void *pNew;
+
+  void *pNew = NULL;
+#ifdef ESP32
+  /* anything larger than 1KB goes to SPIRAM */
+  if (nByte > 1023)  /* TODO: no magic numbers! */
+    pNew = heap_caps_malloc(nByte, MALLOC_CAP_SPIRAM);
+
+  /* fallback to the default allocator */
+  if (pNew == NULL)
+    pNew = heap_caps_malloc(nByte, MALLOC_CAP_DEFAULT);
+#else  
   pNew = malloc((size_t)nByte);
+#endif
+//  printf("Alloc: %u --- %p\r\n", (unsigned int )nByte, pNew);
+
   return pNew;
 }
 static void *SyOSHeapRealloc(void *pOld, sxu32 nByte) {
   void *pNew;
+#ifdef ESP32
+  /* Espressif docs says that realloc() is exactly this: */
+  pNew = heap_caps_realloc(pOld, (size_t)nByte, MALLOC_CAP_8BIT);
+#else
   pNew = realloc(pOld, (size_t)nByte);
+#endif
+  //printf("ReAlloc: %u --- %p --> %p\r\n", (unsigned int )nByte, pOld, pNew);
   return pNew;
 }
 static void SyOSHeapFree(void *pPtr) {
+  //printf("Free: %p\r\n", pPtr);
+#ifdef ESP32
+  heap_caps_free(pPtr);
+#else
   free(pPtr);
+#endif
 }
 
 

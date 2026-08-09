@@ -952,6 +952,7 @@ int ph7_vm_release(ph7_vm *pVm) {
   /* Delete CWD */
   if (pVm->pCwd != NULL) {
 
+    // TODO: use SyOSFree
     free((void *)pVm->pCwd);
     pVm->pCwd = NULL;
   }

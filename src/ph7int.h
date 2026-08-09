@@ -21,12 +21,12 @@
 #pragma once
 
 /* If user didn't specify ENABLE_THREADS and MATH_FUNC - set them to default (ON)*/
-#ifndef PH7_ENABLE_THREADS
-#  define PH7_ENABLE_THREADS 1
-#endif
-#ifndef PH7_ENABLE_MATH_FUNC
-#  define PH7_ENABLE_MATH_FUNC 1
-#endif
+//#ifndef PH7_ENABLE_THREADS
+//#  define PH7_ENABLE_THREADS 1
+//#endif
+//#ifndef PH7_ENABLE_MATH_FUNC
+//#  define PH7_ENABLE_MATH_FUNC 1
+//#endif
 
 /* Internal interface definitions for PH7. */
 #define PH7_PRIVATE
