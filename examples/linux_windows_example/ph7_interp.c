@@ -181,17 +181,6 @@ puts("ph7_init()");
 
 
 
-  rc = ph7_compile_file(
-    pEngine, /* PH7 Engine */
-    argv[n], /* Path to the PHP file to compile */
-    &pVm,    /* OUT: Compiled PHP program */
-    0        /* IN: Compile flags */
-    );
-
-
-
-
-
   if( rc != PH7_OK ){ /* Compile error */
     if( rc == PH7_IO_ERR ){
       Fatal("IO error while opening the target file");
