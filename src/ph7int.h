@@ -17,17 +17,21 @@
  *      http://ph7.symisc.net/
  */
 /* $SymiscID: ph7int.h v1.9 FreeBSD 2012-08-13 26:25 devel <chm@symisc.net> $ */
-#ifndef __PH7INT_H__
-#define __PH7INT_H__
-/* Internal interface definitions for PH7. */
-#ifdef PH7_AMALGAMATION
 
-/* Marker for routines not intended for external use */
-#define PH7_PRIVATE static
-#else
+#pragma once
+
+/* If user didn't specify ENABLE_THREADS and MATH_FUNC - set them to default (ON)*/
+//#ifndef PH7_ENABLE_THREADS
+//#  define PH7_ENABLE_THREADS 1
+//#endif
+//#ifndef PH7_ENABLE_MATH_FUNC
+//#  define PH7_ENABLE_MATH_FUNC 1
+//#endif
+
+/* Internal interface definitions for PH7. */
 #define PH7_PRIVATE
 #include "ph7.h"
-#endif
+
 #ifndef PH7_PI
 /* Value of PI */
 #define PH7_PI 3.1415926535898
@@ -2045,5 +2049,33 @@ PH7_PRIVATE const SyMutexMethods *SyMutexExportMethods(void);
 PH7_PRIVATE sxi32 SyMemBackendMakeThreadSafe(SyMemBackend *pBackend, const SyMutexMethods *pMethods);
 PH7_PRIVATE sxi32 SyMemBackendDisbaleMutexing(SyMemBackend *pBackend);
 #endif
-#endif /* __PH7INT_H__ */
 
+
+/* ESP32 additions and overrides
+ *
+ *
+ */
+#ifdef ESP32
+#  include "freertos/FreeRTOS.h"
+#  include "freertos/task.h"
+#  include "freertos/semphr.h"
+#  include "esp_err.h"
+#  include "esp_heap_caps.h"
+#  include "esp_rom_sys.h"
+#  include "esp_random.h"
+#  include "tarfs.h"
+#  define xstr(s) ystr(s)
+#  define ystr(s) #s
+
+/* There is no uname() system call on ESP32 so we have to emulate it */
+struct utsname {
+
+  const char *sysname;
+  const char *nodename;
+  const char *release;
+  const char *version;
+  const char *machine;
+};
+
+int uname(struct utsname *out);
+#endif /* #ifdef ESP32 */

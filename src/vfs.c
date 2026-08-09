@@ -18,11 +18,9 @@
  *      http://ph7.symisc.net/
  */
 /* $SymiscID: vfs.c v2.1 Win7 2012-05-24 01:18 devel <chm@symisc.net> $ */
-#ifndef PH7_AMALGAMATION
-#include "ph7int.h"
-#endif
 
-//#include "tarfs/tarfs.h"
+#include "ph7int.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>

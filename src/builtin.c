@@ -18,9 +18,9 @@
  *      http://ph7.symisc.net/
  */
 /* $SymiscID: builtin.c v1.0 FreeBSD 2012-08-06 08:39 devel <chm@symisc.net> $ */
-#ifndef PH7_AMALGAMATION
+
 #include "ph7int.h"
-#endif
+
 
 /* Common string literals */
 

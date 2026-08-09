@@ -61,31 +61,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef ESP32
-
-#  include "freertos/FreeRTOS.h"
-#  include "freertos/task.h"
-#  include "freertos/semphr.h"
-#  include "esp_err.h"
-#  include "esp_heap_caps.h"
-#  include "esp_rom_sys.h"
-#  include "esp_random.h"
-#  include "tarfs.h"
-#  define xstr(s) ystr(s)
-#  define ystr(s) #s
-
-struct utsname {
-
-  const char *sysname;
-  const char *nodename;
-  const char *release;
-  const char *version;
-  const char *machine;
-};
-
-int uname(struct utsname *out);
-
-#endif
 
 
 

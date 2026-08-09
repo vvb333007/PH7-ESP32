@@ -10,9 +10,10 @@
  * Status:
  *    Stable.
  */
-#ifndef PH7_AMALGAMATION
+
 #include "ph7int.h"
-#endif
+
+
 
 #include <sys/types.h>
 #include <limits.h>
@@ -21,7 +22,7 @@
 #include <unistd.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
-#if ESP32
+#ifdef ESP32
 /* TARFS is the only FS on ESP32 which supports mmap(), so TARFS is used for scripts.
  * TARFS is READ-ONLY, so for generic file IO there must be SECOND FS mounted (e.g. LittleFS)  
  */
@@ -29,6 +30,7 @@
 #else
 # include <sys/mman.h>
 #endif
+
 #include <sys/file.h>
 #include <pwd.h>
 #include <grp.h>
@@ -131,9 +133,9 @@ static int UnixVfs_Realpath(const char *zPath, ph7_context *pCtx) {
 #endif
 }
 /* int (*xSleep)(unsigned int) */
-static int UnixVfs_Sleep(unsigned int uSec) {
+static int UnixVfs_Sleep(unsigned int usec) {
 
-#if ESP32
+#ifdef ESP32
   /* milliseconds are done by FreeRTOS */
   if (usec >= 1000) {
 
@@ -149,7 +151,7 @@ static int UnixVfs_Sleep(unsigned int uSec) {
   if (usec > 0)
     esp_rom_delay_us(usec);
 #else
-  usleep(uSec);
+  usleep(usec);
 #endif
   return PH7_OK;
 }
@@ -269,7 +271,7 @@ static int UnixVfs_lStat(const char *zPath, ph7_value *pArray, ph7_value *pWorke
   struct stat st;
   int rc;
 #ifdef ESP32
-  /* TODO: tarfs has lstat() */ 
+  /* TODO: tarfs has lstat() but it was never tested */ 
   rc = stat(zPath, &st);
 #else
   rc = lstat(zPath, &st);
@@ -317,21 +319,31 @@ static int UnixVfs_lStat(const char *zPath, ph7_value *pArray, ph7_value *pWorke
 }
 /* int (*xChmod)(const char *,int) */
 static int UnixVfs_Chmod(const char *zPath, int mode) {
+#ifdef ESP32 
+  SXUNUSED(zPath);
+  SXUNUSED(mode);
+  /* Return `success` as a compatibility workaround */
+  return PH7_OK;
+#else
   int rc;
   rc = chmod(zPath, (mode_t)mode);
   return rc == 0 ? PH7_OK : -1;
+#endif
 }
 /* int (*xChown)(const char *,const char *) */
 static int UnixVfs_Chown(const char *zPath, const char *zUser) {
   SXUNUSED(zPath);
   SXUNUSED(zUser);
-  return -1;
+  /* Return `success` as a compatibility workaround */
+  return PH7_OK;
 }
+
 /* int (*xChgrp)(const char *,const char *) */
 static int UnixVfs_Chgrp(const char *zPath, const char *zGroup) {
   SXUNUSED(zPath);
   SXUNUSED(zGroup);
-  return -1;
+  /* Return `success` as a compatibility workaround */
+  return PH7_OK;
 }
 /* int (*xIsfile)(const char *) */
 static int UnixVfs_isfile(const char *zPath) {
@@ -459,7 +471,7 @@ static void UnixVfs_TempDir(ph7_context *pCtx) {
 
 /* unsigned int (*xProcessId)(void) */
 static unsigned int UnixVfs_ProcessId(void) {
-#if ESP32
+#ifdef ESP32
   TaskHandle_t tid = xTaskGetCurrentTaskHandle();
   /* tid is a pointer; ESP32 is 32 bit arch where unsigned int is 32bit */
   return (unsigned int)(uintptr_t)tid;
@@ -517,7 +529,8 @@ static int UnixVfs_link(const char *zSrc, const char *zTarget, int is_sym) {
 /* int (*xChroot)(const char *) */
 static int UnixVfs_chroot(const char *zRootDir) {
 #ifdef ESP32
-  // XXX: have to verify carefully how critical chroot() is
+  // TODO: have to verify carefully how critical chroot() is
+  // TODO: must be implemented as a struct ph7_vm::zRoot; VFS must take rootdir into account
   return 0;
 #else
   int rc;
@@ -734,7 +747,7 @@ static int UnixFile_Seek(void *pUserData, ph7_int64 iOfft, int whence) {
 /* int (*xLock)(void *,int) */
 static int UnixFile_Lock(void *pUserData, int lock_type) {
 #ifdef ESP32
-  // XXX: implement flock() on esp32
+  // TODO: implement flock() on esp32
   return PH7_OK;
   //return -1;
 #else
@@ -834,11 +847,7 @@ const ph7_io_stream sUnixFileStream = {
   UnixDir_Read,   /* xReadDir */
   UnixFile_Write, /* xWrite */
   UnixFile_Seek,  /* xSeek */
-#ifdef ESP32
-  NULL,
-#else
-  UnixFile_Lock, /* xLock */
-#endif
+  UnixFile_Lock,  /* xLock */
   UnixDir_Rewind, /* xRewindDir */
   UnixFile_Tell,  /* xTell */
   UnixFile_Trunc, /* xTrunc */

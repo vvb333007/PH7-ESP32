@@ -26,9 +26,9 @@
  * internally as a secure replacement of the standard libc.
  * The library is re-entrant,thread-safe and platform independent.
  */
-#ifndef PH7_AMALGAMATION
+
 #include "ph7int.h"
-#endif
+
 
 /* Common string literals */
 
@@ -4886,7 +4886,7 @@ static sxi32 SyOSUtilRandomSeed(void *pBuf, sxu32 nLen, void *pUnused) {
   SXUNUSED(pUnused);
 
   /* TODO: check error code and provide a fallback */
-#if ESP32
+#ifdef ESP32
   esp_fill_random(pBuf, nLen);
 #else
   unsigned char *p = pBuf;
