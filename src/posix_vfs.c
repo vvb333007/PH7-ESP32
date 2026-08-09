@@ -88,7 +88,7 @@ static int UnixVfs_getcwd(ph7_context *pCtx) {
 static int UnixVfs_mkdir(const char *zPath, int mode, int recursive) {
   int rc;
   rc = mkdir(zPath, mode);
-  recursive = 0; /* cc warning */
+  recursive = recursive;
   return rc == 0 ? PH7_OK : -1;
 }
 /* int (*xRmdir)(const char *) */
@@ -645,7 +645,7 @@ static int UnixDir_Open(const char *zPath, ph7_value *pResource, void **ppHandle
   /* Open the target directory */
   pDir = opendir(zPath);
   if (pDir == 0) {
-    pResource = 0; /* Compiler warning */
+    pResource = pResource; /* Compiler warning */
     return -1;
   }
   /* Save our structure */

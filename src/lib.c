@@ -4890,7 +4890,7 @@ static sxi32 SyOSUtilRandomSeed(void *pBuf, sxu32 nLen, void *pUnused) {
   esp_fill_random(pBuf, nLen);
 #else
   unsigned char *p = pBuf;
-  for (int i = 0; i < nLen; i++)
+  for (unsigned int i = 0; i < nLen; i++)
     *p++ = rand();
 #endif
   return SXRET_OK;

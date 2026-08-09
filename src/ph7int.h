@@ -21,12 +21,12 @@
 #pragma once
 
 /* If user didn't specify ENABLE_THREADS and MATH_FUNC - set them to default (ON)*/
-//#ifndef PH7_ENABLE_THREADS
-//#  define PH7_ENABLE_THREADS 1
-//#endif
-//#ifndef PH7_ENABLE_MATH_FUNC
-//#  define PH7_ENABLE_MATH_FUNC 1
-//#endif
+#ifndef PH7_ENABLE_THREADS
+#  define PH7_ENABLE_THREADS 1
+#endif
+#ifndef PH7_ENABLE_MATH_FUNC
+#  define PH7_ENABLE_MATH_FUNC 1
+#endif
 
 /* Internal interface definitions for PH7. */
 #define PH7_PRIVATE
@@ -148,7 +148,7 @@ typedef sxi32 (*ProcRawStrCmp)(const SyString *, const SyString *);
 
 #define SX_ADDR(PTR) ((sxptr)PTR)
 #define SX_ARRAYSIZE(X) (sizeof(X) / sizeof(X[0]))
-#define SXUNUSED(P) (P = 0)
+#define SXUNUSED(P) (P = P) /* GCC issues a warning on `P = 0` */
 #define SX_EMPTY(PTR) (PTR == 0)
 #define SX_EMPTY_STR(STR) (STR == 0 || STR[0] == 0)
 typedef struct SyMemBackend SyMemBackend;
@@ -538,26 +538,32 @@ struct SyLex {
   }
 /* Rely on the standard ctype */
 #include <ctype.h>
-#define SyToUpper(c) toupper(c)
-#define SyToLower(c) tolower(c)
-#define SyisUpper(c) isupper(c)
-#define SyisLower(c) islower(c)
-#define SyisSpace(c) isspace(c)
-#define SyisBlank(c) isspace(c)
-#define SyisAlpha(c) isalpha(c)
-#define SyisDigit(c) isdigit(c)
-#define SyisHex(c) isxdigit(c)
-#define SyisPrint(c) isprint(c)
-#define SyisPunct(c) ispunct(c)
-#define SyisSpec(c) iscntrl(c)
-#define SyisCtrl(c) iscntrl(c)
-#define SyisAscii(c) isascii(c)
-#define SyisAlphaNum(c) isalnum(c)
-#define SyisGraph(c) isgraph(c)
+#define SyToUpper(c) toupper( (int)( (unsigned char)(c) ) )
+#define SyToLower(c) tolower( (int)( (unsigned char)(c) ) )
+#define SyisUpper(c) isupper( (int)( (unsigned char)(c) ) )
+#define SyisLower(c) islower( (int)( (unsigned char)(c) ) )
+#define SyisSpace(c) isspace( (int)( (unsigned char)(c) ) )
+#define SyisBlank(c) isspace( (int)( (unsigned char)(c) ) )
+#define SyisAlpha(c) isalpha( (int)( (unsigned char)(c) ) )
+#define SyisDigit(c) isdigit( (int)( (unsigned char)(c) ) )
+#define SyisHex(c) isxdigit( (int)( (unsigned char)(c) ) )
+#define SyisPrint(c) isprint( (int)( (unsigned char)(c) ) )
+#define SyisPunct(c) ispunct( (int)( (unsigned char)(c) ) )
+#define SyisSpec(c) iscntrl( (int)( (unsigned char)(c) ) )
+#define SyisCtrl(c) iscntrl( (int)( (unsigned char)(c) ) )
+#define SyisAscii(c) isascii( (int)( (unsigned char)(c) ) )
+#define SyisAlphaNum(c) isalnum( (int)( (unsigned char)(c) ) )
+#define SyisGraph(c) isgraph( (int)( (unsigned char)(c) ) )
+
 #define SyDigToHex(c) "0123456789ABCDEF"[c & 0x0F]
+
+// TODO: refactor all code that uses 0xc0 magic constant
 #define SyDigToInt(c) ((c < 0xc0 && SyisDigit(c)) ? (c - '0') : 0)
 #define SyCharToUpper(c) ((c < 0xc0 && SyisLower(c)) ? SyToUpper(c) : c)
 #define SyCharToLower(c) ((c < 0xc0 && SyisUpper(c)) ? SyToLower(c) : c)
+
+
+// TODO: review macros below. check if these can be functions without impacting PH7 speed
 /* Remove white space/NUL byte from a raw string */
 #define SyStringLeftTrim(RAW) \
   while ((RAW)->nByte > 0 && (unsigned char)(RAW)->zString[0] < 0xc0 && SyisSpace((RAW)->zString[0])) { \

@@ -13592,7 +13592,7 @@ PH7_PRIVATE ph7_class *PH7_VmExtractClass(
 
   if (pEntry == 0) {
     /* No such entry,return NULL */
-    iNest = 0; /* cc warning */
+    iNest = iNest; /* cc warning */
     return 0;
   }
   pClass = (ph7_class *)pEntry->pUserData;
