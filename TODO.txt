@@ -1,0 +1,6 @@
+Implement ESP32 builtins:
+
+  1. GPIO operations
+  2. I2C operations
+  3. UART operations
+  4. LwIP builtins
