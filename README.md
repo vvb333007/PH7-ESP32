@@ -1,7 +1,7 @@
 ### An ESP32 port of PH7 PHP Engine. Requires [TARFS](https://github.com/vvb333007/tarfs)
 
 
-### Requres SPIRAM (PSRAM): requires about 300KiB of memory per virtual machine; Running PH7 without external RAM is barely possible
+### Requres SPIRAM (PSRAM): requires about 100KiB of memory for the Engine plus ~180 KiB per virtual machine; Running PH7 without external RAM is barely possible
 
 
 ### Work in progress.
