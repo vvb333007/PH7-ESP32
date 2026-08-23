@@ -20,6 +20,9 @@
 /* $SymiscID: builtin.c v1.0 FreeBSD 2012-08-06 08:39 devel <chm@symisc.net> $ */
 
 #include "ph7int.h"
+#if defined(ESP32) || defined(__CYGWIN__)
+#  include "esp32/builtins.h"
+#endif
 
 
 /* Common string literals */
@@ -8131,6 +8134,7 @@ static int PH7_builtin_idate(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   if (nLen < 1) {
     /* Don't bother processing return -1*/
     ph7_result_int(pCtx, -1);
+    return PH7_OK; // BUG: TODO:
   }
   if (nArg < 2) {
     struct tm *pTm;
@@ -8494,11 +8498,12 @@ static const ph7_builtin_func aBuiltInFunc[] = {
   { "is_array", PH7_builtin_is_array },
   { "is_object", PH7_builtin_is_object },
   { "is_resource", PH7_builtin_is_resource },
-  { "douleval", PH7_builtin_floatval },
+  { "doubleval", PH7_builtin_floatval },
   { "floatval", PH7_builtin_floatval },
   { "intval", PH7_builtin_intval },
   { "strval", PH7_builtin_strval },
   { "empty", PH7_builtin_empty },
+
 #ifndef PH7_DISABLE_BUILTIN_FUNC
 #ifdef PH7_ENABLE_MATH_FUNC
   /* Math functions */
@@ -8524,6 +8529,7 @@ static const ph7_builtin_func aBuiltInFunc[] = {
   { "fmod", PH7_builtin_fmod },
   { "hypot", PH7_builtin_hypot },
 #endif /* PH7_ENABLE_MATH_FUNC */
+
   { "round", PH7_builtin_round },
   { "dechex", PH7_builtin_dechex },
   { "decoct", PH7_builtin_decoct },
@@ -8559,14 +8565,18 @@ static const ph7_builtin_func aBuiltInFunc[] = {
   { "implode_recursive", PH7_builtin_implode_recursive },
   { "join_recursive", PH7_builtin_implode_recursive },
   { "explode", PH7_builtin_explode },
+
   { "trim", PH7_builtin_trim },
   { "rtrim", PH7_builtin_rtrim },
   { "chop", PH7_builtin_rtrim },
   { "ltrim", PH7_builtin_ltrim },
+
   { "strtolower", PH7_builtin_strtolower },
   { "mb_strtolower", PH7_builtin_strtolower }, /* Only UTF-8 encoding is supported */
+
   { "strtoupper", PH7_builtin_strtoupper },
   { "mb_strtoupper", PH7_builtin_strtoupper }, /* Only UTF-8 encoding is supported */
+
   { "ucfirst", PH7_builtin_ucfirst },
   { "lcfirst", PH7_builtin_lcfirst },
   { "ord", PH7_builtin_ord },
@@ -8581,6 +8591,7 @@ static const ph7_builtin_func aBuiltInFunc[] = {
   { "strripos", PH7_builtin_strripos },
   { "strrchr", PH7_builtin_strrchr },
   { "strrev", PH7_builtin_strrev },
+
   { "ucwords", PH7_builtin_ucwords },
   { "str_repeat", PH7_builtin_str_repeat },
   { "nl2br", PH7_builtin_nl2br },
@@ -8589,11 +8600,13 @@ static const ph7_builtin_func aBuiltInFunc[] = {
   { "vprintf", PH7_builtin_vprintf },
   { "vsprintf", PH7_builtin_vsprintf },
   { "size_format", PH7_builtin_size_format },
+
 #if !defined(PH7_DISABLE_HASH_FUNC)
   { "md5", PH7_builtin_md5 },
   { "sha1", PH7_builtin_sha1 },
   { "crc32", PH7_builtin_crc32 },
 #endif /* PH7_DISABLE_HASH_FUNC */
+
   { "str_getcsv", PH7_builtin_str_getcsv },
   { "strip_tags", PH7_builtin_strip_tags },
   { "str_shuffle", PH7_builtin_str_shuffle },
@@ -8643,6 +8656,15 @@ static const ph7_builtin_func aBuiltInFunc[] = {
   { "rawurlencode", PH7_builtin_urlencode },
   { "rawurldecode", PH7_builtin_urldecode },
 #endif /* PH7_DISABLE_BUILTIN_FUNC */
+
+/* ESP32 Extensions: Native ESP-IDF bindings and Arduino Core bindings
+ * Set PH7_DISABLE_ESP32_ESPIDF_FUNC to exclude ESP-IDF bindings
+ * PH7_DISABLE_ESP32_ARDUINO_FUNC to exclude ESP-IDF bindings 
+ */
+#if defined(ESP32) || defined(__CYGWIN__)
+#  include "esp32/builtins.inc"
+#endif
+
 };
 /*
  * Register the built-in functions defined above,the array functions 

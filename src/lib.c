@@ -1357,6 +1357,13 @@ PH7_PRIVATE void *SySetAt(SySet *pSet, sxu32 nIdx) {
   zBase = (const char *)pSet->pBase;
   return (void *)&zBase[nIdx * pSet->eSize];
 }
+
+
+
+
+
+
+
 /* Private hash entry */
 struct SyHashEntry_Pr {
   const void *pKey; /* Hash key */
@@ -1368,9 +1375,15 @@ struct SyHashEntry_Pr {
   SyHashEntry_Pr *pNext, *pPrev;               /* Next and previous entry in the list */
   SyHashEntry_Pr *pNextCollide, *pPrevCollide; /* Collision list */
 };
+
+
+
+
 #define INVALID_HASH(H) ((H)->apBucket == 0)
 /* Forward declarartion */
 static sxu32 SyBinHash(const void *pSrc, sxu32 nLen);
+
+
 PH7_PRIVATE sxi32 SyHashInit(SyHash *pHash, SyMemBackend *pAllocator, ProcHash xHash, ProcCmp xCmp) {
   SyHashEntry_Pr **apNew;
 #if defined(UNTRUST)
@@ -1393,6 +1406,10 @@ PH7_PRIVATE sxi32 SyHashInit(SyHash *pHash, SyMemBackend *pAllocator, ProcHash x
   pHash->nBucketSize = SXHASH_BUCKET_SIZE;
   return SXRET_OK;
 }
+
+
+
+
 PH7_PRIVATE sxi32 SyHashRelease(SyHash *pHash) {
   SyHashEntry_Pr *pEntry, *pNext;
 #if defined(UNTRUST)
@@ -1418,6 +1435,10 @@ PH7_PRIVATE sxi32 SyHashRelease(SyHash *pHash) {
   pHash->pAllocator = 0;
   return SXRET_OK;
 }
+
+
+
+
 static SyHashEntry_Pr *HashGetEntry(SyHash *pHash, const void *pKey, sxu32 nKeyLen) {
   SyHashEntry_Pr *pEntry;
   sxu32 nHash;
@@ -1436,6 +1457,11 @@ static SyHashEntry_Pr *HashGetEntry(SyHash *pHash, const void *pKey, sxu32 nKeyL
   /* Entry not found */
   return 0;
 }
+
+
+
+
+
 PH7_PRIVATE SyHashEntry *SyHashGet(SyHash *pHash, const void *pKey, sxu32 nKeyLen) {
   SyHashEntry_Pr *pEntry;
 #if defined(UNTRUST)
@@ -1453,6 +1479,9 @@ PH7_PRIVATE SyHashEntry *SyHashGet(SyHash *pHash, const void *pKey, sxu32 nKeyLe
   }
   return (SyHashEntry *)pEntry;
 }
+
+
+
 static sxi32 HashDeleteEntry(SyHash *pHash, SyHashEntry_Pr *pEntry, void **ppUserData) {
   sxi32 rc;
   if (pEntry->pPrevCollide == 0) {
@@ -1473,6 +1502,10 @@ static sxi32 HashDeleteEntry(SyHash *pHash, SyHashEntry_Pr *pEntry, void **ppUse
   rc = SyMemBackendPoolFree(pHash->pAllocator, pEntry);
   return rc;
 }
+
+
+
+
 PH7_PRIVATE sxi32 SyHashDeleteEntry(SyHash *pHash, const void *pKey, sxu32 nKeyLen, void **ppUserData) {
   SyHashEntry_Pr *pEntry;
   sxi32 rc;
@@ -1488,6 +1521,9 @@ PH7_PRIVATE sxi32 SyHashDeleteEntry(SyHash *pHash, const void *pKey, sxu32 nKeyL
   rc = HashDeleteEntry(&(*pHash), pEntry, ppUserData);
   return rc;
 }
+
+
+
 PH7_PRIVATE sxi32 SyHashDeleteEntry2(SyHashEntry *pEntry) {
   SyHashEntry_Pr *pPtr = (SyHashEntry_Pr *)pEntry;
   sxi32 rc;
@@ -1499,6 +1535,8 @@ PH7_PRIVATE sxi32 SyHashDeleteEntry2(SyHashEntry *pEntry) {
   rc = HashDeleteEntry(pPtr->pHash, pPtr, 0);
   return rc;
 }
+
+
 PH7_PRIVATE sxi32 SyHashResetLoopCursor(SyHash *pHash) {
 #if defined(UNTRUST)
   if (INVALID_HASH(pHash)) {
@@ -1508,6 +1546,8 @@ PH7_PRIVATE sxi32 SyHashResetLoopCursor(SyHash *pHash) {
   pHash->pCurrent = pHash->pList;
   return SXRET_OK;
 }
+
+
 PH7_PRIVATE SyHashEntry *SyHashGetNextEntry(SyHash *pHash) {
   SyHashEntry_Pr *pEntry;
 #if defined(UNTRUST)
@@ -1525,6 +1565,9 @@ PH7_PRIVATE SyHashEntry *SyHashGetNextEntry(SyHash *pHash) {
   /* Return the current entry */
   return (SyHashEntry *)pEntry;
 }
+
+
+
 PH7_PRIVATE sxi32 SyHashForEach(SyHash *pHash, sxi32 (*xStep)(SyHashEntry *, void *), void *pUserData) {
   SyHashEntry_Pr *pEntry;
   sxi32 rc;
@@ -1546,6 +1589,8 @@ PH7_PRIVATE sxi32 SyHashForEach(SyHash *pHash, sxi32 (*xStep)(SyHashEntry *, voi
   }
   return SXRET_OK;
 }
+
+
 static sxi32 HashGrowTable(SyHash *pHash) {
   sxu32 nNewSize = pHash->nBucketSize * 2;
   SyHashEntry_Pr *pEntry;
@@ -1579,6 +1624,9 @@ static sxi32 HashGrowTable(SyHash *pHash) {
   pHash->nBucketSize = nNewSize;
   return SXRET_OK;
 }
+
+
+
 static sxi32 HashInsert(SyHash *pHash, SyHashEntry_Pr *pEntry) {
   sxu32 iBucket = pEntry->nHash & (pHash->nBucketSize - 1);
   /* Insert the entry in its corresponding bcuket */
@@ -1595,6 +1643,8 @@ static sxi32 HashInsert(SyHash *pHash, SyHashEntry_Pr *pEntry) {
   pHash->nEntry++;
   return SXRET_OK;
 }
+
+
 PH7_PRIVATE sxi32 SyHashInsert(SyHash *pHash, const void *pKey, sxu32 nKeyLen, void *pUserData) {
   SyHashEntry_Pr *pEntry;
   sxi32 rc;

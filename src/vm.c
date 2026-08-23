@@ -2669,6 +2669,7 @@ static sxi32 VmByteCodeExec(
               /* Candidate for expansion via user defined callbacks */
               pEntry = SyHashGet(&pVm->hConstant, SyBlobData(&pObj->sBlob), SyBlobLength(&pObj->sBlob));
               if (pEntry) {
+//                printf("Const is expanded (%s)\r\n", SyBlobData(&pObj->sBlob));
                 ph7_constant *pCons = (ph7_constant *)pEntry->pUserData;
                 /* Set a NULL default value */
                 MemObjSetType(pTos, MEMOBJ_NULL);
@@ -2679,6 +2680,8 @@ static sxi32 VmByteCodeExec(
                 pTos->nIdx = SXU32_HIGH;
                 break;
               }
+            } else {
+//              printf("Const is built-in (%s)\r\n", SyBlobData(&pObj->sBlob));
             }
             PH7_MemObjLoad(pObj, pTos);
           } else {

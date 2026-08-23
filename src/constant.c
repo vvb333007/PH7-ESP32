@@ -20,6 +20,10 @@
 /* $SymiscID: constant.c v1.1 Win7 2012-08-07 08:22 devel <chm@symisc.net> $ */
 
 #include "ph7int.h"
+#if defined(ESP32) || defined(__CYGWIN__)
+#  include "esp32/constants.h"
+#endif
+
 
 /* This file implement built-in constants for the PH7 engine. */
 /*
@@ -453,6 +457,7 @@ static void PH7_DBIA_Const(ph7_value *pVal, void *pUserData) {
  */
 static void PH7_M_PI_Const(ph7_value *pVal, void *pUserData) {
   SXUNUSED(pUserData); /* cc warning */
+  puts("Const!");
   ph7_value_double(pVal, PH7_PI);
 }
 /*
@@ -1839,7 +1844,10 @@ static const ph7_builtin_constant aBuiltIn[] = {
   { "static", PH7_static_Const },
   { "self", PH7_self_Const },
   { "__CLASS__", PH7_self_Const },
-  { "parent", PH7_parent_Const }
+  { "parent", PH7_parent_Const },
+#if defined(ESP32) || defined(__CYGWIN__)
+#  include "esp32/constants.inc"
+#endif
 };
 /*
  * Register the built-in constants defined above.
