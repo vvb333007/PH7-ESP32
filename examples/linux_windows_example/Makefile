@@ -9,7 +9,7 @@ CC      := gcc
 OBJDIR  := .
 
 # Flags
-CFLAGS  := -Wall -Wextra -O3 -MMD -MP -DPH7_ENABLE_THREADS=1 -DPH7_ENABLE_MATH_FUNC=1
+CFLAGS  := -Wall -Wextra -O3 -MMD -MP -DPH7_ENABLE_THREADS=1 -DPH7_ENABLE_MATH_FUNC=1 -I../../src
 
 
 # Common sources
@@ -26,7 +26,9 @@ COMMON_SRC := \
 ../../src/parse.c \
 ../../src/vfs.c \
 ../../src/posix_vfs.c \
-../../src/vm.c
+../../src/vm.c \
+../../src/esp32/builtins.c \
+../../src/esp32/constants.c
 
 INTER_SRC := $(COMMON_SRC) ph7_interp.c
 INTER_OBJ := $(patsubst %.c,$(OBJDIR)/%.o,$(INTER_SRC))
@@ -37,7 +39,7 @@ TARGETS := inter
 
 .PHONY: all
 
-all: $(TARGETS) clean
+all: $(TARGETS)
 
 inter: $(INTER_OBJ)
 >$(CC) $(CFLAGS)  $^ -o $@

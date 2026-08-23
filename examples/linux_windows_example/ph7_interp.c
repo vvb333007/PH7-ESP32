@@ -153,7 +153,7 @@ int main(int argc,char **argv)
 */
 
   /* Allocate a new PH7 engine instance */
-puts("ph7_init()");
+
   rc = ph7_init(&pEngine);
   if( rc != PH7_OK ){
     /*
@@ -228,7 +228,8 @@ puts("ph7_init()");
    * And finally, execute our program. Note that your output (STDOUT in our case)
    * should display the result.
    */
-
+puts("EXECUTION:");
+fflush(stdout);
   ph7_vm_exec(pVm,0);
   /* All done, cleanup the mess left behind.
   */
