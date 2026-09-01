@@ -187,7 +187,7 @@ static sxi32 GenStateEnterBlock(
   ph7_gen_state *pGen, /* Code generator state */
   sxi32 iType,         /* Block type [i.e: loop, conditional, function body, etc.]*/
   sxu32 nFirstInstr,   /* First instruction to compile */
-  void *pUserData,     /* Upper layer private data */
+  void *pUserData,     /* Upper layer private data, e.g. ph7_vm_func for functions */
   GenBlock **ppBlock   /* OUT: instantiated block */
 ) {
   GenBlock *pBlock;
@@ -3016,17 +3016,58 @@ static sxi32 PH7_CompileGlobal(ph7_gen_state *pGen) {
 static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
   sxi32 nRet = 0; /* TRUE if there is a return value */
   sxi32 rc;
+  int func_is_void = 0;
+  int func_must_return = 0;
   /* Jump the 'return' keyword */
   pGen->pIn++;
-  if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_SEMI) == 0) {
-    /* Compile the expression */
-    rc = PH7_CompileExpr(&(*pGen), 0, 0);
-    if (rc == SXERR_ABORT) {
-      return SXERR_ABORT;
-    } else if (rc != SXERR_EMPTY) {
-      nRet = 1;
+  ph7_vm_func *pFunc = NULL;
+  sxi32 nLine = pGen->pIn->nLine;
+
+  // Find out if 'return' is called from within a function.
+  // If it is - then check if function has a return type
+  //
+  GenBlock *pBlock = pGen->pCurrent;
+  while (pBlock) {
+    if (pBlock->iFlags & GEN_BLOCK_FUNC) {
+      pFunc = (ph7_vm_func *)pBlock->pUserData;
+      if (pFunc->iFlags & VM_FUNC_RET_TYPE) {
+        if (pFunc->iFlags & PH7_TKWRD_VOID)
+          func_is_void = 1;
+        else
+          func_must_return = 1;
+      }
+      break;
     }
+    pBlock = pBlock->pParent;
   }
+
+  if (pGen->pIn < pGen->pEnd) {
+
+    // Is it ; right after 'return' or do we have an expression ?
+    if ((pGen->pIn->nType & PH7_TK_SEMI) == 0) {
+      // return statement with expression. incompatible with :void functions
+      if (func_is_void) {
+        PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Returning a value from 'void' function");
+        return SXERR_ABORT;
+      }
+
+      /* Compile the expression */
+      rc = PH7_CompileExpr(&(*pGen), 0, 0);
+      if (rc == SXERR_ABORT) {
+        return SXERR_ABORT;
+      } else if (rc != SXERR_EMPTY) {
+        nRet = 1;
+      }
+    } else {
+      // Empty return; statement. incompatible with PHP7-style functions, except :void
+      if (func_must_return) {
+        PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Function must return value");
+        return SXERR_ABORT;
+      }
+    } 
+  }
+
+
   /* Emit the done instruction */
   PH7_VmEmitInstr(pGen->pVm, PH7_OP_DONE, nRet, 0, 0, 0);
   return SXRET_OK;
@@ -3706,8 +3747,16 @@ static sxi32 GenStateCompileFuncBody(
   GenBlock *pBlock;
   sxu32 nGotoOfft;
   sxi32 rc;
+
   /* Attach the new function */
-  rc = GenStateEnterBlock(&(*pGen), GEN_BLOCK_PROTECTED | GEN_BLOCK_FUNC, PH7_VmInstrLength(pGen->pVm), pFunc, &pBlock);
+  rc = GenStateEnterBlock(&(*pGen), 
+                          GEN_BLOCK_PROTECTED | GEN_BLOCK_FUNC, 
+                          PH7_VmInstrLength(pGen->pVm),
+                          pFunc,      /* pBlock.pUserData = pFunc; */
+                          &pBlock);
+
+//  printf("GenStateCompileFuncBody() : pBlock == %p, iFlags=%08x\r\n",pBlock, pBlock->iFlags);
+
   if (rc != SXRET_OK) {
     PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out-of-memory");
     /* Don't worry about freeing memory, everything will be released shortly */
@@ -3718,7 +3767,16 @@ static sxi32 GenStateCompileFuncBody(
   pInstrContainer = PH7_VmGetByteCodeContainer(pGen->pVm);
   PH7_VmSetByteCodeContainer(pGen->pVm, &pFunc->aByteCode);
   /* Compile the body */
-  PH7_CompileBlock(&(*pGen), 0);
+
+//  printf("PH7_CompileBlock() start\r\n");
+  rc = PH7_CompileBlock(&(*pGen), 0);
+  if (rc != SXRET_OK) {
+    /* Don't worry about freeing memory, everything will be released shortly */
+    return SXERR_ABORT;
+  }
+
+//  printf("PH7_CompileBlock() end\r\n");
+
   /* Fix exception jumps now the destination is resolved */
   GenStateFixJumps(pGen->pCurrent, PH7_OP_THROW, PH7_VmInstrLength(pGen->pVm));
   /* Emit the final return if not yet done */
@@ -3957,6 +4015,9 @@ static sxi32 PH7_CompileFunction(ph7_gen_state *pGen) {
 
   nLine = pGen->pIn->nLine;
   pGen->pIn++; /* Jump the 'function' keyword */
+
+//  printf("PH7_CompileFunction\r\n");
+
   iFlags = 0;
   if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_AMPER)) {
     /* Return by reference,remember that */
@@ -3964,7 +4025,7 @@ static sxi32 PH7_CompileFunction(ph7_gen_state *pGen) {
     /* Jump the '&' token */
     pGen->pIn++;
   }
-  if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & (PH7_TK_ID | PH7_TK_KEYWORD)) == 0) {
+  if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & (/*PH7_TK_ID | */PH7_TK_KEYWORD)) != 0) { //BUG:
     /* Invalid function name */
     rc = PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Invalid function name");
     if (rc == SXERR_ABORT) {
@@ -6410,7 +6471,7 @@ PH7_PRIVATE sxi32 PH7_GenCompileError(ph7_gen_state *pGen, sxi32 nErrType, sxu32
   if (nErrType == E_ERROR) {
     /* Increment the error counter */
     pGen->nErr++;
-    if (pGen->nErr > 15) {
+    if (pGen->nErr > PH7_ERR_LIMIT) {
       /* Error count limit reached */
       if (pGen->xErr) {
         SyBlobFormat(pWorker, "%u Error count limit reached,PH7 is aborting compilation\n", nLine);
@@ -6451,4 +6512,5 @@ PH7_PRIVATE sxi32 PH7_GenCompileError(ph7_gen_state *pGen, sxi32 nErrType, sxu32
   }
   return rc;
 }
+
 

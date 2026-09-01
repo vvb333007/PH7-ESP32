@@ -72,6 +72,13 @@
  * Refer to [ph7_lib_version()], [ph7_lib_signature()], [ph7_lib_ident()] and
  * [ph7_lib_copyright()] for more information.
  */
+
+
+/*
+ * The PH7_ERR_LIMIT C preprocessor macro sets the maximum number of errors tolerated by the compiler before it aborts compilation
+ */
+#define PH7_ERR_LIMIT 1
+
 /*
  * The PH7_VERSION C preprocessor macroevaluates to a string literal
  * that is the ph7 version in the format "X.Y.Z" where X is the major
