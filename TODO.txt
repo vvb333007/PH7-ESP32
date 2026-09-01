@@ -4,3 +4,44 @@ Implement ESP32 builtins:
   2. I2C operations
   3. UART operations
   4. LwIP builtins
+
+
+1)
+types: add 'resource' type (alias it to uint64)
+
+<?php  
+resource $var = fopen()
+?>
+
+
+2)
+enums: add new keyword 'enum', implement it as a class, so Class::field syntax can be naturally used:
+Casting enums: pure vs key=>value
+
+<?php
+enum Suit
+{
+    case Hearts;
+    case Diamonds;
+    case Clubs;
+    case Spades;
+}
+
+function do_stuff(Suit $s)
+{
+    // ...
+}
+
+do_stuff(Suit::Spades);
+?>
+
+
+3)
+'match' keyword
+
+
+4)
+Short array syntax []
+
+5)
+function_exists()
