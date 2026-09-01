@@ -3805,8 +3805,32 @@ static sxi32 GenStateCompileFunc(
       return SXERR_ABORT;
     }
   }
-  /* Compile function body */
-  pGen->pIn = &pEnd[1];
+  
+  /* Compile return type if exists */
+  if (pEnd[1].nType == PH7_TK_COLON) {
+    /* 7.x route */
+    if (&pEnd[2] < pGen->pEnd) {
+      if (pEnd[2].nType != PH7_TK_KEYWORD) {
+        PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type is expected after ':'");
+        return SXERR_ABORT;
+      }
+
+      sxu32 nKey = (sxu32)(SX_PTR_TO_INT(pEnd[2].pUserData));
+
+      // Check if nKey is one of a valid types
+//      printf("Function '%s' has return type %08x\r\n",zName, (unsigned int)nKey);
+
+      // Add return type to the function flags
+      pFunc->iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey);
+
+      // Skip two tokens (a colon and a type decl)
+      pGen->pIn = &pEnd[1 + 2];
+    }
+  } else
+    /* 5.x route */
+    pGen->pIn = &pEnd[1];
+
+  /* Compile function body: handle closures */
   if (bHandleClosure) {
     ph7_vm_func_closure_env sEnv;
     int got_this = 0; /* TRUE if $this have been seen */

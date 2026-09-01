@@ -585,8 +585,11 @@ static sxi32 TokenizePHP(SyStream *pStream, SyToken *pToken, void *pUserData, vo
 ** is substantially reduced.  This is important for embedded applications
 ** on platforms with limited memory.
 */
-/* Hash score: 103 */
+//#define ORIG_HASH 1
 static sxu32 KeywordCode(const char *z, int n) {
+
+#if ORIG_HASH
+  /* Hash score: 103 */
   /* zText[] encodes 532 bytes of keywords in 333 bytes */
   /*   extendswitchprintegerequire_oncenddeclareturnamespacechobject      */
   /*   hrowbooleandefaultrycaselfinalistaticlonewconstringlobaluse        */
@@ -675,9 +678,99 @@ static sxu32 KeywordCode(const char *z, int n) {
     PH7_TKWRD_XOR, PH7_TKWRD_ARRAY, PH7_TKWRD_AS, PH7_TKWRD_ARRAY, PH7_TKWRD_EXIT,
     PH7_TKWRD_UNSET, PH7_TKWRD_XOR, PH7_TKWRD_OR, PH7_TKWRD_BREAK
   };
+#else
+/* Hash score: 88 */
+static const char zText[296] = {
+  'e','x','t','e','n','d','s','w','i','t','c','h','e','n','d','d','e','c',
+  'l','a','r','e','q','u','i','r','e','_','o','n','c','e','l','s','e','l',
+  'f','i','n','a','l','i','s','t','a','t','i','c','a','s','e','q','p','r',
+  'i','n','t','e','r','f','a','c','e','c','h','o','b','j','e','c','t','h',
+  'r','o','w','c','l','o','n','e','w','c','o','n','s','t','r','i','n','g',
+  'l','o','b','a','l','s','n','e','l','i','f','l','o','a','t','r','y','u',
+  's','e','n','d','i','f','u','n','c','t','i','o','n','a','m','e','s','p',
+  'a','c','e','n','d','w','h','i','l','e','v','a','l','v','a','r','r','a',
+  'y','a','b','s','t','r','a','c','t','a','n','d','e','f','a','u','l','t',
+  'b','o','o','l','c','l','a','s','s','c','o','n','t','i','n','u','e','x',
+  'i','t','d','i','e','m','p','t','y','d','o','g','o','t','o','i','m','p',
+  'l','e','m','e','n','t','s','i','n','c','l','u','d','e','_','o','n','c',
+  'e','n','d','f','o','r','e','a','c','h','i','n','s','t','a','n','c','e',
+  'o','f','i','s','s','e','t','p','a','r','e','n','t','p','r','i','v','a',
+  't','e','p','r','o','t','e','c','t','e','d','p','u','b','l','i','c','a',
+  't','c','h','r','e','t','u','r','n','u','n','s','e','t','v','o','i','d',
+  'x','o','r','b','r','e','a','k',
+};
+/* aKWHash[i] is the hash value for the i-th keyword */
+static const unsigned char aHash[122] = {
+     0,   0,  36,  52,  30,   0,  49,  17,  16,  61,  67,  24,   0,
+    54,   0,   0,   0,   0,  53,  68,   0,   0,   0,   0,   0,   0,
+    32,   0,   0,   0,   0,  15,  62,   0,  60,   0,  34,   0,   0,
+     0,  27,  31,   0,   2,  55,  57,   0,   0,   0,  46,   0,   0,
+     0,   0,  20,  66,   0,  35,   0,  70,   0,   0,  29,   0,   0,
+     4,  48,   0,   0,   8,   0,  28,   0,   0,  56,   0,   0,   0,
+    43,   0,   1,  42,  71,  58,   0,   0,  44,   0,   0,   0,  37,
+    51,   0,   0,   0,  10,  33,   0,   0,  18,  25,  50,  26,   0,
+     0,  12,   0,  64,  19,   0,  63,   0,  39,   6,   0,   0,   0,
+    65,  69,   0,   3,   0,
+};
+/* aKWNext[] forms the hash collision chain.  If aKWHash[i]==0
+** then the i-th keyword has no more hash collisions.  Otherwise,
+** the next keyword with the same hash is aKWHash[i]-1. */
+static const unsigned char aNext[72] = {
+     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  22,   7,
+     0,   0,   5,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+     0,   0,   0,   0,  40,   0,  41,   0,   0,   9,  45,  23,   0,
+     0,   0,  21,   0,  13,   0,  11,  14,   0,   0,  59,   0,   0,
+     0,   0,  38,   0,   0,  47,
+};
+/* aKWLen[i] is the length (in bytes) of the i-th keyword */
+static const unsigned char aLen[72] = {
+     7,   9,   6,   6,   7,  12,   7,   4,   4,   5,   4,   6,   4,
+     3,   5,   9,   3,   4,   6,   5,   5,   3,   5,   6,   6,   3,
+     4,   5,   3,   3,   5,   2,   8,   9,   8,   5,   4,   3,   5,
+     8,   3,   7,   4,   5,   2,   8,   4,   3,   5,   2,   4,  10,
+     7,  12,  10,   6,   7,   3,   2,  10,   5,   6,   7,   9,   6,
+     5,   6,   5,   4,   3,   5,
+};
+/* aKWOffset[i] is the index into zKWText[] of the start of
+** the text for the i-th keyword. */
+static const sxu16 aOffset[72] = {
+     0,   3,   6,  12,  15,  20,  20,  31,  33,  36,  40,  42,  47,
+    49,  52,  54,  54,  62,  65,  70,  75,  78,  81,  84,  89,  95,
+    97, 100, 104, 107, 109, 112, 113, 120, 128, 131, 135, 139, 140,
+   145, 153, 155, 162, 166, 168, 171, 178, 182, 184, 189, 191, 195,
+   205, 205, 216, 216, 219, 219, 220, 226, 236, 241, 247, 254, 263,
+   268, 273, 279, 284, 288, 291,
+};
+/* aKWCode[i] is the parser symbol code for the i-th keyword */
+static const sxu32 aCode[72] = {
+  PH7_TKWRD_EXTENDS,   PH7_TKWRD_ENDSWITCH,     PH7_TKWRD_SWITCH,  PH7_TKWRD_ENDDEC,  PH7_TKWRD_DECLARE,   
+  PH7_TKWRD_REQONCE,   PH7_TKWRD_REQUIRE,   PH7_TKWRD_ELSE,PH7_TKWRD_SELF,PH7_TKWRD_FINAL, 
+  PH7_TKWRD_LIST,PH7_TKWRD_STATIC,  PH7_TKWRD_CASE,PH7_TKWRD_SEQ, PH7_TKWRD_PRINT, 
+  PH7_TKWRD_INTERFACE,     PH7_TKWRD_INT, PH7_TKWRD_ECHO,PH7_TKWRD_OBJECT,  PH7_TKWRD_THROW, 
+  PH7_TKWRD_CLONE, PH7_TKWRD_NEW, PH7_TKWRD_CONST, PH7_TKWRD_STRING,  PH7_TKWRD_GLOBAL,  
+  PH7_TKWRD_SNE, PH7_TKWRD_ELIF,PH7_TKWRD_FLOAT, PH7_TKWRD_TRY, PH7_TKWRD_USE, 
+  PH7_TKWRD_ENDIF, PH7_TKWRD_IF,  PH7_TKWRD_FUNCTION,    PH7_TKWRD_NAMESPACE,     PH7_TKWRD_ENDWHILE,    
+  PH7_TKWRD_WHILE, PH7_TKWRD_EVAL,PH7_TKWRD_VAR, PH7_TKWRD_ARRAY, PH7_TKWRD_ABSTRACT,    
+  PH7_TKWRD_AND, PH7_TKWRD_DEFAULT,   PH7_TKWRD_BOOL,PH7_TKWRD_CLASS, PH7_TKWRD_AS,  
+  PH7_TKWRD_CONTINUE,    PH7_TKWRD_EXIT,PH7_TKWRD_DIE, PH7_TKWRD_EMPTY, PH7_TKWRD_DO,  
+  PH7_TKWRD_GOTO,PH7_TKWRD_IMPLEMENTS,      PH7_TKWRD_INCLUDE,   PH7_TKWRD_INCONCE,   PH7_TKWRD_END4EACH,    
+  PH7_TKWRD_ENDFOR,  PH7_TKWRD_FOREACH,   PH7_TKWRD_FOR, PH7_TKWRD_OR,  PH7_TKWRD_INSTANCEOF,      
+  PH7_TKWRD_ISSET, PH7_TKWRD_PARENT,  PH7_TKWRD_PRIVATE,   PH7_TKWRD_PROTECTED,     PH7_TKWRD_PUBLIC,  
+  PH7_TKWRD_CATCH, PH7_TKWRD_RETURN,  PH7_TKWRD_UNSET, PH7_TKWRD_VOID,PH7_TKWRD_XOR, 
+  PH7_TKWRD_BREAK, 
+};
+#endif
+
   int h, i;
   if (n < 2) return PH7_TK_ID;
+
+#if ORIG_HASH
   h = (((int)z[0] * 4) ^ ((int)z[n - 1] * 3) ^ n) % 151;
+#else
+  h = (((int)z[0] * 4) ^ ((int)z[n - 1] * 3) ^ n) % 122;
+#endif
+
   for (i = ((int)aHash[h]) - 1; i >= 0; i = ((int)aNext[i]) - 1) {
     if ((int)aLen[i] == n && SyMemcmp(&zText[aOffset[i]], z, n) == 0) {
       /* PH7_TKWRD_EXTENDS */

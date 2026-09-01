@@ -1125,12 +1125,21 @@ struct ph7_vm_func_closure_env {
              */
 };
 /* Function configuration flags */
-#define VM_FUNC_ARG_BY_REF 0x001   /* Argument passed by reference */
-#define VM_FUNC_ARG_HAS_DEF 0x002  /* Argument has default value associated with it */
-#define VM_FUNC_REF_RETURN 0x004   /* Return by reference */
+#define VM_FUNC_ARG_BY_REF   0x001   /* Argument passed by reference */
+#define VM_FUNC_ARG_HAS_DEF  0x002  /* Argument has default value associated with it */
+#define VM_FUNC_REF_RETURN   0x004   /* Return by reference */
 #define VM_FUNC_CLASS_METHOD 0x008 /* VM function is in fact a class method */
-#define VM_FUNC_CLOSURE 0x010      /* VM function is a closure */
-#define VM_FUNC_ARG_IGNORE 0x020   /* Do not install argument in the current frame */
+#define VM_FUNC_CLOSURE      0x010      /* VM function is a closure */
+#define VM_FUNC_ARG_IGNORE   0x020   /* Do not install argument in the current frame */
+#define VM_FUNC_RET_TYPE     0x040   /* PHP 7.0 syntax was used for the function return type */
+
+/* Types are 0x?????000 so can be ORed with above flags, when VM_FUNC_RET_TYPE is set */
+#define VM_FUNC_RET_BOOL   PH7_TKWRD_BOOL
+#define VM_FUNC_RET_INT    PH7_TKWRD_INT
+#define VM_FUNC_RET_FLOAT  PH7_TKWRD_FLOAT
+#define VM_FUNC_RET_STRING PH7_TKWRD_STRING
+#define VM_FUNC_RET_OBJECT PH7_TKWRD_OBJECT
+
 /*
  * Each user defined function is parsed out and stored in an instance
  * of the following structure.
@@ -1702,11 +1711,14 @@ enum ph7_expr_id {
 #define PH7_TKWRD_XOR 0x4000         /* xor: MUST BE A POWER OF TWO  */
 #define PH7_TKWRD_BREAK 55           /* break */
 #define PH7_TKWRD_GOTO 56            /* goto */
-#define PH7_TKWRD_BOOL 0x8000        /* bool:  MUST BE A POWER OF TWO */
-#define PH7_TKWRD_INT 0x10000        /* int:   MUST BE A POWER OF TWO */
-#define PH7_TKWRD_FLOAT 0x20000      /* float:  MUST BE A POWER OF TWO */
+
+#define PH7_TKWRD_BOOL   0x08000     /* bool:  MUST BE A POWER OF TWO */
+#define PH7_TKWRD_INT    0x10000     /* int:   MUST BE A POWER OF TWO */
+#define PH7_TKWRD_FLOAT  0x20000     /* float:  MUST BE A POWER OF TWO */
 #define PH7_TKWRD_STRING 0x40000     /* string: MUST BE A POWER OF TWO */
 #define PH7_TKWRD_OBJECT 0x80000     /* object: MUST BE A POWER OF TWO */
+#define PH7_TKWRD_VOID 0x80000000    /* void: MUST BE A POWER OF TWO, use the very last bit */
+
 #define PH7_TKWRD_SEQ 0x100000       /* String string comparison operator: 'eq' equal MUST BE A POWER OF TWO */
 #define PH7_TKWRD_SNE 0x200000       /* String string comparison operator: 'ne' not equal MUST BE A POWER OF TWO */
 /* JSON encoding/decoding related definition */
