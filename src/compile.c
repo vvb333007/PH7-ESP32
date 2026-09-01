@@ -3863,30 +3863,8 @@ static sxi32 GenStateCompileFunc(
       return SXERR_ABORT;
     }
   }
-  
-  /* Compile return type if exists */
-  if (pEnd[1].nType == PH7_TK_COLON) {
-    /* 7.x route */
-    if (&pEnd[2] < pGen->pEnd) {
-      if (pEnd[2].nType != PH7_TK_KEYWORD) {
-        PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type is expected after ':'");
-        return SXERR_ABORT;
-      }
 
-      sxu32 nKey = (sxu32)(SX_PTR_TO_INT(pEnd[2].pUserData));
-
-      // Check if nKey is one of a valid types
-//      printf("Function '%s' has return type %08x\r\n",zName, (unsigned int)nKey);
-
-      // Add return type to the function flags
-      pFunc->iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey);
-
-      // Skip two tokens (a colon and a type decl)
-      pGen->pIn = &pEnd[1 + 2];
-    }
-  } else
-    /* 5.x route */
-    pGen->pIn = &pEnd[1];
+  pGen->pIn = &pEnd[1];
 
   /* Compile function body: handle closures */
   if (bHandleClosure) {
@@ -3894,7 +3872,7 @@ static sxi32 GenStateCompileFunc(
     int got_this = 0; /* TRUE if $this have been seen */
     if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)
         && SX_PTR_TO_INT(pGen->pIn->pUserData) == PH7_TKWRD_USE) {
-      sxu32 nLine = pGen->pIn->nLine;
+      /*sxu32*/ nLine = pGen->pIn->nLine;
       /* Closure,record environment variable */
       pGen->pIn++;
       if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_LPAREN) == 0) {
@@ -3962,7 +3940,8 @@ static sxi32 GenStateCompileFunc(
           /* Ignore trailing commas */
           pGen->pIn++;
         }
-      }
+      } // while
+
       if (!got_this) {
         /* Make the $this variable [Current processed Object (class instance)]  
            * available to the closure environment.
@@ -3977,8 +3956,36 @@ static sxi32 GenStateCompileFunc(
         /* Mark as closure */
         pFunc->iFlags |= VM_FUNC_CLOSURE;
       }
+    } // if got 'use'
+  }
+
+#if 1
+  /* Compile return type if exists */
+  nLine = pGen->pIn->nLine;
+  if (pGen->pIn->nType == PH7_TK_COLON) {
+    /* 7.x route, skip ':' */
+    pGen->pIn++;
+    if (pGen->pIn < pGen->pEnd) {
+      if (pGen->pIn->nType != PH7_TK_KEYWORD) {
+err:
+        PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type is expected after ':'");
+        return SXERR_ABORT;
+      }
+
+      sxu32 nKey = (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData));
+
+      // Check if nKey is one of a valid types: object, string, array, int, bool, resource
+      //printf("Function '%s' has return type %08x\r\n",zName, (unsigned int)nKey);
+      if ((nKey & VM_FUNC_RET_MASK) == 0)
+        goto err;
+
+      // Add return type to the function flags
+      pFunc->iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey);
+      pGen->pIn++;
     }
   }
+#endif
+
   /* Compile the body */
   rc = GenStateCompileFuncBody(&(*pGen), pFunc);
   if (rc == SXERR_ABORT) {

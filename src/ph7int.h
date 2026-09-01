@@ -1124,6 +1124,7 @@ struct ph7_vm_func_closure_env {
              *]
              */
 };
+
 /* Function configuration flags */
 #define VM_FUNC_ARG_BY_REF   0x001   /* Argument passed by reference */
 #define VM_FUNC_ARG_HAS_DEF  0x002  /* Argument has default value associated with it */
@@ -1131,14 +1132,17 @@ struct ph7_vm_func_closure_env {
 #define VM_FUNC_CLASS_METHOD 0x008 /* VM function is in fact a class method */
 #define VM_FUNC_CLOSURE      0x010      /* VM function is a closure */
 #define VM_FUNC_ARG_IGNORE   0x020   /* Do not install argument in the current frame */
-#define VM_FUNC_RET_TYPE     0x040   /* PHP 7.0 syntax was used for the function return type */
 
-/* Types are 0x?????000 so can be ORed with above flags, when VM_FUNC_RET_TYPE is set */
-#define VM_FUNC_RET_BOOL   PH7_TKWRD_BOOL
-#define VM_FUNC_RET_INT    PH7_TKWRD_INT
-#define VM_FUNC_RET_FLOAT  PH7_TKWRD_FLOAT
-#define VM_FUNC_RET_STRING PH7_TKWRD_STRING
-#define VM_FUNC_RET_OBJECT PH7_TKWRD_OBJECT
+#define VM_FUNC_RET_TYPE     0x040   /* PHP 7.0 syntax was used for the function return type (i.e. :void) */
+
+/* Types are keywords with IDs which are power of two integers.  Compiler stores return 
+ * function type (if set) into iFlags field (ORed) when VM_FUNC_RET_TYPE is set 
+ */
+#define VM_FUNC_RET_MASK \
+  (PH7_TKWRD_ARRAY | PH7_TKWRD_BOOL | PH7_TKWRD_INT | \
+   PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_OBJECT | \
+   PH7_TKWRD_VOID)
+
 
 /*
  * Each user defined function is parsed out and stored in an instance
@@ -1641,7 +1645,7 @@ enum ph7_expr_id {
 #define PH7_TK_ARRAY_OP 0x0800000                 /* Array operator '=>' */
 #define PH7_TK_OTHER 0x1000000                    /* Other symbols */
 /*
- * PHP keyword.
+ * PHP keyword IDs.
  * These words have special meaning in PHP. Some of them represent things which look like
  * functions, some look like constants, and so on, but they're not, really: they are language constructs.
  * You cannot use any of the following words as constants, class names, function or method names.
@@ -1657,8 +1661,8 @@ enum ph7_expr_id {
 /* The number '8' is reserved for PH7_TK_ID */
 #define PH7_TKWRD_REQONCE 9          /* require_once */
 #define PH7_TKWRD_REQUIRE 10         /* require */
-#define PH7_TKWRD_ELIF 0x4000000     /* elseif: MUST BE A POWER OF TWO */
-#define PH7_TKWRD_ELSE 0x8000000     /* else:  MUST BE A POWER OF TWO */
+/* The number '11' is reserved */ 
+/* The number '12' is reserved */
 #define PH7_TKWRD_IF 13              /* if */
 #define PH7_TKWRD_FINAL 14           /* final */
 #define PH7_TKWRD_LIST 15            /* list */
@@ -1667,20 +1671,16 @@ enum ph7_expr_id {
 #define PH7_TKWRD_SELF 18            /* self */
 #define PH7_TKWRD_FUNCTION 19        /* function */
 #define PH7_TKWRD_NAMESPACE 20       /* namespace */
-#define PH7_TKWRD_ENDIF 0x400000     /* endif: MUST BE A POWER OF TWO */
-#define PH7_TKWRD_CLONE 0x80         /* clone: MUST BE A POWER OF TWO  */
-#define PH7_TKWRD_NEW 0x100          /* new: MUST BE A POWER OF TWO  */
+/* The number '21' is reserved */
 #define PH7_TKWRD_CONST 22           /* const */
 #define PH7_TKWRD_THROW 23           /* throw */
 #define PH7_TKWRD_USE 24             /* use */
-#define PH7_TKWRD_ENDWHILE 0x800000  /* endwhile: MUST BE A POWER OF TWO */
+/* The number '25' is reserved */
 #define PH7_TKWRD_WHILE 26           /* while */
 #define PH7_TKWRD_EVAL 27            /* eval */
 #define PH7_TKWRD_VAR 28             /* var */
-#define PH7_TKWRD_ARRAY 0x200        /* array: MUST BE A POWER OF TWO */
 #define PH7_TKWRD_ABSTRACT 29        /* abstract */
 #define PH7_TKWRD_TRY 30             /* try */
-#define PH7_TKWRD_AND 0x400          /* and: MUST BE A POWER OF TWO  */
 #define PH7_TKWRD_DEFAULT 31         /* default */
 #define PH7_TKWRD_CLASS 32           /* class */
 #define PH7_TKWRD_AS 33              /* as */
@@ -1693,34 +1693,48 @@ enum ph7_expr_id {
 #define PH7_TKWRD_INCONCE 40         /* include_once */
 #define PH7_TKWRD_INCLUDE 41         /* include */
 #define PH7_TKWRD_EMPTY 42           /* empty */
-#define PH7_TKWRD_INSTANCEOF 0x800   /* instanceof: MUST BE A POWER OF TWO  */
 #define PH7_TKWRD_ISSET 43           /* isset */
 #define PH7_TKWRD_PARENT 44          /* parent */
 #define PH7_TKWRD_PRIVATE 45         /* private */
-#define PH7_TKWRD_ENDFOR 0x1000000   /* endfor: MUST BE A POWER OF TWO */
-#define PH7_TKWRD_END4EACH 0x2000000 /* endforeach: MUST BE A POWER OF TWO */
 #define PH7_TKWRD_FOR 48             /* for */
 #define PH7_TKWRD_FOREACH 49         /* foreach */
-#define PH7_TKWRD_OR 0x1000          /* or: MUST BE A POWER OF TWO  */
 #define PH7_TKWRD_PROTECTED 50       /* protected */
 #define PH7_TKWRD_DO 51              /* do */
 #define PH7_TKWRD_PUBLIC 52          /* public */
 #define PH7_TKWRD_CATCH 53           /* catch */
 #define PH7_TKWRD_RETURN 54          /* return */
-#define PH7_TKWRD_UNSET 0x2000       /* unset: MUST BE A POWER OF TWO  */
-#define PH7_TKWRD_XOR 0x4000         /* xor: MUST BE A POWER OF TWO  */
 #define PH7_TKWRD_BREAK 55           /* break */
 #define PH7_TKWRD_GOTO 56            /* goto */
 
-#define PH7_TKWRD_BOOL   0x08000     /* bool:  MUST BE A POWER OF TWO */
-#define PH7_TKWRD_INT    0x10000     /* int:   MUST BE A POWER OF TWO */
-#define PH7_TKWRD_FLOAT  0x20000     /* float:  MUST BE A POWER OF TWO */
-#define PH7_TKWRD_STRING 0x40000     /* string: MUST BE A POWER OF TWO */
-#define PH7_TKWRD_OBJECT 0x80000     /* object: MUST BE A POWER OF TWO */
-#define PH7_TKWRD_VOID 0x80000000    /* void: MUST BE A POWER OF TWO, use the very last bit */
+// Keywords 57..127 are available for use for language extensions
 
-#define PH7_TKWRD_SEQ 0x100000       /* String string comparison operator: 'eq' equal MUST BE A POWER OF TWO */
-#define PH7_TKWRD_SNE 0x200000       /* String string comparison operator: 'ne' not equal MUST BE A POWER OF TWO */
+/* Constants which MUST BE A POWER OF TWO  */
+#define PH7_TKWRD_CLONE    0x00000080         /* clone */
+#define PH7_TKWRD_NEW      0x00000100          /* new */
+#define PH7_TKWRD_ARRAY    0x00000200        /* array: MUST BE A POWER OF TWO */
+#define PH7_TKWRD_AND      0x00000400          /* and */
+#define PH7_TKWRD_INSTANCEOF 0x000800   /* instanceof */
+#define PH7_TKWRD_OR       0x00001000          /* or */
+#define PH7_TKWRD_UNSET    0x00002000       /* unset */
+#define PH7_TKWRD_XOR      0x00004000         /* xor */
+#define PH7_TKWRD_BOOL     0x00008000     /* bool */
+#define PH7_TKWRD_INT      0x00010000     /* int */ 
+#define PH7_TKWRD_FLOAT    0x00020000     /* float */
+#define PH7_TKWRD_STRING   0x00040000     /* string */ 
+#define PH7_TKWRD_OBJECT   0x00080000     /* object */ 
+#define PH7_TKWRD_SEQ      0x00100000       /* String string comparison operator */ 
+#define PH7_TKWRD_SNE      0x00200000       /* String string comparison operator */ 
+#define PH7_TKWRD_ENDIF    0x00400000     /* endif */ 
+#define PH7_TKWRD_ENDWHILE 0x00800000  /* endwhile */ 
+#define PH7_TKWRD_ENDFOR   0x01000000   /* endfor */ 
+#define PH7_TKWRD_END4EACH 0x02000000 /* endforeach */ 
+#define PH7_TKWRD_ELIF     0x04000000     /* elseif */ 
+#define PH7_TKWRD_ELSE     0x08000000     /* else */ 
+// Keyword 0x10000000 is available for use for language extensions, e.g. 'resource' type
+// Keyword 0x20000000 is available for use for language extensions, 
+// Keyword 0x40000000 is available for use for language extensions
+#define PH7_TKWRD_VOID     0x80000000    /* void */
+
 /* JSON encoding/decoding related definition */
 enum json_err_code {
   JSON_ERROR_NONE = 0,       /* No error has occurred. */

@@ -906,6 +906,27 @@ int ph7_vm_exec(ph7_vm *pVm, int *pExitStatus) {
   /* Execution result */
   return rc;
 }
+
+/*
+ * [CAPIREF: ph7_vm_exec()]
+ * Same as ph7_vm_exec() but doesn't run TOP code block: instead calls 'setup()' once and then 'loop()' in a loop
+ */
+int ph7_vm_exec_sketch(ph7_vm *pVm) {
+
+# if 0
+  ph7_vm_call_function(pVm, "setup", 0, NULL, NULL); //TODO: check if NULL can be passed
+  // TODO: atomic_load()
+  while (pVm->iAbort == 0) {
+    ph7_vm_call_function(pVm, "loop", 0, NULL, NULL); //TODO: check if NULL can be passed
+    // TODO: call OS-specific yield()
+    xYield(); 
+  }
+#endif
+  return PH7_OK;
+}
+
+
+
 /*
  * [CAPIREF: ph7_vm_reset()]
  * Please refer to the official documentation for function purpose and expected parameters.

@@ -628,6 +628,16 @@ static sxi32 ExprAssembleAnnon(ph7_gen_state *pGen, SyToken **ppCur, SyToken *pE
       goto Synchronize;
     }
   }
+  /* Jump return type if any */
+  if (pIn->nType & PH7_TK_COLON /*':'*/) {
+    pIn++;
+    if ((pIn->nType & PH7_TK_KEYWORD) == 0) {
+      if (PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "A function return type is expected after ':'") == SXERR_ABORT)
+        return SXERR_ABORT;
+    } else
+      pIn++;
+  }
+
   if (pIn->nType & PH7_TK_OCB /*'{'*/) {
     pIn++; /* Jump the leading curly '{' */
     PH7_DelimitNestedTokens(pIn, pEnd, PH7_TK_OCB /*'{'*/, PH7_TK_CCB /*'}'*/, &pIn);
