@@ -1,24 +1,70 @@
-Implement ESP32 builtins:
+# TODO
 
-  1. GPIO operations
-  2. I2C operations
-  3. UART operations
-  4. LwIP builtins
+## Milestones
+
+---
+
+### 1. Interrupt subsystem
+
+* GPIO interrupts
+* PCNT interrupts
+* Register PHP fnctions as interrupt handlers
+* Event-based dispatch
+
+### 2. VM Yield subsystem
+
+* Ability to pause and resume any VM regardless of its current state
+* Add `yield()` support for PHP scripts
+* Allow multiple VMs to run within a single FreeRTOS task context
+
+### 3. ESP-IDF bindings
+
+* Implement a selected subset of ESP-IDF APIs (GPIO API first)
 
 
-1)
-types: add 'resource' type (alias it to uint64)
+### 4. Arduino Core bindings
+  * Almost done
 
-<?php  
-resource $var = fopen()
-?>
+### 5. Standard Library
 
+An analogue of the Arduino Core `.cpp` library, implemented in PHP where possible.
 
-2)
-enums: add new keyword 'enum', implement it as a class, so Class::field syntax can be naturally used:
-Casting enums: pure vs key=>value
+Standard Arduino Core classes:
 
-<?php
+* `HardwareSerial`
+* `SPI`
+* `FS`
+* `Print`
+* `Server`
+* etc.
+
+So far Print, Stream, Server, Client are implemented
+---
+
+## Smaller tasks
+
+---
+
+### 1. `resource` type
+
+Add the `resource` type and alias it to `uint64`.
+
+```php
+resource $var = fopen();
+```
+
+### 2. `enum`
+
+Add the `enum` keyword.
+
+Implement enums as classes, so `Class::field` syntax can be used naturally.
+
+Consider enum casting semantics:
+
+* pure enum
+* `key => value` enum  (should we define our own syntax, C-like?)
+
+```php
 enum Suit
 {
     case Hearts;
@@ -33,15 +79,20 @@ function do_stuff(Suit $s)
 }
 
 do_stuff(Suit::Spades);
-?>
+```
 
+### 3. `match` keyword
 
-3)
-'match' keyword
+### 4. Short array syntax
 
+Support:
 
-4)
-Short array syntax []
+```php
+$arr = [];
+```
 
-5)
-function_exists()
+lex.c and compile.c must be updated
+
+### 5. function_exists()
+
+Implement `function_exists()`.
