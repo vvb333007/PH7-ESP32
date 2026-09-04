@@ -36,7 +36,7 @@ typedef struct Label Label;
 #define GEN_BLOCK_COND 0x004       /* Conditional block [i.e: if(condition){} ]*/
 #define GEN_BLOCK_FUNC 0x008       /* Function body */
 #define GEN_BLOCK_GLOBAL 0x010     /* Global block (always set)*/
-#define GEN_BLOC_NESTED_FUNC 0x020 /* Nested function body */
+#define GEN_BLOC_NESTED_FUNC 0x020 /* Nested function body. TODO: seemed to be unused */
 #define GEN_BLOCK_EXPR 0x040       /* Expression */
 #define GEN_BLOCK_STD 0x080        /* Standard block */
 #define GEN_BLOCK_EXCEPTION 0x100  /* Exception block [i.e: try{ } }*/
@@ -3028,7 +3028,7 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
   //
   GenBlock *pBlock = pGen->pCurrent;
   while (pBlock) {
-    if (pBlock->iFlags & GEN_BLOCK_FUNC) {
+    if (pBlock->iFlags & (GEN_BLOCK_FUNC | GEN_BLOC_NESTED_FUNC)) {
       pFunc = (ph7_vm_func *)pBlock->pUserData;
       if (pFunc->iFlags & VM_FUNC_RET_TYPE) {
         if (pFunc->iFlags & PH7_TKWRD_VOID)

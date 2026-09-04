@@ -1,4 +1,3 @@
-
 /*
  * ----------------------------------------------------------
  * File: builtin.c
@@ -8664,6 +8663,7 @@ static const ph7_builtin_func aBuiltInFunc[] = {
 #if defined(ESP32) || defined(__CYGWIN__)
 #  include "esp32/builtins.inc"
 #endif
+
 
 };
 /*
