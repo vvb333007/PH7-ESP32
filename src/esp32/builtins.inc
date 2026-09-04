@@ -11,7 +11,7 @@
  *   https://github.com/vvb333007/PH7-ESP32
  */
 
-/* Arduino Core native bindigs registration is done here
+/* Arduino Core / ESP-IDF native bindigs registration is done here
  * This file is then included by PH7 builtin.c to register Arduino functions as built-ins
  *
  * To add a new function (or to delete the existing one) all 3 files (builtins.c, .h and .inc)
@@ -23,47 +23,102 @@
 
 #ifndef PH7_DISABLE_ESP32_ARDUINO_FUNC
 
+// References: https://docs.arduino.cc/language-reference/
+//             Arduino Core 3.x source code
+//             
+
+
+// Advanced I/O
+//
 Bind( shiftIn )
 Bind( shiftOut )
-Bind( makeWord )
-Bind( random )
-Bind( randomSeed )
-Bind( useRealRandomGenerator )
-Bind( map )
-Bind( micros )
-Bind( millis )
-Bind( delay )
 Bind( pulseIn )
 Bind( pulseInLong )
 
-Bind( pinMode )
-Bind( digitalWrite )
-Bind( digitalRead )
+//Bind( tone )
+//Bind( noTone )
 
-Bind( digitalPinIsValid )
-Bind( digitalPinCanOutput )
-Bind( digitalPinToRtcPin )
-Bind( digitalPinToDacChannel )
-Bind( digitalPinToTouchChannel )
-Bind( digitalPinToAnalogChannel )
-Bind( analogChannelToDigitalPin )
+// Characters
+//
+//Bind( isAlpha )
+//Bind( isAlphaNumeric )
+//Bind( isAscii )
+//Bind( isControl )
+//Bind( isDigit )
+//Bind( isGraph )
+//Bind( isHexadecimalDigit )
+//Bind( isLowerCase )
+//Bind( isPrintable )
+//Bind( isPunct )
+//Bind( isSpace )
+//Bind( isUpperCase )
+//Bind( isWhitespace )
+//Bind( toAscii )
+//Bind( toLowerCase )
+//Bind( toUpperCase )
 
-//Bind( analogRead )
-//Bind( analogReadResolution )
-//Bind( analogReadMilliVolts )
-//Bind( analogWrite )
-//Bind( analogWriteResolution )
-//Bind( analogWriteFrequency )
-//Bind( analogSetAttenuation )
-//Bind( analogSetPinAttenuation )
-//Bind( analogSetWidth )
-
+// Interrupts / External interrupts
+//
+//Bind( interrupts )
+//Bind( noInterrupts )
 //Bind( attachInterrupt )
 //Bind( attachInterruptArg )
 //Bind( detachInterrupt )
 //Bind( enableInterrupt )
 //Bind( disableInterrupt )
 
+
+// Analog IO
+//
+Bind( analogChannelToDigitalPin )
+//Bind( analogRead )
+//Bind( analogReadResolution )
+//Bind( analogWrite )
+//Bind( analogWriteResolution )
+//Bind( analogReadMilliVolts )
+//Bind( analogWriteFrequency )
+//Bind( analogSetAttenuation )
+//Bind( analogSetPinAttenuation )
+//Bind( analogSetWidth )
+//Bind( analogContinuous )
+//Bind( analogContinuousDeinit )
+//Bind( analogContinuousRead )
+//Bind( analogContinuousSetAtten )
+//Bind( analogContinuousSetWidth )
+//Bind( analogContinuousStart )
+//Bind( analogContinuousStop )
+
+
+
+// Random Numbers
+Bind( random )
+Bind( randomSeed )
+//Bind( randomVector )
+
+// Misc
+Bind( map )
+//Bind( constrain )
+
+// Time
+Bind( micros )
+Bind( millis )
+Bind( delay )
+Bind( delayMicroseconds )
+
+
+// Digital IO
+Bind( pinMode )
+Bind( digitalWrite )
+Bind( digitalRead )
+Bind( digitalPinIsValid )
+Bind( digitalPinCanOutput )
+Bind( digitalPinToRtcPin )
+Bind( digitalPinToDacChannel )
+Bind( digitalPinToTouchChannel )
+Bind( digitalPinToAnalogChannel )
+
+// PWM controller (LEDC)
+//
 //Bind( ledcAttach )
 //Bind( ledcAttachChannel )
 //Bind( ledcChangeFrequency )
@@ -79,14 +134,8 @@ Bind( analogChannelToDigitalPin )
 //Bind( ledcWriteNote )
 //Bind( ledcWriteTone )
 
-//Bind( analogContinuous )
-//Bind( analogContinuousDeinit )
-//Bind( analogContinuousRead )
-//Bind( analogContinuousSetAtten )
-//Bind( analogContinuousSetWidth )
-//Bind( analogContinuousStart )
-//Bind( analogContinuousStop )
-
+// I2C
+//
 //Bind( i2cDeinit )
 //Bind( i2cGetClock )
 //Bind( i2cInit )
@@ -96,29 +145,17 @@ Bind( analogChannelToDigitalPin )
 //Bind( i2cWrite )
 //Bind( i2cWriteReadNonStop )
 
+// CPU
+//
 //Bind( getApbFrequency )
 //Bind( getCpuFrequencyMhz )
 //Bind( getXtalFrequencyMhz )
 //Bind( setCpuFrequencyMhz )
+//Bind( temperatureRead )
 
-//Bind( isAlpha )
-//Bind( isAlphaNumeric )
-//Bind( isAscii )
-//Bind( isControl )
-//Bind( isDigit )
-//Bind( isGraph )
-//Bind( isHexadecimalDigit )
-//Bind( isLowerCase )
-//Bind( isPrintable )
-//Bind( isPunct )
-//Bind( isSpace )
-//Bind( isUpperCase )
-//Bind( isWhitespace )
 
-//Bind( toAscii )
-//Bind( toLowerCase )
-//Bind( toUpperCase )
-
+// Remote Control Peripheral (RMT)
+//
 //Bind( rmtDeinit )
 //Bind( rmtInit )
 //Bind( rmtRead )
@@ -135,35 +172,32 @@ Bind( analogChannelToDigitalPin )
 //Bind( rmtWriteRepeated )
 
 
-
-
-
+// Sigma-Delta
+//
 //Bind( sigmaDeltaAttach )
 //Bind( sigmaDeltaDetach )
 //Bind( sigmaDeltaWrite )
 
-//Bind( temperatureRead )
 
-
+// Touch
+//
 //Bind( touchAttachInterrupt )
 //Bind( touchAttachInterruptArg )
 //Bind( touchDetachInterrupt )
 //Bind( touchInterruptGetLastStatus )
 //Bind( touchInterruptSetThresholdDirection )
-
 //Bind( touchRead )
 //Bind( touchSetConfig )
 //Bind( touchSetDefaultThreshold )
 //Bind( touchSetTiming )
 //Bind( touchSleepWakeUpEnable )
 
-  
 
-
+// UART
+//
 //Bind( uartAvailable )
 //Bind( uartAvailableForWrite )
 //Bind( uartBegin )
-//Bind( uartDetectBaudrate )
 //Bind( uartEnableRxInternalPull )
 //Bind( uartEnd )
 //Bind( uartFlush )
@@ -171,10 +205,15 @@ Bind( analogChannelToDigitalPin )
 //Bind( uartGetBaudRate )
 //Bind( uartGetDebug )
 //Bind( uartIsDriverInstalled )
-//Bind( uartPeek )
 //Bind( uartPinSignalInversion )
+
+//Bind( uartPeek )
 //Bind( uartRead )
 //Bind( uartReadBytes )
+//Bind( uartWrite )
+//Bind( uartWriteBuf )
+
+
 //Bind( uartSetBaudRate )
 //Bind( uartSetClockSource )
 //Bind( uartSetCtsInvert )
@@ -189,9 +228,7 @@ Bind( analogChannelToDigitalPin )
 //Bind( uartSetRxInvert )
 //Bind( uartSetRxTimeout )
 //Bind( uartSetTxInvert )
-//Bind( uartStartDetectBaudrate )
-//Bind( uartWrite )
-//Bind( uartWriteBuf )
+
 #endif // Arduino Core bindings
 
 
@@ -199,6 +236,7 @@ Bind( analogChannelToDigitalPin )
  */
 #ifndef PH7_DISABLE_ESP32_FREERTOS_FUNC
 //Bind( vTaskDelay )
+// TODO: queues, task notifications, tasks
 #endif // FreeRTOS
 
 
