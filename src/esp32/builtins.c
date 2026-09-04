@@ -254,12 +254,20 @@ int Impl(analogChannelToDigitalPin, pCtx, nArg, apArg) {
 //
 //
 int Impl(shiftIn, pCtx, nArg, apArg) {
+  SXUNUSED(pCtx);
+  SXUNUSED(nArg);
+  SXUNUSED(apArg);
+
   return PH7_OK;
 }
 
 //
 //
 int Impl(shiftOut, pCtx, nArg, apArg) {
+  SXUNUSED(pCtx);
+  SXUNUSED(nArg);
+  SXUNUSED(apArg);
+
   return PH7_OK;
 }
 
@@ -267,6 +275,10 @@ int Impl(shiftOut, pCtx, nArg, apArg) {
 // $res = makeWord($a, $b)
 //
 int Impl(makeWord, pCtx, nArg, apArg) {
+  SXUNUSED(pCtx);
+  SXUNUSED(nArg);
+  SXUNUSED(apArg);
+
   return PH7_OK;
 }
 
@@ -293,7 +305,7 @@ int Impl(random, pCtx, nArg, apArg) {
   }
 
 #ifdef __CYGWIN__
-  printf("random(%d, %d) called\r\n", min, max);
+  printf("random(%ld, %ld) called\r\n", min, max);
 #else
   if (min < max)
     min = (esp_random() % (howbig - howsmall) + howsmall);
@@ -410,11 +422,35 @@ int Impl(delay, pCtx, nArg, apArg) {
   return PH7_OK;
 }
 
+// delayMicroseconds($micros);
+//
+int Impl(delayMicroseconds, pCtx, nArg, apArg) {
+
+  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
+
+    unsigned int interval = (unsigned int)ph7_value_to_int(apArg[0]); // TODO: int64 ?
+#ifdef __CYGWIN__
+    printf("delayMicroseconds(%u) called\r\n", interval);
+#else
+    delayMicroseconds( interval );
+#endif
+  } else {
+    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing numeric argument");
+  }
+
+  ph7_result_null(pCtx);
+  return PH7_OK;
+}
+
 
 // $v = pulseIn($pin, $state, $timeout);
 //
 int Impl(pulseIn, pCtx, nArg, apArg) {
 //unsigned long pulseIn(uint8_t pin, uint8_t state, unsigned long timeout) {
+  SXUNUSED(pCtx);
+  SXUNUSED(nArg);
+  SXUNUSED(apArg);
+
   return PH7_OK;
 }
 
@@ -422,6 +458,10 @@ int Impl(pulseIn, pCtx, nArg, apArg) {
 //
 int Impl(pulseInLong, pCtx, nArg, apArg) {
 //unsigned long pulseInLong(uint8_t pin, uint8_t state, unsigned long timeout) {
+  SXUNUSED(pCtx);
+  SXUNUSED(nArg);
+  SXUNUSED(apArg);
+
   return PH7_OK;
 }
 
