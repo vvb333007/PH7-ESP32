@@ -52,7 +52,7 @@ $(OBJDIR):
 >mkdir -p $(OBJDIR)
 
 clean:
->rm -f ../../src/*.[od] *.[od]
+>rm -f ../../src/*.[od] ../../src/esp32/*.[od]  *.[od]
 
 
 
