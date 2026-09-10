@@ -25,6 +25,8 @@
  * This file implement a thread-safe and full-reentrant compiler for the PH7 engine.
  * That is, routines defined in this file takes a stream of tokens and output
  * PH7 bytecode instructions.
+ *
+ * TODO: Find and remove craziness like this: &(*pGen). Looks like code which was once copy/pasted 
  */
 /* Forward declaration */
 typedef struct LangConstruct LangConstruct;
@@ -4704,6 +4706,7 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
       return SXERR_ABORT;
     }
     /* Synchronize with the first semi-colon or curly braces */
+    // TODO: this operation is done often and is a candidate for an inline  function
     while (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & (PH7_TK_OCB /*'{'*/ | PH7_TK_SEMI /*';'*/)) == 0) {
       pGen->pIn++;
     }
@@ -6118,7 +6121,17 @@ static ProcLangConstruct GenStateGetStatementHandler(
     }
     n++;
   }
+
   if (pLookahed) {
+    // TODO: enum language construct
+/*
+enum ID [: type] {
+  case Name1 [= Const1] ;
+  case Name2 [= Const2] ;
+  case Name3 [= Const3] ;
+}
+
+*/
     if (nKeywordID == PH7_TKWRD_INTERFACE && (pLookahed->nType & PH7_TK_ID)) {
       return PH7_CompileClassInterface;
     } else if (nKeywordID == PH7_TKWRD_CLASS && (pLookahed->nType & PH7_TK_ID)) {

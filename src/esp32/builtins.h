@@ -197,10 +197,17 @@ Have( analogChannelToDigitalPin )
 #endif // #ifndef PH7_DISABLE_ESP32_ARDUINO_FUNC
 
 #ifndef PH7_DISABLE_ESP32_FREERTOS_FUNC
-/* What do we have?
+/* 
  * FreeRTOS bindings. Useful stuff like queues, events etc
  */
+//Have( xQueueCreate )
+//Have( vQueueDelete )
+//Have( xQueueSend )
+//Have( xQueueReceive ) // Signature differs from FreeRTOS's one
+
 //Have( vTaskDelay )
+//Have( pdMS_TO_TICKS )
+
 #endif // #ifndef PH7_DISABLE_ESP32_FREERTOS_FUNC
 
 #ifndef PH7_DISABLE_ESP32_ESPIDF_FUNC

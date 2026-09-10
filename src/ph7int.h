@@ -20,13 +20,13 @@
 
 #pragma once
 
-/* If user didn't specify ENABLE_THREADS and MATH_FUNC - set them to default (ON)*/
-//#ifndef PH7_ENABLE_THREADS
-//#  define PH7_ENABLE_THREADS 1
-//#endif
-//#ifndef PH7_ENABLE_MATH_FUNC
-//#  define PH7_ENABLE_MATH_FUNC 1
-//#endif
+/* If user didn't specify ENABLE_THREADS and MATH_FUNC - set them to default (OFF)*/
+#ifndef PH7_ENABLE_THREADS
+#  define PH7_ENABLE_THREADS 0
+#endif
+#ifndef PH7_ENABLE_MATH_FUNC
+#  define PH7_ENABLE_MATH_FUNC 0
+#endif
 
 /* Internal interface definitions for PH7. */
 #define PH7_PRIVATE
@@ -1136,7 +1136,7 @@ struct ph7_vm_func_closure_env {
 #define VM_FUNC_RET_TYPE     0x040   /* PHP 7.0 syntax was used for the function return type (i.e. :void) */
 
 /* Types are keywords with IDs which are power of two integers.  Compiler stores return 
- * function type (if set) into iFlags field (ORed) when VM_FUNC_RET_TYPE is set 
+ * function type (if set) into iFlags field (ORed) when VM_FUNC_RET_TYPE is set: this is PHP7.x syntax for function return types (e.g. :void or :int)
  */
 #define VM_FUNC_RET_MASK \
   (PH7_TKWRD_ARRAY | PH7_TKWRD_BOOL | PH7_TKWRD_INT | \
@@ -1705,10 +1705,13 @@ enum ph7_expr_id {
 #define PH7_TKWRD_RETURN 54          /* return */
 #define PH7_TKWRD_BREAK 55           /* break */
 #define PH7_TKWRD_GOTO 56            /* goto */
+#define PH7_TKWRD_ENUM 57            /* enum */
 
-// Keywords 57..127 are available for use for language extensions
+// Keywords [58..63] are available for use for language extensions
+// Keywords [65..127] are available for use for language extensions
 
 /* Constants which MUST BE A POWER OF TWO  */
+// Keyword 0x00000040 is available for use for language extensions
 #define PH7_TKWRD_CLONE    0x00000080         /* clone */
 #define PH7_TKWRD_NEW      0x00000100          /* new */
 #define PH7_TKWRD_ARRAY    0x00000200        /* array: MUST BE A POWER OF TWO */
@@ -1730,8 +1733,8 @@ enum ph7_expr_id {
 #define PH7_TKWRD_END4EACH 0x02000000 /* endforeach */ 
 #define PH7_TKWRD_ELIF     0x04000000     /* elseif */ 
 #define PH7_TKWRD_ELSE     0x08000000     /* else */ 
-// Keyword 0x10000000 is available for use for language extensions, e.g. 'resource' type
-// Keyword 0x20000000 is available for use for language extensions, 
+#define PH7_TKWRD_NEVER    0x10000000     /* :never */
+#define PH7_TKWRD_MIXED    0x20000000     /* :mixed */
 // Keyword 0x40000000 is available for use for language extensions
 #define PH7_TKWRD_VOID     0x80000000    /* void */
 

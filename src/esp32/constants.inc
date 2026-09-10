@@ -13,6 +13,11 @@
 
 #ifndef PH7_DISABLE_ESP32_ARDUINO_FUNC
 
+  /* Instead of using Arduino's constants we use raw numbers. This is required to be able to use shared handlers
+   * If these constants are changed in ESP-IDF or Arduino Core then they must be changed here as well
+   *
+   */
+
   /* Arduino ADC native constants 
   */
   { "ADC_0db", esp32_const_int0 },
@@ -91,6 +96,15 @@
   { "LED_COLOR_ORDER_GBR", esp32_const_int4 },
   { "LED_COLOR_ORDER_GRB", esp32_const_int5 },
 #endif // Disable Arduino functions
+
+#ifndef PH7_DISABLE_ESP32_FREERTOS_FUNC
+  /*
+  * FreeRTOS native constants
+  */
+  { "pdPASS",    esp32_const_int1 },
+  { "pdFAIL",    esp32_const_int0 },
+  { "portMAX_DELAY",    esp32_const_mint1 }, // Ugly hack. -1 is 0xffffffff
+#endif
 
 #ifndef PH7_DISABLE_ESP32_ESPIDF_FUNC
   /*
