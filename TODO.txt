@@ -176,3 +176,5 @@ $arr = [];
 ### 7. `function_exists()`
 
 Implement `function_exists()`.
+
+###8. empty strings are === null which is wrong.
