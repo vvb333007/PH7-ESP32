@@ -718,7 +718,7 @@ static sxi32 GenStateCompileString(ph7_gen_state *pGen) {
       }
       zIn++;
     }
-    if (zIn > zCur) {
+    if (zIn >= zCur) {
       if (pObj == 0) {
         pObj = GenStateNewStrObj(&(*pGen), &iCons);
         if (pObj == 0) {
@@ -976,6 +976,15 @@ PH7_PRIVATE sxi32 PH7_CompileString(ph7_gen_state *pGen, sxi32 iCompileFlag) {
 /*
  * Compile a Heredoc string.
  *  See the block-comment above for more information.
+ * BUG: CITO: an empty heredoc statements screws the compiler up: it reaches the end of the script in attempt to find an end statement
+
+Dome:
+
+$c = <<<'EOT'
+EOT;
+var_dump($c);  <-- unreachable code
+echo 'Hello';  <-- unreachable code
+
  */
 static sxi32 PH7_CompileHereDoc(ph7_gen_state *pGen, sxi32 iCompileFlag) {
 //  sxi32 rc;

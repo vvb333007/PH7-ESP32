@@ -677,6 +677,7 @@ static sxi32 LexExtractHeredoc(SyStream *pStream, SyToken *pToken) {
   pStream->nLine++; /* Increment line counter */
   zIn++;
   /* Isolate the delimited string */
+#if 0
   sStr.zString = (const char *)zIn;
   /* Go and found the closing delimiter */
   for (;;) {
@@ -721,10 +722,52 @@ static sxi32 LexExtractHeredoc(SyStream *pStream, SyToken *pToken) {
       zIn = zPtr;
     }
   } /* For(;;) */
+#else
+  sStr.zString = (const char *)zIn;
+  /* Go and found the closing delimiter */
+  for (;;) {
+    /* Check if the current line is the closing delimiter BEFORE consuming it as content */
+    if ((sxu32)(zEnd - zIn) >= sDelim.nByte && SyMemcmp((const void *)sDelim.zString, (const void *)zIn, sDelim.nByte) == 0) {
+      zPtr = &zIn[sDelim.nByte];
+      while (zPtr < zEnd && zPtr[0] < 0xc0 && SyisSpace(zPtr[0]) && zPtr[0] != '\n') {
+        zPtr++;
+      }
+      if (zPtr >= zEnd) {
+        pStream->zText = zPtr;
+        break;
+      }
+      if (zPtr[0] == ';') {
+        const unsigned char *zCur = zPtr;
+        zPtr++;
+        while (zPtr < zEnd && zPtr[0] < 0xc0 && SyisSpace(zPtr[0]) && zPtr[0] != '\n') {
+          zPtr++;
+        }
+        if (zPtr >= zEnd || zPtr[0] == '\n') {
+          pStream->zText = zCur;
+          break;
+        }
+      } else if (zPtr[0] == '\n') {
+        pStream->zText = zPtr;
+        break;
+      }
+    }
+    /* Not a match: consume this line as content and move to the next */
+    while (zIn < zEnd && zIn[0] != '\n') {
+      zIn++;
+    }
+    if (zIn >= zEnd) {
+      pStream->zText = pStream->zEnd;
+      break;
+    }
+    pStream->nLine++;
+    zIn++;
+  } /* For(;;) */
+#endif
   /* Get the delimited string length */
   sStr.nByte = (sxu32)((const char *)zIn - sStr.zString);
   /* Record token type and length */
   pToken->nType = bNowDoc ? PH7_TK_NOWDOC : PH7_TK_HEREDOC;
+  //puts("nType==heredoc");
   SyStringDupPtr(&pToken->sData, &sStr);
   /* Remove trailing white spaces */
   SyStringRightTrim(&pToken->sData);

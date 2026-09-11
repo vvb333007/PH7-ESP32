@@ -1233,6 +1233,7 @@ PH7_PRIVATE sxi32 PH7_MemObjDump(
     if (ShowType) {
       SyBlobAppend(&(*pOut), "(", sizeof(char));
     }
+    //printf("pObj->iFlags == %08x\r\n", (unsigned int)pObj->iFlags);
     if (pObj->iFlags & MEMOBJ_HASHMAP) {
       /* Dump hashmap entries */
       rc = PH7_HashmapDump(&(*pOut), (ph7_hashmap *)pObj->x.pOther, ShowType, nTab + 1, nDepth + 1);

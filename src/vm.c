@@ -8671,14 +8671,16 @@ static int vm_builtin_var_dump(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   int i;
   SyBlobInit(&sDump, &pCtx->pVm->sAllocator);
   /* Dump one or more expressions */
+  //printf("nArg=%d\r\n",nArg);
   for (i = 0; i < nArg; i++) {
     ph7_value *pObj = apArg[i];
     /* Reset the working buffer */
     SyBlobReset(&sDump);
     /* Dump the given expression */
+    //printf("Dump\r\n");
     PH7_MemObjDump(&sDump, pObj, TRUE, 0, 0, 0);
     /* Output */
-    if (SyBlobLength(&sDump) > 0) {
+    if (1 /*SyBlobLength(&sDump) > 0*/) {
       ph7_context_output(pCtx, (const char *)SyBlobData(&sDump), (int)SyBlobLength(&sDump));
     }
   }

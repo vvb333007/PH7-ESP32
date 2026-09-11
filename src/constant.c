@@ -457,7 +457,7 @@ static void PH7_DBIA_Const(ph7_value *pVal, void *pUserData) {
  */
 static void PH7_M_PI_Const(ph7_value *pVal, void *pUserData) {
   SXUNUSED(pUserData); /* cc warning */
-  puts("Const!");
+  //puts("Const!");
   ph7_value_double(pVal, PH7_PI);
 }
 /*
