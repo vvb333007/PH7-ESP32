@@ -235,8 +235,20 @@ Bind( digitalPinToAnalogChannel )
 /* FreeRTOS native bindigs, a subset
  */
 #ifndef PH7_DISABLE_ESP32_FREERTOS_FUNC
+
+//Bind( xQueueCreate )
+//Bind( vQueueDelete )
+//Bind( xQueueSend )
+//Bind( xQueueReceive )
+
+//Bind( xTaskNotify )
+//Bind( xTaskNotifyWait )
+//Bind( xTaskNotifyGive )
+//Bind( ulTaskNotifyTake )
+
 //Bind( vTaskDelay )
-// TODO: queues, task notifications, tasks
+
+
 #endif // FreeRTOS
 
 

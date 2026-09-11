@@ -11,10 +11,12 @@
  *   https://github.com/vvb333007/PH7-ESP32
  */
 
-#ifndef PH7_DISABLE_ESP32_ARDUINO_FUNC
+#ifndef PH7_DISABLE_ESP32_ARDUINO_CONSTS
 
   /* Instead of using Arduino's constants we use raw numbers. This is required to be able to use shared handlers
    * If these constants are changed in ESP-IDF or Arduino Core then they must be changed here as well
+   *
+   * Constants can be disabled here but still can be used in user code when Arduino.php, IDF.php and FreeRTOS.php are require()'d
    *
    */
 
@@ -51,14 +53,14 @@
 
   /* Arduino SPI
    */
-#ifdef CONFIG_IDF_TARGET_ESP32
+# ifdef CONFIG_IDF_TARGET_ESP32
   { "FSPI", esp32_const_int1 },
   { "HSPI", esp32_const_int2 },
   { "VSPI", esp32_const_int3 },
-#else
+# else
   { "FSPI", esp32_const_int0 },
   { "HSPI", esp32_const_int1 },
-#endif // Original ESP32
+# endif // Original ESP32
 
   { "SPI_CLOCK_DIV2",   esp32_const_int2 },   // 8 MHz
   { "SPI_CLOCK_DIV4",   esp32_const_int4 },   // 4 MHz
@@ -95,21 +97,29 @@
   { "LED_COLOR_ORDER_RBG", esp32_const_int3 },
   { "LED_COLOR_ORDER_GBR", esp32_const_int4 },
   { "LED_COLOR_ORDER_GRB", esp32_const_int5 },
-#endif // Disable Arduino functions
+#endif // Disable Arduino constants
 
-#ifndef PH7_DISABLE_ESP32_FREERTOS_FUNC
+#ifndef PH7_DISABLE_ESP32_FREERTOS_CONSTS
   /*
   * FreeRTOS native constants
   */
   { "pdPASS",    esp32_const_int1 },
   { "pdFAIL",    esp32_const_int0 },
   { "portMAX_DELAY",    esp32_const_mint1 }, // Ugly hack. -1 is 0xffffffff
-#endif
 
-#ifndef PH7_DISABLE_ESP32_ESPIDF_FUNC
-  /*
-  * ESP-IDF native constants (GPIO )
+  { "eNoAction",    esp32_const_int0 },
+  { "eSetBits",    esp32_const_int1 },
+  { "eIncrement",    esp32_const_int2 },
+  { "eSetValueWithOverwrite",    esp32_const_int3 },
+  { "eSetValueWithoutOverwrite",    esp32_const_int4 },
+
+#endif //#ifndef PH7_DISABLE_ESP32_FREERTOS_CONSTS
+
+ /*
+  * ESP-IDF native constants (GPIO ).
   */
+
+#ifndef PH7_DISABLE_ESP32_ESPIDF_CONSTS
   { "GPIO_PORT_0",    esp32_const_int0 },
   { "GPIO_PORT_MAX",  esp32_const_int1 },
 
@@ -152,6 +162,6 @@
   { "GPIO_DRIVE_CAP_DEFAULT", esp32_const_int2 },
   { "GPIO_DRIVE_CAP_3",       esp32_const_int3 },
   { "GPIO_DRIVE_CAP_MAX",     esp32_const_int4 },
-#endif
+#endif // #ifndef PH7_DISABLE_ESP32_ESPIDF_CONSTS
 
 
