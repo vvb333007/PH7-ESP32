@@ -475,7 +475,8 @@ PH7_PRIVATE sxi32 PH7_CompileSimpleString(ph7_gen_state *pGen, sxi32 iCompileFla
   /* Delimit the string */
   zIn = pStr->zString;
   zEnd = &zIn[pStr->nByte];
-#if 0
+#if 0 
+  // BUG: empty string is NOT null
   if (zIn >= zEnd) {
     /* Empty string,load NULL */
     PH7_VmEmitInstr(pGen->pVm, PH7_OP_LOADC, 0, 0, 0, 0);
@@ -557,11 +558,15 @@ static sxi32 PH7_CompileNowDoc(ph7_gen_state *pGen, sxi32 iCompileFlag) {
   ph7_value *pObj;
   sxu32 nIdx;
   nIdx = 0; /* Prevent compiler warning */
+
+#if 0
+  // BUG: same as in SimpleString
   if (pStr->nByte <= 0) {
     /* Empty string,load NULL */
     PH7_VmEmitInstr(pGen->pVm, PH7_OP_LOADC, 0, 0, 0, 0);
     return SXRET_OK;
   }
+#endif
   /* Reserve a new constant */
   pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
   if (pObj == 0) {
@@ -693,11 +698,13 @@ static sxi32 GenStateCompileString(ph7_gen_state *pGen) {
   /* Delimit the string */
   zIn = pStr->zString;
   zEnd = &zIn[pStr->nByte];
+#if 0
   if (zIn >= zEnd) {
     /* Empty string,load NULL */
     PH7_VmEmitInstr(pGen->pVm, PH7_OP_LOADC, 0, 0, 0, 0);
     return SXRET_OK;
   }
+#endif
   zCur = 0;
   /* Compile the node */
   iCons = 0;
