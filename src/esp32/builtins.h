@@ -205,6 +205,11 @@ Have( analogChannelToDigitalPin )
 //Have( xQueueSend )
 //Have( xQueueReceive ) // Signature differs from FreeRTOS's one
 
+//Have( xTaskNotify )
+//Have( xTaskNotifyWait )
+//Have( xTaskNotifyGive )
+//Have( ulTaskNotifyTake )
+
 //Have( vTaskDelay )
 //Have( pdMS_TO_TICKS )
 

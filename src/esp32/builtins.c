@@ -469,27 +469,49 @@ int Impl(pulseInLong, pCtx, nArg, apArg) {
 
 #ifndef PH7_DISABLE_ESP32_ESPIDF_FUNC
 #if 0
-/**
- * @brief Structure that contains the configuration of an IO
+/* TODO: should it be a class instance to make the syntax closer to C++ or leave it as a hasmap aka array?
+ *
  */
+$config = new gpio_config_t;
 
-$config = array(
-  'fun_sel' => 0,                   /*!< Value of IOMUX function selection */
-  'sig_out' => 0,                   /*!< Index of the outputting peripheral signal */
-  'drv' => 1,                       /*!< Value of drive strength */
-  'pu' => 0,                        /*!< Status of pull-up enabled or not */
-  'pd' => 0,                        /*!< Status of pull-down enabled or not */
-  'ie' => 0,                        /*!< Status of input enabled or not */
-  'oe' => 1,                        /*!< Status of output enabled or not */
-  'oe_ctrl_by_periph' = 0,          /*!< True if use output enable signal from peripheral, otherwise False */
-  'oe_inv' = 0,                     /*!< Whether the output enable signal is inversed or not */
-  'od' = 0,                         /*!< Status of open-drain enabled or not */
-  'slp_sel' = 0                     /*!< Status of pin sleep mode enabled or not */
-);
+$config->fun_sel;                   /*!< Value of IOMUX function selection */
+$config->sig_out;                   /*!< Index of the outputting peripheral signal */
+$config->drv;                       /*!< Value of drive strength */
+$config->pu;                        /*!< Status of pull-up enabled or not */
+$config->pd;                        /*!< Status of pull-down enabled or not */
+$config->ie;                        /*!< Status of input enabled or not */
+$config->oe;                        /*!< Status of output enabled or not */
+$config->oe_ctrl_by_periph;          /*!< True if use output enable signal from peripheral, otherwise False */
+$config->oe_inv;                     /*!< Whether the output enable signal is inversed or not */
+$config->od;                         /*!< Status of open-drain enabled or not */
+$config->slp_sel;                     /*!< Status of pin sleep mode enabled or not */
+
+
+
+// Function that require a structure as an argument are implemented partially in PHP.
+// The reason for this is to simplify binding function code: we defenitely do not want to
+// parse arrays or classes in .c code. Instead we "vectorize" calls where needed
+//
+// function gpio_config($pin, $cfg) {
+//   /* .c foreign function which assembles a structure from arguments and calls ESP-IDF's gpio_config */
+//   gpio_config_edf( $pin,
+//                    $c->fun_sel,
+//                    $c->sig_out,
+//                    $c->drv,
+//                    $c->pu,
+//                    $c->pd,
+//                    $c->ie,
+//                    $c->oe,
+//                    $c->oe_ctrl_by_periph,
+//                    $c->oe_inv,
+//                    $c->od,
+//                    $c->slp_sel);
+//
+// }
+int Impl(gpio_config(ph7_context *ctx, int argc, ph7_value **argv) {  return PH7_OK; }
 
 int Impl(gpio_reset_pin(ph7_context *ctx, int argc, ph7_value **argv) {   return PH7_OK; }
 
-int Impl(gpio_config(ph7_context *ctx, int argc, ph7_value **argv) {  return PH7_OK; }
 int Impl(gpio_get_io_config(ph7_context *ctx, int argc, ph7_value **argv)  { return PH7_OK; }
 
 int Impl(gpio_get_drive_capability(ph7_context *ctx, int argc, ph7_value **argv) { return PH7_OK; }
@@ -551,6 +573,32 @@ int Impl(gpio_set_intr_type(ph7_context *ctx, int argc, ph7_value **argv) {   re
 #ifndef PH7_DISABLE_ESP32_FREERTOS_FUNC
 #if 0
 int Impl(vTaskDelay(ph7_context *ctx, int argc, ph7_value **argv) {
+  return PH7_OK;
+}
+
+int Impl( xQueueCreate )(ph7_context *ctx, int argc, ph7_value **argv) {
+  return PH7_OK;
+}
+int Impl( vQueueDelete )(ph7_context *ctx, int argc, ph7_value **argv) {
+  return PH7_OK;
+}
+int Impl( xQueueSend )(ph7_context *ctx, int argc, ph7_value **argv) {
+  return PH7_OK;
+}
+int Impl( xQueueReceive )(ph7_context *ctx, int argc, ph7_value **argv) {
+  return PH7_OK;
+}
+
+int Impl( xTaskNotify )(ph7_context *ctx, int argc, ph7_value **argv) {
+  return PH7_OK;
+}
+int Impl( xTaskNotifyWait )(ph7_context *ctx, int argc, ph7_value **argv) {
+  return PH7_OK;
+}
+int Impl( xTaskNotifyGive )(ph7_context *ctx, int argc, ph7_value **argv) {
+  return PH7_OK;
+}
+int Impl( ulTaskNotifyTake )(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
 #endif
