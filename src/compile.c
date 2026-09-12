@@ -3626,6 +3626,8 @@ static sxi32 GenStateCollectFuncArgs(ph7_vm_func *pFunc, ph7_gen_state *pGen, Sy
           sArg.nType = MEMOBJ_STRING;
         } else if (nKey & PH7_TKWRD_FLOAT) {
           sArg.nType = MEMOBJ_REAL;
+        } else if (nKey & PH7_TKWRD_MIXED) {
+          puts("mixed type: no automatic cast");
         } else {
           PH7_GenCompileError(&(*pGen), E_WARNING, pGen->pIn->nLine,
                               "Invalid argument type '%z',Automatic cast will not be performed",
@@ -3734,6 +3736,7 @@ static sxi32 GenStateCollectFuncArgs(ph7_vm_func *pFunc, ph7_gen_state *pGen, Sy
             /* String */
             c = 's';
             break;
+        /* Mixed type is NOT a candidate for overloading */
           default:
             break;
         }
@@ -4690,6 +4693,371 @@ done:
   pGen->pEnd = pTmp;
   return PH7_OK;
 }
+
+/*
+ * Compile a user-defined enum
+ *
+ * enum ID [:TYPE] {
+ *   case ID = RVAL;
+ *   case ID = RVAL;
+ *   case ID = RVAL;
+ * }
+ */
+static sxi32 GenStateCompileEnum(ph7_gen_state *pGen, sxi32 iFlags) {
+
+
+
+  sxu32 nLine = pGen->pIn->nLine;
+  ph7_class *pClass, *pBase;
+  SyToken *pEnd, *pTmp;
+  sxi32 iProtection;
+  sxi32 iAttrflags;
+  SyString *pName;
+  SyString *pElem;
+  sxi32 nKwrd;
+  sxi32 rc;
+
+  /* Jump the 'enum' keyword */
+  pGen->pIn++;
+
+  /* TODO: check for TK_ID here never fires: it is checked in lokahead code beofre calling to this function 
+   as a result "unexpected keyword enum" is displayed instead of "ibvaid absent enum name" */
+  if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_ID) == 0) {
+    /* Syntax error */
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "Invalid/absent enum name");
+    return SXERR_ABORT;
+  }
+
+  /* Extract enum name */
+  pName = &pGen->pIn->sData;
+
+  /* Advance the stream cursor */
+  pGen->pIn++;
+
+
+  sxu32 nKey = 0; // enum type (0: no type)
+
+  /* Extract enum type if exists */
+  if (pGen->pIn->nType == PH7_TK_COLON) {
+    /* 7.x route, skip ':' */
+    pGen->pIn++;
+    if (pGen->pIn < pGen->pEnd) {
+      if (pGen->pIn->nType != PH7_TK_KEYWORD) {
+err:
+        PH7_GenCompileError(pGen, E_ERROR, nLine, "float, int, bool or string is expected after ':'");
+        return SXERR_ABORT;
+      }
+
+      sxu32 nKey = (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData));
+
+      // Check if nKey is one of a valid types: string, int, bool, float;
+      if ((nKey & VM_ENUM_MASK) == 0)
+        goto err;
+      /* jump the  type */
+      pGen->pIn++;
+    }
+  }
+
+  /* enum body */
+
+  if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_OCB /*'{'*/) == 0) {
+
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "Expected '{' after enum '%z' declaration", pName);
+    return SXERR_ABORT;
+  }
+
+  pGen->pIn++; /* Jump the leading curly brace */
+  pEnd = 0;    /* cc warning */
+
+  /* Delimit the enum body */
+  PH7_DelimitNestedTokens(pGen->pIn, pGen->pEnd, PH7_TK_OCB /*'{'*/, PH7_TK_CCB /*'}'*/, &pEnd);
+
+  if (pEnd >= pGen->pEnd) {
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "Missing closing braces'}' after enum '%z' definition", pName);
+    return SXERR_ABORT;
+  }
+
+  /* Swap token stream */
+  pTmp = pGen->pEnd;
+  pGen->pEnd = pEnd;
+
+#if 0
+  /* Obtain a raw class */
+  pClass = PH7_NewRawClass(pGen->pVm, pName, nLine);
+  if (pClass == 0) {
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    return SXERR_ABORT;
+  }
+
+//        SyMemBackendPoolFree(&pGen->pVm->sAllocator, pClass);
+
+  /* Set the inherited flags */
+  pClass->iFlags = iFlags;
+
+#endif
+  /* Start the parse process */
+  for (;;) {
+
+    /* Jump leading/trailing semi-colons */
+    while (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_SEMI /*';'*/)) {
+      pGen->pIn++;
+    }
+
+    /* End of the body checks */
+    if (pGen->pIn >= pGen->pEnd)
+      break;
+
+    if (pGen->pIn->nType & PH7_TK_CCB) /* '}' */
+      break;
+
+    if ( (pGen->pIn->nType & PH7_TK_KEYWORD) &&
+          (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData)) == PH7_TKWRD_CASE ) {
+
+      /* Jump the 'case' keyword */
+      if (++pGen->pIn >= pGen->pEnd) break;
+
+      /* Get the enum element name */
+      if ( (pGen->pIn->nType & PH7_TK_ID) ) {
+        pElem = &pGen->pIn->sData;
+        if (++pGen->pIn >= pGen->pEnd) break;
+
+        puts("case parsed");
+      } else {
+        PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                               "Unexpected token '%z'. Expecting an enum element name within enum '%z'",
+                               &pGen->pIn->sData, pName);
+        return SXERR_ABORT;
+      }
+    } else {
+      
+      PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                               "Unexpected token '%z'. Expecting 'case' within enum '%z'",
+                               &pGen->pIn->sData, pName);
+        return SXERR_ABORT;
+    }
+  }
+
+  /* Restore parser limit */
+  pGen->pEnd = pTmp;
+  pGen->pIn = pEnd;
+  /* Jump the curly */
+  if (pGen->pIn < pGen->pEnd)
+    pGen->pIn++;
+
+#if 0
+    /* Assume public visibility */
+    iProtection = PH7_TKWRD_PUBLIC;
+    iAttrflags = 0;
+    if (pGen->pIn->nType & PH7_TK_KEYWORD) {
+      /* Extract the current keyword */
+      nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
+      if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
+        iProtection = nKwrd;
+        pGen->pIn++; /* Jump the visibility token */
+        if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & (PH7_TK_KEYWORD | PH7_TK_DOLLAR)) == 0) {
+          rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                                   "Unexpected token '%z'. Expecting attribute declaration inside class '%z'",
+                                   &pGen->pIn->sData, pName);
+          if (rc == SXERR_ABORT) {
+            /* Error count limit reached,abort immediately */
+            return SXERR_ABORT;
+          }
+          goto done;
+        }
+        if (pGen->pIn->nType & PH7_TK_DOLLAR) {
+          /* Attribute declaration */
+          rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
+          if (rc != SXRET_OK) {
+            if (rc == SXERR_ABORT) {
+              return SXERR_ABORT;
+            }
+            goto done;
+          }
+          continue;
+        }
+        /* Extract the keyword */
+        nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
+      }
+      if (nKwrd == PH7_TKWRD_CONST) {
+        /* Process constant declaration */
+        rc = GenStateCompileClassConstant(&(*pGen), iProtection, iAttrflags, pClass);
+        if (rc != SXRET_OK) {
+          if (rc == SXERR_ABORT) {
+            return SXERR_ABORT;
+          }
+          goto done;
+        }
+      } else {
+        if (nKwrd == PH7_TKWRD_STATIC) {
+          /* Static method or attribute,record that */
+          iAttrflags |= PH7_CLASS_ATTR_STATIC;
+          pGen->pIn++; /* Jump the static keyword */
+          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)) {
+            /* Extract the keyword */
+            nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
+            if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
+              iProtection = nKwrd;
+              pGen->pIn++; /* Jump the visibility token */
+            }
+          }
+          if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & (PH7_TK_KEYWORD | PH7_TK_DOLLAR)) == 0) {
+            rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                                     "Unexpected token '%z',Expecting method,attribute or constant declaration inside class '%z'",
+                                     &pGen->pIn->sData, pName);
+            if (rc == SXERR_ABORT) {
+              /* Error count limit reached,abort immediately */
+              return SXERR_ABORT;
+            }
+            goto done;
+          }
+          if (pGen->pIn->nType & PH7_TK_DOLLAR) {
+            /* Attribute declaration */
+            rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
+            if (rc != SXRET_OK) {
+              if (rc == SXERR_ABORT) {
+                return SXERR_ABORT;
+              }
+              goto done;
+            }
+            continue;
+          }
+          /* Extract the keyword */
+          nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
+        } else if (nKwrd == PH7_TKWRD_ABSTRACT) {
+          /* Abstract method,record that */
+          iAttrflags |= PH7_CLASS_ATTR_ABSTRACT;
+          /* Mark the whole class as abstract */
+          pClass->iFlags |= PH7_CLASS_ABSTRACT;
+          /* Advance the stream cursor */
+          pGen->pIn++;
+          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)) {
+            nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
+            if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
+              iProtection = nKwrd;
+              pGen->pIn++; /* Jump the visibility token */
+            }
+          }
+          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD) && SX_PTR_TO_INT(pGen->pIn->pUserData) == PH7_TKWRD_STATIC) {
+            /* Static method */
+            iAttrflags |= PH7_CLASS_ATTR_STATIC;
+            pGen->pIn++; /* Jump the static keyword */
+          }
+          if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_KEYWORD) == 0 || SX_PTR_TO_INT(pGen->pIn->pUserData) != PH7_TKWRD_FUNCTION) {
+            rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                                     "Unexpected token '%z',Expecting method declaration after 'abstract' keyword inside class '%z'",
+                                     &pGen->pIn->sData, pName);
+            if (rc == SXERR_ABORT) {
+              /* Error count limit reached,abort immediately */
+              return SXERR_ABORT;
+            }
+            goto done;
+          }
+          nKwrd = PH7_TKWRD_FUNCTION;
+        } else if (nKwrd == PH7_TKWRD_FINAL) {
+          /* final method ,record that */
+          iAttrflags |= PH7_CLASS_ATTR_FINAL;
+          pGen->pIn++; /* Jump the final keyword */
+          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)) {
+            /* Extract the keyword */
+            nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
+            if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
+              iProtection = nKwrd;
+              pGen->pIn++; /* Jump the visibility token */
+            }
+          }
+          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD) && SX_PTR_TO_INT(pGen->pIn->pUserData) == PH7_TKWRD_STATIC) {
+            /* Static method */
+            iAttrflags |= PH7_CLASS_ATTR_STATIC;
+            pGen->pIn++; /* Jump the static keyword */
+          }
+          if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_KEYWORD) == 0 || SX_PTR_TO_INT(pGen->pIn->pUserData) != PH7_TKWRD_FUNCTION) {
+            rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                                     "Unexpected token '%z',Expecting method declaration after 'final' keyword inside class '%z'",
+                                     &pGen->pIn->sData, pName);
+            if (rc == SXERR_ABORT) {
+              /* Error count limit reached,abort immediately */
+              return SXERR_ABORT;
+            }
+            goto done;
+          }
+          nKwrd = PH7_TKWRD_FUNCTION;
+        }
+        if (nKwrd != PH7_TKWRD_FUNCTION && nKwrd != PH7_TKWRD_VAR) {
+          rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                                   "Unexpected token '%z',Expecting method declaration inside class '%z'",
+                                   &pGen->pIn->sData, pName);
+          if (rc == SXERR_ABORT) {
+            /* Error count limit reached,abort immediately */
+            return SXERR_ABORT;
+          }
+          goto done;
+        }
+        if (nKwrd == PH7_TKWRD_VAR) {
+          pGen->pIn++; /* Jump the 'var' keyword */
+          if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_DOLLAR /*'$'*/) == 0) {
+            rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                                     "Expecting attribute declaration after 'var' keyword");
+            if (rc == SXERR_ABORT) {
+              /* Error count limit reached,abort immediately */
+              return SXERR_ABORT;
+            }
+            goto done;
+          }
+          /* Attribute declaration */
+          rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
+        } else {
+          /* Process method declaration */
+          rc = GenStateCompileClassMethod(&(*pGen), iProtection, iAttrflags, TRUE, pClass);
+        }
+        if (rc != SXRET_OK) {
+          if (rc == SXERR_ABORT) {
+            return SXERR_ABORT;
+          }
+          goto done;
+        }
+      }
+    } else {
+      /* Attribute declaration */
+      rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
+      if (rc != SXRET_OK) {
+        if (rc == SXERR_ABORT) {
+          return SXERR_ABORT;
+        }
+        goto done;
+      }
+    }
+  }
+  /* Install the class */
+  rc = PH7_VmInstallClass(pGen->pVm, pClass);
+  if (rc == SXRET_OK) {
+    ph7_class **apInterface;
+    sxu32 n;
+    if (pBase) {
+      /* Inherit from base class and mark as a subclass */
+      rc = PH7_ClassInherit(&(*pGen), pClass, pBase);
+    }
+    apInterface = (ph7_class **)SySetBasePtr(&aInterfaces);
+    for (n = 0; n < SySetUsed(&aInterfaces); n++) {
+      /* Implements one or more interface */
+      rc = PH7_ClassImplement(pClass, apInterface[n]);
+      if (rc != SXRET_OK) {
+        break;
+      }
+    }
+  }
+  SySetRelease(&aInterfaces);
+  if (rc != SXRET_OK) {
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    return SXERR_ABORT;
+  }
+done:
+  /* Point beyond the class body */
+  pGen->pIn = &pEnd[1];
+  pGen->pEnd = pTmp;
+#endif
+  return PH7_OK;
+}
+
 /*
  * Compile a user-defined class.
  * According to the PHP language reference manual
@@ -5143,6 +5511,14 @@ static sxi32 PH7_CompileClass(ph7_gen_state *pGen) {
   rc = GenStateCompileClass(&(*pGen), 0);
   return rc;
 }
+
+
+static sxi32 PH7_CompileEnum(ph7_gen_state *pGen) {
+  sxi32 rc;
+  rc = GenStateCompileEnum(&(*pGen), 0);
+  return rc;
+}
+
 /*
  * Exception handling.
  *  According to the PHP language reference manual
@@ -6154,6 +6530,8 @@ enum ID [: type] {
       return PH7_CompileClassInterface;
     } else if (nKeywordID == PH7_TKWRD_CLASS && (pLookahed->nType & PH7_TK_ID)) {
       return PH7_CompileClass;
+    } else if (nKeywordID == PH7_TKWRD_ENUM && (pLookahed->nType & PH7_TK_ID)) {
+      return PH7_CompileEnum;
     } else if (nKeywordID == PH7_TKWRD_ABSTRACT && (pLookahed->nType & PH7_TK_KEYWORD)
                && SX_PTR_TO_INT(pLookahed->pUserData) == PH7_TKWRD_CLASS) {
       return PH7_CompileAbstractClass;

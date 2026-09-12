@@ -1141,7 +1141,11 @@ struct ph7_vm_func_closure_env {
 #define VM_FUNC_RET_MASK \
   (PH7_TKWRD_ARRAY | PH7_TKWRD_BOOL | PH7_TKWRD_INT | \
    PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_OBJECT | \
-   PH7_TKWRD_VOID)
+   PH7_TKWRD_VOID | PH7_TKWRD_MIXED)
+
+/* Valid types for enums */
+#define VM_ENUM_MASK \
+  (PH7_TKWRD_BOOL | PH7_TKWRD_INT | PH7_TKWRD_FLOAT | PH7_TKWRD_STRING)
 
 
 /*
@@ -1735,7 +1739,7 @@ enum ph7_expr_id {
 #define PH7_TKWRD_ELSE     0x08000000     /* else */ 
 #define PH7_TKWRD_NEVER    0x10000000     /* :never */
 #define PH7_TKWRD_MIXED    0x20000000     /* :mixed */
-// Keyword 0x40000000 is available for use for language extensions
+//#define PH7_TKWRD_UNUSED1      0x40000000    /* unused */
 #define PH7_TKWRD_VOID     0x80000000    /* void */
 
 /* JSON encoding/decoding related definition */

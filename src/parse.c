@@ -632,7 +632,8 @@ static sxi32 ExprAssembleAnnon(ph7_gen_state *pGen, SyToken **ppCur, SyToken *pE
   if (pIn->nType & PH7_TK_COLON /*':'*/) {
     pIn++;
     if ((pIn->nType & PH7_TK_KEYWORD) == 0) {
-      if (PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "A function return type is expected after ':'") == SXERR_ABORT)
+      if (PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "B function return type is expected after ':'") == SXERR_ABORT)
+
         return SXERR_ABORT;
     } else
       pIn++;
