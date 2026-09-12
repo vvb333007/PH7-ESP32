@@ -18,454 +18,329 @@
 #include "ph7int.h"
 #include "builtins.h"
 
-#define Impl( Name_ , pCtx_ , nArg_, apArg_) \
-esp32_builtin_ ## Name_ (ph7_context *pCtx_, int nArg_, ph7_value **apArg_)
 
+
+/* Templates and boilerplates.
+ * IMPLEMENT() macros are function templates: 0, 1 or two args.
+ *
+ *  C11 Dispatcher, choose converter function by the type T 
+ */
+#define ph7_value_to(T, v) _Generic((T)0,          \
+    int:              ph7_value_to_int,            \
+    long:             ph7_value_to_int64,          \
+    long long:        ph7_value_to_int64,          \
+    float:            ph7_value_to_double,         \
+    double:           ph7_value_to_double          \
+)(v)
+
+/* Low level template for foreign functions which can not be generalized into IMPLEMENT_N_N() 
+ * E.g. function random() below can work with 1 or 2 arguments - means no suitable IMPLEMENT macro
+ */
+#define Impl( Name_ , pCtx_ , nArg_, apArg_) \
+  int esp32_builtin_ ## Name_ (ph7_context *pCtx_, int nArg_, ph7_value **apArg_)
+
+/* Two numeric arguments like digitalWrite(pin, value).
+ * CODE must call ph7_result_* to set the return value.
+ * if it doesnt the return value is whatever was in the accumulator. 
+ */
+#define IMPLEMENT_N_N(name, T0, T1, ...)                    \
+  Impl(name, pCtx, nArg, apArg) {                           \
+    if (nArg >= 2 &&                                        \
+        ph7_value_is_numeric(apArg[0]) &&                   \
+        ph7_value_is_numeric(apArg[1])) {                   \
+      T0 a0 = (T0)ph7_value_to(T0, apArg[0]);               \
+      T1 a1 = (T1)ph7_value_to(T1, apArg[1]);               \
+      __VA_ARGS__;                                          \
+    } else {                                                \
+      ph7_context_throw_error(pCtx, PH7_CTX_WARNING,        \
+        #name ": expected 2 numeric arguments");            \
+      ph7_result_null(pCtx);                                \
+    }                                                       \
+    return PH7_OK;                                          \
+  }
+
+/* One-arg functions like digitalRead() or delay() 
+*/
+#define IMPLEMENT_N(name, T0, ...)                          \
+  Impl(name, pCtx, nArg, apArg) {                           \
+    if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {      \
+      T0 a0 = (T0)ph7_value_to(T0, apArg[0]);               \
+      __VA_ARGS__;                                          \
+    } else {                                                \
+      ph7_context_throw_error(pCtx, PH7_CTX_WARNING,        \
+        #name ": expected 1 numeric argument");             \
+      ph7_result_null(pCtx);                                \
+    }                                                       \
+    return PH7_OK;                                          \
+  }
+
+/* No-arg functions like millis(), micros(), esp_timer_get_time() 
+*/
+#define IMPLEMENT(name, ...)                                \
+  Impl(name, pCtx, nArg, apArg) {                           \
+    (void)nArg; (void)apArg;                                \
+    __VA_ARGS__;                                            \
+    return PH7_OK;                                          \
+  }
 
 #ifndef PH7_DISABLE_ESP32_ARDUINO_FUNC
 # ifdef ESP32
 #  include <Arduino.h>
 # endif
 
-// pinMode(int $pin, int $mode)
-//
-int Impl(pinMode, pCtx, nArg, apArg) {
-
-  if (nArg >= 2 && ph7_value_is_numeric(apArg[0])) {
-
-    unsigned int pin = (unsigned int)ph7_value_to_int(apArg[0]);
-    int mode = ph7_value_to_int(apArg[1]);
+/* Actual implemetation.
+ * IMPLEMENT_N_N(functionName, arg1 type, arg2 type, CODE...) will create a function
+ * int ep32_builtin_functionName(...) which will be called each time PHP codes calls functionName($arg1, $arg2)
+ *
+ * The CODE.. part is the actual code to be executed; Arguments are available as a0, a1, a2, and so on
+ */
+IMPLEMENT_N_N(pinMode, int, int,
 #ifdef __CYGWIN__
-    printf("pinMode(%u, %u) called\r\n", pin, mode);
+  puts("pinMode()");
 #else
-    pinMode(pin, mode);
+  pinMode(a0, a1);
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing numeric argument");
-  }
+)
 
-  ph7_result_null(pCtx);
-  return PH7_OK;
-}
-
-// digitalWrite($pin, $value)
-//
-int Impl(digitalWrite, pCtx, nArg, apArg) {
-
-  if (nArg >= 2 && ph7_value_is_numeric(apArg[0])) {
-
-    int pin = ph7_value_to_int(apArg[0]);
-    int value = ph7_value_to_int(apArg[1]);
+IMPLEMENT_N_N(digitalWrite, int, int,
 #ifdef __CYGWIN__
-    printf("digitalWrite(%d, %d) called\r\n", pin, value);
+  puts("pinMode()");
 #else
-    digitalWrite(pin, value);
+  digitalWrite(a0, a1 ? 1 : 0);
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing numeric argument");
-  }
+)
 
-  ph7_result_null(pCtx);
-  return PH7_OK;
-}
-
-// int $value = digitalRead(int $pin)
-//
-int Impl(digitalRead, pCtx, nArg, apArg) {
-
-  int value = -1;
-
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
-
-    int pin = ph7_value_to_int(apArg[0]);
+IMPLEMENT_N(delay, int,
 #ifdef __CYGWIN__
-    printf("digitalRead(%d) called\r\n", pin);
+  puts("pinMode()");
 #else
-    value = digitalRead( pin );
+  delay(a0);
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing numeric argument");
-  }
+)
 
-  ph7_result_int(pCtx, value);
-  return PH7_OK;
-}
-
-
-// bool $ret = digitalPinIsInvalid($pin)
-//
-int Impl(digitalPinIsValid, pCtx, nArg, apArg) {
-  int value = 0;
-
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
-
-    int pin = ph7_value_to_int(apArg[0]);
+IMPLEMENT_N(delayMicroseconds, long long,
 #ifdef __CYGWIN__
-    printf("digitalPinIsValid(%d) called\r\n", pin);
+  puts("pinMode()");
 #else
-    value = digitalPinIsValid( pin );
+  delayMicroseconds(a0);
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing GPIO number");
-  }
+)
 
-  ph7_result_int(pCtx, value);
+IMPLEMENT_N(digitalRead, int,
+#ifdef __CYGWIN__
+  puts("pinMode()");
+#else
+  ph7_result_int(pCtx, digitalRead(a0));
+#endif
+)
 
-  return PH7_OK;
-}
+IMPLEMENT(millis,
+#ifdef __CYGWIN__
+  puts("pinMode()");
+#else
+  ph7_result_int64(pCtx, (sxi64)millis());
+#endif
+)
+
+IMPLEMENT(micros,
+#ifdef __CYGWIN__
+  puts("pinMode()");
+#else
+  ph7_result_int64(pCtx, (sxi64)micros());
+#endif
+)
+
+// bool $ret = digitalPinIsValid($pin)
+//
+IMPLEMENT_N(digitalPinIsValid, int,
+#ifdef __CYGWIN__
+  puts("pinMode()");
+#else
+  ph7_result_int(pCtx, digitalPinIsValid(a0));
+#endif
+)
 
 // bool digitalPinCanOutput($pin)
 //
-int Impl(digitalPinCanOutput, pCtx, nArg, apArg) {
-  int value = 0;
-
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
-
-    int pin = ph7_value_to_int(apArg[0]);
+IMPLEMENT_N(digitalPinCanOutput, int,
 #ifdef __CYGWIN__
-    printf("digitalPinCanOutput(%d) called\r\n", pin);
+  puts("pinMode()");
 #else
-    value = digitalPinCanOutput( pin );
+  ph7_result_int(pCtx, digitalPinCanOutput(a0));
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing GPIO number");
-  }
-
-  ph7_result_int(pCtx, value);
-
-  return PH7_OK;
-
-}
+)
 
 // $rtc_pin = digitalPinToRtcPin($pin)
 //
-int Impl(digitalPinToRtcPin, pCtx, nArg, apArg) {
-  int value = 0;
-
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
-
-    int pin = ph7_value_to_int(apArg[0]);
+IMPLEMENT_N(digitalPinToRtcPin, int,
 #ifdef __CYGWIN__
-    printf("digitalPinToRtcPin(%d) called\r\n", pin);
+  puts("pinMode()");
 #else
-    value = digitalPinToRtcPin( pin );
+  ph7_result_int(pCtx, digitalPinToRtcPin(a0));
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing GPIO number");
-  }
-
-  ph7_result_int(pCtx, value);
-
-  return PH7_OK;
-
-}
+)
 
 // $chan = digitalPinToDacChannel($pin)
 //
-int Impl(digitalPinToDacChannel, pCtx, nArg, apArg) {
-  int value = 0;
-
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
-
-    int pin = ph7_value_to_int(apArg[0]);
+IMPLEMENT_N(digitalPinToDacChannel, int,
 #ifdef __CYGWIN__
-    printf("digitalPinToDacChannel(%d) called\r\n", pin);
+  puts("pinMode()");
 #else
-    value = digitalPinToDacChannel( pin );
+  ph7_result_int(pCtx, digitalPinToDacChannel(a0));
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing GPIO number");
-  }
-
-  ph7_result_int(pCtx, value);
-
-  return PH7_OK;
-
-}
+)
 
 // $chan = digitalPinToTouchChannel($pin)
 //
-int Impl(digitalPinToTouchChannel, pCtx, nArg, apArg) {
-  int value = 0;
-
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
-
-    int pin = ph7_value_to_int(apArg[0]);
+IMPLEMENT_N(digitalPinToTouchChannel, int,
 #ifdef __CYGWIN__
-    printf("digitalPinToTouchChannel(%d) called\r\n", pin);
+  puts("pinMode()");
 #else
-    value = digitalPinToTouchChannel( pin );
+  ph7_result_int(pCtx, digitalPinToTouchChannel(a0));
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing GPIO number");
-  }
-
-  ph7_result_int(pCtx, value);
-
-  return PH7_OK;
-
-}
+)
 
 // $chan = digitalPinToAnalogChannel($pin)
 //
-int Impl(digitalPinToAnalogChannel, pCtx, nArg, apArg) {
-  int value = 0;
-
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
-
-    int pin = ph7_value_to_int(apArg[0]);
+IMPLEMENT_N(digitalPinToAnalogChannel, int,
 #ifdef __CYGWIN__
-    printf("digitalPinToAnalogChannel(%d) called\r\n", pin);
+  puts("pinMode()");
 #else
-    value = digitalPinToAnalogChannel( pin );
+  ph7_result_int(pCtx, digitalPinToAnalogChannel(a0));
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing GPIO number");
-  }
-
-  ph7_result_int(pCtx, value);
-
-  return PH7_OK;
-
-}
+)
 
 // $digi_pin = analogChannelToDigitalPin($ana_pin);
 //
-int Impl(analogChannelToDigitalPin, pCtx, nArg, apArg) {
-  int value = 0;
-
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
-
-    int channel = ph7_value_to_int(apArg[0]);
+IMPLEMENT_N(analogChannelToDigitalPin, int,
 #ifdef __CYGWIN__
-    printf("analogChannelToDigitalPin(%d) called\r\n", channel);
+  puts("pinMode()");
 #else
-    value = analogChannelToDigitalPin( channel );
+  ph7_result_int(pCtx, analogChannelToDigitalPin(a0));
 #endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing numeric argument");
-  }
+)
 
-  ph7_result_int(pCtx, value);
-
-  return PH7_OK;
-}
-
+// shiftIn(dataPin, clockPin, bitOrder)
+// TODO: implement
 //
-//
-int Impl(shiftIn, pCtx, nArg, apArg) {
-  SXUNUSED(pCtx);
-  SXUNUSED(nArg);
-  SXUNUSED(apArg);
+IMPLEMENT(shiftIn,
+  /* not implemented yet */
+)
 
-  return PH7_OK;
-}
-
+// shiftOut(dataPin, clockPin, bitOrder, value)
+// TODO: implement
 //
-//
-int Impl(shiftOut, pCtx, nArg, apArg) {
-  SXUNUSED(pCtx);
-  SXUNUSED(nArg);
-  SXUNUSED(apArg);
+IMPLEMENT(shiftOut,
+  /* not implemented yet */
+)
 
-  return PH7_OK;
-}
+// pulseIn()
+// TODO: implement
+//
+IMPLEMENT(pulseIn,
+  /* not implemented yet */
+)
+
+// pulseInLong
+// TODO: implement
+//
+IMPLEMENT(pulseInLong,
+  /* not implemented yet */
+)
 
 // $res = makeWord($a)
 // $res = makeWord($a, $b)
+// TODO: implement
 //
-int Impl(makeWord, pCtx, nArg, apArg) {
-  SXUNUSED(pCtx);
-  SXUNUSED(nArg);
-  SXUNUSED(apArg);
+IMPLEMENT(makeWord,
+  /* not implemented yet */
+)
 
-  return PH7_OK;
-}
 
-// random($upper_limit)
-// random($lower_limit, $upper_limit)
-//
-int Impl(random, pCtx, nArg, apArg) {
-
-  long min = 0, max;
-
-  if (nArg == 1 && ph7_value_is_numeric(apArg[0])) {
-
-    max = (long)ph7_value_to_int(apArg[0]);
-
-  } else if (nArg == 2 && ph7_value_is_numeric(apArg[0]) && ph7_value_is_numeric(apArg[1])) {
-
-    min = (long)ph7_value_to_int(apArg[0]);
-    max = (long)ph7_value_to_int(apArg[1]);
-
-  } else {
-
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing numeric argument");
-    return PH7_OK;
-  }
-
-#ifdef __CYGWIN__
-  printf("random(%ld, %ld) called\r\n", min, max);
-#else
-  if (min < max)
-    min = (esp_random() % (howbig - howsmall) + howsmall);
-#endif
-
-  ph7_result_int(pCtx, min);
-  return PH7_OK;
-}
 // randomSeed();
 // No-op: we use HWRNG which requires no seeding
 //
-int Impl(randomSeed, pCtx, nArg, apArg) {
-
-  SXUNUSED(pCtx);
-  SXUNUSED(nArg);
-  SXUNUSED(apArg);
-
-  return PH7_OK;
-}
+IMPLEMENT(randomSeed,
+  /* no-op */
+)
 
 // useRealRandomGenerator();
 // No-op: we use HWRNG always, no software PRNG fallback
 //
-int Impl(useRealRandomGenerator, pCtx, nArg, apArg) {
+IMPLEMENT(useRealRandomGenerator,
+  /* no-op */
+)
 
-  SXUNUSED(pCtx);
-  SXUNUSED(nArg);
-  SXUNUSED(apArg);
-
-  return PH7_OK;
-}
-
-
-//$scaled_x = map( long $x, long $in_min, long $in_max, long $out_min, long $out_max) {
+// Too many args to create a dedicated IMPLEMENT_N_N_N_N...
+// $scaled_x = map(long $x, long $in_min, long $in_max, long $out_min, long $out_max)
 //
-int Impl(map, pCtx, nArg, apArg) {
-
-  long ret;
-
-  if (nArg == 5) {
-
-    long x = (long)ph7_value_to_int(apArg[0]);
-    long in_min = (long)ph7_value_to_int(apArg[1]);
-    long in_max = (long)ph7_value_to_int(apArg[2]);
-    long out_min = (long)ph7_value_to_int(apArg[3]);
-    long out_max = (long)ph7_value_to_int(apArg[4]);
-
-    const long run = in_max - in_min;
-
-    if (run == 0)
-      ret = -1;
-    else {
-      const long rise = out_max - out_min;
-      const long delta = x - in_min;
-      ret = (delta * rise) / run + out_min;
-    }
-
-    ph7_result_int(pCtx, ret);
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing numeric argument");
+Impl(map, pCtx, nArg, apArg) {
+  if (nArg != 5 ||
+      !ph7_value_is_numeric(apArg[0]) ||
+      !ph7_value_is_numeric(apArg[1]) ||
+      !ph7_value_is_numeric(apArg[2]) ||
+      !ph7_value_is_numeric(apArg[3]) ||
+      !ph7_value_is_numeric(apArg[4])) {
+    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "map: expected 5 numeric arguments");
+    ph7_result_null(pCtx);
     return PH7_OK;
   }
 
-  return PH7_OK;
-}
+  const long x       = (long)ph7_value_to_int(apArg[0]);
+  const long in_min  = (long)ph7_value_to_int(apArg[1]);
+  const long in_max  = (long)ph7_value_to_int(apArg[2]);
+  const long out_min = (long)ph7_value_to_int(apArg[3]);
+  const long out_max = (long)ph7_value_to_int(apArg[4]);
 
-// $tim = micros();
-//
-int Impl(micros, pCtx, nArg, apArg) {
+  const long run = in_max - in_min;
 
-  SXUNUSED(nArg);
-  SXUNUSED(apArg);
-#ifdef __CYGWIN__
-  SXUNUSED(pCtx);
-  printf("micros() called\r\n");
-#else
-  ph7_result_int64(pCtx, micros());
-#endif
-  return PH7_OK;
-}
-
-// $tim = millis();
-//
-int Impl(millis, pCtx, nArg, apArg) {
-
-  SXUNUSED(nArg);
-  SXUNUSED(apArg);
-#ifdef __CYGWIN__
-  SXUNUSED(pCtx);
-  printf("millis() called\r\n");
-#else
-  ph7_result_int64(pCtx, millis());
-#endif
-  return PH7_OK;
-}
-
-// delay($millis);
-//
-int Impl(delay, pCtx, nArg, apArg) {
-
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
-
-    unsigned int interval = (unsigned int)ph7_value_to_int(apArg[0]); // TODO: int64 ?
-#ifdef __CYGWIN__
-    printf("delay(%u) called\r\n", interval);
-#else
-    delay( interval );
-#endif
-  } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing numeric argument");
+  if (run == 0) {
+    ph7_result_int(pCtx, -1);
+    return PH7_OK;
   }
 
-  ph7_result_null(pCtx);
+  const long rise  = out_max - out_min;
+  const long delta = x - in_min;
+
+  ph7_result_int(pCtx, (delta * rise) / run + out_min);
   return PH7_OK;
 }
 
-// delayMicroseconds($micros);
+
+// Variable args Arduino function random is implemented via Impl as it gives more freedom
+// in what to check and what input we can tolerate
+// random($upper_limit)
+// random($lower_limit, $upper_limit)
 //
-int Impl(delayMicroseconds, pCtx, nArg, apArg) {
+Impl(random, pCtx, nArg, apArg) {
 
-  if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {
+  long min = 0, max = 0;
 
-    unsigned int interval = (unsigned int)ph7_value_to_int(apArg[0]); // TODO: int64 ?
-#ifdef __CYGWIN__
-    printf("delayMicroseconds(%u) called\r\n", interval);
-#else
-    delayMicroseconds( interval );
-#endif
+  if (nArg == 1 && ph7_value_is_numeric(apArg[0])) {
+    max = (long)ph7_value_to_int(apArg[0]);
+  } else if (nArg == 2 && ph7_value_is_numeric(apArg[0]) && ph7_value_is_numeric(apArg[1])) {
+    min = (long)ph7_value_to_int(apArg[0]);
+    max = (long)ph7_value_to_int(apArg[1]);
   } else {
-    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "Missing numeric argument");
+    ph7_context_throw_error(pCtx, PH7_CTX_WARNING, "random: expected 1 or 2 numeric arguments");
+    ph7_result_null(pCtx);
+    return PH7_OK;
   }
 
-  ph7_result_null(pCtx);
-  return PH7_OK;
-}
-
-
-// $v = pulseIn($pin, $state, $timeout);
-//
-int Impl(pulseIn, pCtx, nArg, apArg) {
-//unsigned long pulseIn(uint8_t pin, uint8_t state, unsigned long timeout) {
-  SXUNUSED(pCtx);
-  SXUNUSED(nArg);
-  SXUNUSED(apArg);
+  if (min >= max) {
+    ph7_result_int(pCtx, min);
+  } else {
+#ifdef __CYGWIN__
+    puts("random() called");
+#else
+    ph7_result_int(pCtx, min + (long)(esp_random() % (unsigned long)(max - min)));
+#endif
+  }
 
   return PH7_OK;
 }
 
-// $v = pulseInLong($pin, $state, $timeout);
-//
-int Impl(pulseInLong, pCtx, nArg, apArg) {
-//unsigned long pulseInLong(uint8_t pin, uint8_t state, unsigned long timeout) {
-  SXUNUSED(pCtx);
-  SXUNUSED(nArg);
-  SXUNUSED(apArg);
-
-  return PH7_OK;
-}
-
-#endif // ARDUINO
+#endif //#ifndef PH7_DISABLE_ESP32_ARDUINO_FUNC
 
 #ifndef PH7_DISABLE_ESP32_ESPIDF_FUNC
 #if 0
@@ -566,44 +441,85 @@ int Impl(gpio_isr_handler_remove(ph7_context *ctx, int argc, ph7_value **argv) {
 int Impl(gpio_isr_register(ph7_context *ctx, int argc, ph7_value **argv) {   return PH7_OK; }
 int Impl(gpio_set_intr_type(ph7_context *ctx, int argc, ph7_value **argv) {   return PH7_OK; }
 
-#endif
-#endif // ESP-IDF
+#endif // 0
+#endif // #ifndef PH7_DISABLE_ESP32_ESPIDF_FUNC
 
 
 #ifndef PH7_DISABLE_ESP32_FREERTOS_FUNC
 #if 0
+// void vTaskDelay(const TickType_t xTicksToDelay);
+//
 int Impl(vTaskDelay(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
 
+//QueueHandle_t xQueueCreate(UBaseType_t uxQueueLength, UBaseType_t uxItemSize);
+//
 int Impl( xQueueCreate )(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
+
+// void vQueueDelete(QueueHandle_t xQueue);
+//
 int Impl( vQueueDelete )(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
+
+//BaseType_t xQueueSend(QueueHandle_t xQueue,
+//                      const void *pvItemToQueue,
+//                      TickType_t xTicksToWait);
+//
 int Impl( xQueueSend )(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
+
+//BaseType_t xQueueReceive(QueueHandle_t xQueue,
+//                         void *pvBuffer,
+//                         TickType_t xTicksToWait);
+//
 int Impl( xQueueReceive )(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
 
+//BaseType_t xTaskNotify(TaskHandle_t xTaskToNotify,
+//                       uint32_t ulValue,
+//                       eNotifyAction eAction);
+//
 int Impl( xTaskNotify )(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
+
+
+//BaseType_t xTaskNotifyWait(uint32_t ulBitsToClearOnEntry,
+//                           uint32_t ulBitsToClearOnExit,
+//                           uint32_t *pulNotificationValue,
+//                           TickType_t xTicksToWait);
+//
 int Impl( xTaskNotifyWait )(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
+
+
+//BaseType_t xTaskNotifyGive(TaskHandle_t xTaskToNotify);
+//
 int Impl( xTaskNotifyGive )(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
+
+//uint32_t ulTaskNotifyTake(BaseType_t xClearCountOnExit,
+//                          TickType_t xTicksToWait);
+//
 int Impl( ulTaskNotifyTake )(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
-#endif
-#endif
+#endif //#if 0
+#endif //#ifndef PH7_DISABLE_ESP32_FREERTOS_FUNC
 
 
 #undef Impl
+
+
+
+
+
 
