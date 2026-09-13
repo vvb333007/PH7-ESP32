@@ -129,34 +129,28 @@ php_ipc_sleep($handle, $mask); // sleep until woken up by another VM
 
 ---
 
-### 3. `resource` type
+### 3. `mixed` type
 
-Add the `resource` type and alias it to `uint64`.
-
-```php
-resource $var = fopen();
-```
-
+Done
 ---
 
 ### 4. `enum`
 
 Add the `enum` keyword.
 
-Implement enums as classes, so `Class::field` syntax can be used naturally.
-
-Consider enum casting semantics:
-
-* pure enum
-* `key => value` enum (should we define our own syntax, or use C-like syntax?)
+Done. No casting tho
 
 ```php
-enum Suit
+//Example
+//
+enum Suit :mixed
 {
-    case Hearts;
-    case Diamonds;
-    case Clubs;
-    case Spades;
+    case Hearts;                // 0
+    case Diamonds = 99;         // 99
+    case Clubs;                 // 1
+    case Spades;                // 2
+    case Huh = 6.7;             // 6.7 a floating point number
+    case Huh2 = 'A string';     // 'A string'
 }
 
 function do_stuff(Suit $s)
@@ -190,3 +184,4 @@ $arr = [];
 Implement `function_exists()`.
 
 ###8. empty strings are === null which is wrong.
+Done
