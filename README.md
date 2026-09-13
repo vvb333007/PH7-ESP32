@@ -1,10 +1,10 @@
-### An ESP32 port of PH7 PHP Engine. Requires [TARFS](https://github.com/vvb333007/tarfs)
+### An ESP32 port and a further development of PH7 PHP Engine. Uses [TARFS](https://github.com/vvb333007/tarfs)
 
 
-### Requres SPIRAM (PSRAM): requires about 100KiB of memory for the Engine plus ~180 KiB per virtual machine; Running PH7 without external RAM is barely possible
+### Memory footprint: requires about 100KiB of memory for the Engine plus ~180 KiB per virtual machine; Running PH7 without external RAM is barely possible. Modern ESP32 chips are all equipped with plenty of PSRAM (4..8MiB)
 
 
-### Work in progress.
+### Work in progress. [A roadmap](https://github.com/vvb333007/PH7-ESP32/TODO.md)
 
 
 [![Build Status](https://travis-ci.org/symisc/PH7.svg?branch=master)](https://travis-ci.org/symisc/PH7)
