@@ -138,11 +138,12 @@ Done
 
 Add the `enum` keyword.
 
-Done. No casting tho
+Done.
 
 ```php
 //Example
-//
+
+// Mixed-type enum
 enum Suit :mixed
 {
     case Hearts;                // 0
@@ -153,12 +154,37 @@ enum Suit :mixed
     case Huh2 = 'A string';     // 'A string'
 }
 
+// Integer enum, autoincrement
+enum Suit2 :int
+{
+    case Hearts;                // 0
+    case Diamonds = 99;         // 99
+    case Clubs;                 // 1
+    case Spades;                // 2
+}
+
+// Integer enum, comma-separated
+enum Suit3
+{
+    case Hearts;                // 0
+    case Diamonds = 99;         // 99
+    case Clubs = 1, Spades = 2;   // Allowed 1, 2
+    //case Clubs, Spades;         // Syntax error
+}
+
 function do_stuff(Suit $s)
 {
     // ...
 }
 
-do_stuff(Suit::Spades);
+
+function do_stuff2(Suit2 $s)
+{
+    // ...
+}
+
+do_stuff(Suit::Spades); // <-- no autocast, value passed as is
+do_stuff2('66');   // <-- autocast to int, since Suit2 enum is of type int
 ```
 
 ---
