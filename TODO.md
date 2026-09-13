@@ -185,3 +185,10 @@ Implement `function_exists()`.
 
 ###8. empty strings are === null which is wrong.
 Done
+
+
+###9. Function return arguments
+Done
+Syntax is accepted. Compiler checks for returns from void functions and checks if nothing is returned from a function that should return a value
+NO RETURN TYPECASTING is performed!
+
