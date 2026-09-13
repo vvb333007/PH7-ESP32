@@ -1205,7 +1205,7 @@ struct ph7_class {
   ph7_class *pBase;     /* Base class if any */
   SyHash hDerived;      /* Derived [child] classes */
   SyString sName;       /* Class full qualified name */
-  sxi32 iFlags;         /* Class configuration flags [i.e: final, interface, abstract, etc.]  */
+  sxi32 iFlags;         /* Class configuration flags [i.e: final, interface, abstract, enum etc.]  */
   SyHash hAttr;         /* Class attributes [i.e: variables and constants] */
   SyHash hMethod;       /* Class methods */
   sxu32 nLine;          /* Line number on which this class was declared */
@@ -1213,9 +1213,11 @@ struct ph7_class {
   ph7_class *pNextName; /* Next class [interface, abstract, etc.] with the same name */
 };
 /* Class configuration flags */
-#define PH7_CLASS_FINAL 0x001     /* Class is final [cannot be extended] */
-#define PH7_CLASS_INTERFACE 0x002 /* Class is interface */
-#define PH7_CLASS_ABSTRACT 0x004  /* Class is abstract */
+#define PH7_CLASS_FINAL     0x001  /* Class is final [cannot be extended] */
+#define PH7_CLASS_INTERFACE 0x002  /* Class is interface */
+#define PH7_CLASS_ABSTRACT  0x004  /* Class is abstract */
+#define PH7_CLASS_ENUM      0x008  /* Class is enum, only having static const attributes */
+
 /* Class attribute/methods/constants protection levels */
 #define PH7_CLASS_PROT_PUBLIC 1    /* public */
 #define PH7_CLASS_PROT_PROTECTED 2 /* protected */

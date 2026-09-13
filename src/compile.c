@@ -30,7 +30,7 @@
  */
 /* Forward declaration */
 typedef struct LangConstruct LangConstruct;
-typedef struct JumpFixup JumpFixup;
+typedef struct JumpFixup JumpFixup;                         
 typedef struct Label Label;
 /* Block [i.e: set of statements] control flags */
 #define GEN_BLOCK_LOOP 0x001       /* Loop block [i.e: for,while,...] */
@@ -3601,6 +3601,7 @@ static sxi32 GenStateCollectFuncArgs(ph7_vm_func *pFunc, ph7_gen_state *pGen, Sy
   SyBlob sSig;          /* Function signature */
   char *zDup;           /* Copy of argument name */
   sxi32 rc;
+  sxu32 nKey;
 
   pIn = pGen->pIn;
   //pCur = 0;
@@ -3613,9 +3614,14 @@ static sxi32 GenStateCollectFuncArgs(ph7_vm_func *pFunc, ph7_gen_state *pGen, Sy
     }
     SyZero(&sArg, sizeof(ph7_vm_func_arg));
     SySetInit(&sArg.aByteCode, &pGen->pVm->sAllocator, sizeof(VmInstr));
+
+    // Type hint: either a keyword (int, string, mixed, etc) or a class/enum name
     if (pIn->nType & (PH7_TK_ID | PH7_TK_KEYWORD)) {
+
+      // Built in types: these are keywords
       if (pIn->nType & PH7_TK_KEYWORD) {
-        sxu32 nKey = (sxu32)(SX_PTR_TO_INT(pIn->pUserData));
+        nKey = (sxu32)(SX_PTR_TO_INT(pIn->pUserData));
+choose_memobj:
         if (nKey & PH7_TKWRD_ARRAY) {
           sArg.nType = MEMOBJ_HASHMAP;
         } else if (nKey & PH7_TKWRD_BOOL) {
@@ -3636,17 +3642,39 @@ static sxi32 GenStateCollectFuncArgs(ph7_vm_func *pFunc, ph7_gen_state *pGen, Sy
                               &pIn->sData);
         }
       } else {
-        SyString *pName = &pIn->sData; /* Class name */
-        char *zDup;
-        /* Argument must be a class instance,record that*/
-        zDup = SyMemBackendStrDup(&pGen->pVm->sAllocator, pName->zString, pName->nByte);
-        if (zDup) {
-          sArg.nType = SXU32_HIGH; /* 0xFFFFFFFF as sentinel */
-          SyStringInitFromBuf(&sArg.sClass, zDup, pName->nByte);
+        SyString *pName = &pIn->sData; /* Class/Enum name */
+
+#if 1
+        ph7_class *pClass;
+        pClass = PH7_VmExtractClass(pGen->pVm, pName->zString, pName->nByte, FALSE, 0);
+        if (pClass == NULL) {
+          // undefined type hint, abort compilation
+          PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unknown type '%z'", pName);
+          return SXERR_ABORT;
+        }
+        if ((pClass->iFlags & PH7_CLASS_ENUM) != 0) {
+          // TODO: extract overal enum type and use it for autocast (if type is not :mixed)
+          //sArg.nType = MEMOBJ_INT;
+          //puts("enum type");
+             /* When compiled, enum class has its nLine reused to store :type keyword (or zero if there were none)*/
+             nKey = pClass->nLine; 
+             goto choose_memobj;
+        } else {
+#endif
+          char *zDup;
+          /* Argument must be a class instance,record that*/
+          zDup = SyMemBackendStrDup(&pGen->pVm->sAllocator, pName->zString, pName->nByte);
+          if (zDup) {
+            sArg.nType = SXU32_HIGH; /* 0xFFFFFFFF as sentinel */
+            SyStringInitFromBuf(&sArg.sClass, zDup, pName->nByte);
+          }
         }
       }
       pIn++;
     }
+
+
+
     if (pIn >= pEnd) {
       rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Missing argument name");
       return rc;
@@ -4255,11 +4283,8 @@ static sxi32 GenStateCompileClassConstant(ph7_gen_state *pGen, sxi32 iProtection
   int bIsEnum;
   int bUseAutoValue;
 
-  /**
-   * PH7_CLASS_ATTR_ENUM has nothing to do with classes, so clear that flag and keep it in bIsEnum.
-   */
   bIsEnum = (iFlags & PH7_CLASS_ATTR_ENUM) ? 1 : 0;
-  iFlags &= ~PH7_CLASS_ATTR_ENUM;
+  //iFlags &= ~PH7_CLASS_ATTR_ENUM;
 
   bUseAutoValue = 0;
 
@@ -4865,16 +4890,16 @@ static sxi32 GenStateCompileEnum(ph7_gen_state *pGen, sxi32 iFlags) {
 
 
   sxu32 nLine = pGen->pIn->nLine;
-  ph7_class *pClass, *pBase;
+  ph7_class *pClass;
   SyToken *pEnd, *pTmp;
-  sxi32 iProtection;
-  sxi32 iAttrflags;
+
+
   SyString *pName;
-  SyString *pElem;
+
   sxi32 nKwrd;
   sxi32 rc;
   sxi32 nAutoValue = 0;
-
+  sxu32 nKey = 0; // enum type (0: no type)
   /* Jump the 'enum' keyword */
   pGen->pIn++;
 
@@ -4891,7 +4916,7 @@ static sxi32 GenStateCompileEnum(ph7_gen_state *pGen, sxi32 iFlags) {
   pGen->pIn++;
 
 
-  sxu32 nKey = 0; // enum type (0: no type)
+  
 
   /* Extract enum type if exists */
   if (pGen->pIn->nType == PH7_TK_COLON) {
@@ -4904,11 +4929,13 @@ err:
         return SXERR_ABORT;
       }
 
-      sxu32 nKey = (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData));
+      nKey = (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData));
 
-      // Check if nKey is one of a valid types: string, int, bool, float;
+      // Check if nKey is one of a valid types: string, int, bool, float, mixed;
       if ((nKey & VM_ENUM_MASK) == 0)
         goto err;
+
+      
       /* jump the  type */
       pGen->pIn++;
     }
@@ -4946,8 +4973,10 @@ err:
     return SXERR_ABORT;
   }
 
-  /* Set the inherited flags */
-  pClass->iFlags = iFlags;
+  /* Set the inherited flags and mark as enum */
+  pClass->iFlags = iFlags | PH7_CLASS_ENUM ;
+  /* Reuse nLine member for enum type */
+  pClass->nLine = nKey; // TODO: refactor
 
 
   /* Start the parse process */
