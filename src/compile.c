@@ -3627,8 +3627,10 @@ static sxi32 GenStateCollectFuncArgs(ph7_vm_func *pFunc, ph7_gen_state *pGen, Sy
         } else if (nKey & PH7_TKWRD_FLOAT) {
           sArg.nType = MEMOBJ_REAL;
         } else if (nKey & PH7_TKWRD_MIXED) {
-          puts("mixed type: no automatic cast");
+          /* 'mixed' as function argument: do not do any autocasting */
+          //puts("mixed type: no automatic cast");
         } else {
+          /* unknown typename, treat as mixed + warning*/
           PH7_GenCompileError(&(*pGen), E_WARNING, pGen->pIn->nLine,
                               "Invalid argument type '%z',Automatic cast will not be performed",
                               &pIn->sData);
@@ -4109,7 +4111,9 @@ static sxi32 GetProtectionLevel(sxi32 nKeyword) {
   return PH7_CLASS_PROT_PUBLIC;
 }
 /*
- * Compile a class constant.
+ * Compile a class constant OR compile an enum 'case'
+ * Last arg is used to set enum values when there is no explicit '='
+ *
  * According to the PHP language reference manual
  *  Class Constants
  *   It is possible to define constant values on a per-class basis remaining 
@@ -4129,7 +4133,10 @@ static sxi32 GetProtectionLevel(sxi32 nKeyword) {
  *   Refer to the official documentation for more information on the powerful extension
  *   introduced by the PH7 engine to the OO subsystem.
  */
-static sxi32 GenStateCompileClassConstant(ph7_gen_state *pGen, sxi32 iProtection, sxi32 iFlags, ph7_class *pClass) {
+#if 0 
+// Original SyMisc algorithm
+//
+static sxi32 GenStateCompileClassConstant(ph7_gen_state *pGen, sxi32 iProtection, sxi32 iFlags, ph7_class *pClass, sxi32 *auto_value) {
   sxu32 nLine = pGen->pIn->nLine;
   SySet *pInstrContainer;
   ph7_class_attr *pCons;
@@ -4233,6 +4240,156 @@ Synchronize:
   }
   return SXERR_CORRUPT;
 }
+#else
+/* Upgraded version which can compile enum entries (which are class members, constants)
+ * When =EXPR is omitted from the 'case ID' enum entry then we simply use pAutoValue (which 
+ * monotonically increments). case ID=10 does not affect pAutoValue counter in this release of PH7
+ */
+static sxi32 GenStateCompileClassConstant(ph7_gen_state *pGen, sxi32 iProtection, sxi32 iFlags, ph7_class *pClass, sxi32 *pAutoValue) {
+  sxu32 nLine = pGen->pIn->nLine;
+  SySet *pInstrContainer;
+  ph7_class_attr *pCons;
+  SyString *pName;
+  sxi32 rc;
+
+  int bIsEnum;
+  int bUseAutoValue;
+
+  /**
+   * PH7_CLASS_ATTR_ENUM has nothing to do with classes, so clear that flag and keep it in bIsEnum.
+   */
+  bIsEnum = (iFlags & PH7_CLASS_ATTR_ENUM) ? 1 : 0;
+  iFlags &= ~PH7_CLASS_ATTR_ENUM;
+
+  bUseAutoValue = 0;
+
+  iProtection = GetProtectionLevel(iProtection);
+  pGen->pIn++; /* Jump the 'const'/'case' keyword */
+loop:
+  iFlags |= PH7_CLASS_ATTR_CONSTANT;
+  if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_ID) == 0) {
+    rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Invalid constant name");
+    if (rc == SXERR_ABORT) {
+      return SXERR_ABORT;
+    }
+    goto Synchronize;
+  }
+  pName = &pGen->pIn->sData;
+  if (GenStateIsReservedConstant(pName)) {
+    rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Cannot redeclare a reserved constant '%z'", pName);
+    if (rc == SXERR_ABORT) {
+      return SXERR_ABORT;
+    }
+    goto Synchronize;
+  }
+  pGen->pIn++;
+
+  if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_EQUAL /* '=' */) == 0) {
+    if (!bIsEnum) {
+      /* class constants must have '= EXPR'. */
+      rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Expected '=' after class constant %z'", pName);
+      if (rc == SXERR_ABORT) {
+        return SXERR_ABORT;
+      }
+      goto Synchronize;
+    }
+    /* No equal sign, so it is 'case ID;' and we have to use our autovalue*/
+    bUseAutoValue = 1;
+  } else {
+    pGen->pIn++; /* Jump the equal sign */
+  }
+
+  pCons = PH7_NewClassAttr(pGen->pVm, pName, nLine, iProtection, iFlags);
+  if (pCons == 0) {
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    return SXERR_ABORT;
+  }
+
+  /* Create a bytecode container for the constant. This code should then be 
+   * executed once (later, when accessing the constant) and the value is cached 
+   * for subsequent accesses 
+   */
+  pInstrContainer = PH7_VmGetByteCodeContainer(pGen->pVm);
+  PH7_VmSetByteCodeContainer(pGen->pVm, &pCons->aByteCode);
+
+  if (bUseAutoValue) {
+
+    /**
+     * 'case Name;' no '=' token, no RVALUE. No expression to compile.
+     * Create a fake token containing an integer 'autoincrementing' value, swap input stream for the
+     * compiler and call CompileExpr on that token; Once compiled - switch the input stream back;
+     */
+    SyToken aFake[1];
+    SyToken *pSaveIn = pGen->pIn;
+    SyToken *pSaveEnd = pGen->pEnd;
+
+    static char zNum[32];  // TODO: CITO: Can it be local buffer on the stack?
+    sxi32 nAutoValue = 0;  // Fallback
+    if (pAutoValue != NULL) {
+      nAutoValue = *pAutoValue;
+      /* TODO: make aoutcounter aware of last numeric value set and start from there+1*/
+      *pAutoValue = nAutoValue + 1; 
+    }
+
+    SyBufferFormat(zNum, sizeof(zNum), "%d", nAutoValue);
+    SyStringInitFromBuf(&aFake[0].sData, zNum, SyStrlen(zNum));
+    aFake[0].nType = PH7_TK_INTEGER;
+    aFake[0].nLine = nLine;
+
+    pGen->pIn = aFake;
+    pGen->pEnd = &aFake[1];
+
+    rc = PH7_CompileExpr(&(*pGen), EXPR_FLAG_COMMA_STATEMENT, 0);
+
+    pGen->pIn = pSaveIn;
+    pGen->pEnd = pSaveEnd;
+  } else {
+    rc = PH7_CompileExpr(&(*pGen), EXPR_FLAG_COMMA_STATEMENT, 0);
+  }
+
+  if (rc == SXERR_EMPTY) {
+    rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Empty constant '%z' value", pName);
+    if (rc == SXERR_ABORT) {
+      return SXERR_ABORT;
+    }
+  }
+  PH7_VmEmitInstr(pGen->pVm, PH7_OP_DONE, 1, 0, 0, 0);
+  PH7_VmSetByteCodeContainer(pGen->pVm, pInstrContainer);
+  if (rc == SXERR_ABORT) {
+    return SXERR_ABORT;
+  }
+  rc = PH7_ClassInstallAttr(pClass, pCons);
+  if (rc != SXRET_OK) {
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    return SXERR_ABORT;
+  }
+  if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_COMMA)) {
+    pGen->pIn++;
+    if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_ID) == 0) {
+      SyToken *pTok = pGen->pIn;
+      if (pTok >= pGen->pEnd) {
+        pTok--;
+      }
+      rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                               "Unexpected token '%z',expecting constant declaration inside class '%z'",
+                               &pTok->sData, &pClass->sName);
+      if (rc == SXERR_ABORT) {
+        return SXERR_ABORT;
+      }
+    } else {
+      if (pGen->pIn->nType & PH7_TK_ID) {
+        goto loop;
+      }
+    }
+  }
+  return SXRET_OK;
+Synchronize:
+  while (pGen->pIn < pGen->pEnd && ((pGen->pIn->nType & PH7_TK_SEMI) == 0)) {
+    pGen->pIn++;
+  }
+  return SXERR_CORRUPT;
+}
+#endif
 /*
  * complie a class attribute or Properties in the PHP jargon.
  * According to the PHP language reference manual
@@ -4642,7 +4799,7 @@ static sxi32 PH7_CompileClassInterface(ph7_gen_state *pGen) {
     }
     if (nKwrd == PH7_TKWRD_CONST) {
       /* Parse constant */
-      rc = GenStateCompileClassConstant(&(*pGen), 0, 0, pClass);
+      rc = GenStateCompileClassConstant(&(*pGen), 0, 0, pClass, 0);
       if (rc != SXRET_OK) {
         if (rc == SXERR_ABORT) {
           return SXERR_ABORT;
@@ -4697,10 +4854,10 @@ done:
 /*
  * Compile a user-defined enum
  *
- * enum ID [:TYPE] {
- *   case ID = RVAL;
- *   case ID = RVAL;
- *   case ID = RVAL;
+ * enum TK_ID [:TK_KEYWORD] {
+ *   case TK_ID [= EXPR];
+ *   case TK_ID [= EXPR];
+ *   case TK_ID [= EXPR];
  * }
  */
 static sxi32 GenStateCompileEnum(ph7_gen_state *pGen, sxi32 iFlags) {
@@ -4716,21 +4873,20 @@ static sxi32 GenStateCompileEnum(ph7_gen_state *pGen, sxi32 iFlags) {
   SyString *pElem;
   sxi32 nKwrd;
   sxi32 rc;
+  sxi32 nAutoValue = 0;
 
   /* Jump the 'enum' keyword */
   pGen->pIn++;
 
-  /* TODO: check for TK_ID here never fires: it is checked in lokahead code beofre calling to this function 
-   as a result "unexpected keyword enum" is displayed instead of "ibvaid absent enum name" */
   if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_ID) == 0) {
     /* Syntax error */
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Invalid/absent enum name");
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "Unexpected token '%z', expecting the enum name", &pGen->pIn->sData);
     return SXERR_ABORT;
   }
 
   /* Extract enum name */
   pName = &pGen->pIn->sData;
-
+//  PH7_GenCompileError(pGen, E_WARNING, nLine, "enum name is '%z'", &pGen->pIn->sData);
   /* Advance the stream cursor */
   pGen->pIn++;
 
@@ -4744,7 +4900,7 @@ static sxi32 GenStateCompileEnum(ph7_gen_state *pGen, sxi32 iFlags) {
     if (pGen->pIn < pGen->pEnd) {
       if (pGen->pIn->nType != PH7_TK_KEYWORD) {
 err:
-        PH7_GenCompileError(pGen, E_ERROR, nLine, "float, int, bool or string is expected after ':'");
+        PH7_GenCompileError(pGen, E_ERROR, nLine, "mixed, float, int, bool or string is expected after ':'");
         return SXERR_ABORT;
       }
 
@@ -4781,20 +4937,19 @@ err:
   pTmp = pGen->pEnd;
   pGen->pEnd = pEnd;
 
-#if 0
+
   /* Obtain a raw class */
   pClass = PH7_NewRawClass(pGen->pVm, pName, nLine);
+
   if (pClass == 0) {
     PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
     return SXERR_ABORT;
   }
 
-//        SyMemBackendPoolFree(&pGen->pVm->sAllocator, pClass);
-
   /* Set the inherited flags */
   pClass->iFlags = iFlags;
 
-#endif
+
   /* Start the parse process */
   for (;;) {
 
@@ -4810,252 +4965,64 @@ err:
     if (pGen->pIn->nType & PH7_TK_CCB) /* '}' */
       break;
 
-    if ( (pGen->pIn->nType & PH7_TK_KEYWORD) &&
-          (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData)) == PH7_TKWRD_CASE ) {
+    /* Extract the current keyword, must be 'case' */
+    if ((pGen->pIn->nType & PH7_TK_KEYWORD) != 0) {
+      nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
 
-      /* Jump the 'case' keyword */
-      if (++pGen->pIn >= pGen->pEnd) break;
+      if ( nKwrd == PH7_TKWRD_CASE ) {
 
-      /* Get the enum element name */
-      if ( (pGen->pIn->nType & PH7_TK_ID) ) {
-        pElem = &pGen->pIn->sData;
-        if (++pGen->pIn >= pGen->pEnd) break;
+        /* Process 'case ID [= EXPR]' as a constant declaration 'const ID = EXPR' or 'const ID = nAutoValue'
+         * PH7_CLASS_ATTR_ENUM tells the GenStateCompileClassConstant() to accept values without explicit '='.
+         * This behavior is required for PH7_CompileEnum()
+         */
+        //puts("compiling a constant");
 
-        puts("case parsed");
-      } else {
-        PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                               "Unexpected token '%z'. Expecting an enum element name within enum '%z'",
-                               &pGen->pIn->sData, pName);
+        rc = GenStateCompileClassConstant(&(*pGen), 
+                                          PH7_CLASS_PROT_PUBLIC, 
+                                          PH7_CLASS_ATTR_STATIC | PH7_CLASS_ATTR_ENUM, 
+                                          pClass, 
+                                          &nAutoValue);
+        
+
+        /* Success! continue parsing of the next 'case' statement */
+        if (rc == SXRET_OK) {
+          //puts("success");
+          continue;
+        }
+
         return SXERR_ABORT;
       }
-    } else {
-      
-      PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                               "Unexpected token '%z'. Expecting 'case' within enum '%z'",
-                               &pGen->pIn->sData, pName);
-        return SXERR_ABORT;
     }
+
+    rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
+                                     "Unexpected token '%z', Expecting 'case' inside enum '%z'",
+                                     &pGen->pIn->sData, pName);
+    return SXERR_ABORT;
+  } // for(;;)
+  
+
+  /* Install the class */
+  //puts("Installing out class");
+  rc = PH7_VmInstallClass(pGen->pVm, pClass);
+
+  if (rc != SXRET_OK) {
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "Can not install enum, out of memory");
+    return SXERR_ABORT;
   }
 
+
   /* Restore parser limit */
+  //puts("Enum done");
   pGen->pEnd = pTmp;
   pGen->pIn = pEnd;
   /* Jump the curly */
   if (pGen->pIn < pGen->pEnd)
     pGen->pIn++;
 
-#if 0
-    /* Assume public visibility */
-    iProtection = PH7_TKWRD_PUBLIC;
-    iAttrflags = 0;
-    if (pGen->pIn->nType & PH7_TK_KEYWORD) {
-      /* Extract the current keyword */
-      nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
-      if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
-        iProtection = nKwrd;
-        pGen->pIn++; /* Jump the visibility token */
-        if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & (PH7_TK_KEYWORD | PH7_TK_DOLLAR)) == 0) {
-          rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                                   "Unexpected token '%z'. Expecting attribute declaration inside class '%z'",
-                                   &pGen->pIn->sData, pName);
-          if (rc == SXERR_ABORT) {
-            /* Error count limit reached,abort immediately */
-            return SXERR_ABORT;
-          }
-          goto done;
-        }
-        if (pGen->pIn->nType & PH7_TK_DOLLAR) {
-          /* Attribute declaration */
-          rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
-          if (rc != SXRET_OK) {
-            if (rc == SXERR_ABORT) {
-              return SXERR_ABORT;
-            }
-            goto done;
-          }
-          continue;
-        }
-        /* Extract the keyword */
-        nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
-      }
-      if (nKwrd == PH7_TKWRD_CONST) {
-        /* Process constant declaration */
-        rc = GenStateCompileClassConstant(&(*pGen), iProtection, iAttrflags, pClass);
-        if (rc != SXRET_OK) {
-          if (rc == SXERR_ABORT) {
-            return SXERR_ABORT;
-          }
-          goto done;
-        }
-      } else {
-        if (nKwrd == PH7_TKWRD_STATIC) {
-          /* Static method or attribute,record that */
-          iAttrflags |= PH7_CLASS_ATTR_STATIC;
-          pGen->pIn++; /* Jump the static keyword */
-          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)) {
-            /* Extract the keyword */
-            nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
-            if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
-              iProtection = nKwrd;
-              pGen->pIn++; /* Jump the visibility token */
-            }
-          }
-          if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & (PH7_TK_KEYWORD | PH7_TK_DOLLAR)) == 0) {
-            rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                                     "Unexpected token '%z',Expecting method,attribute or constant declaration inside class '%z'",
-                                     &pGen->pIn->sData, pName);
-            if (rc == SXERR_ABORT) {
-              /* Error count limit reached,abort immediately */
-              return SXERR_ABORT;
-            }
-            goto done;
-          }
-          if (pGen->pIn->nType & PH7_TK_DOLLAR) {
-            /* Attribute declaration */
-            rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
-            if (rc != SXRET_OK) {
-              if (rc == SXERR_ABORT) {
-                return SXERR_ABORT;
-              }
-              goto done;
-            }
-            continue;
-          }
-          /* Extract the keyword */
-          nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
-        } else if (nKwrd == PH7_TKWRD_ABSTRACT) {
-          /* Abstract method,record that */
-          iAttrflags |= PH7_CLASS_ATTR_ABSTRACT;
-          /* Mark the whole class as abstract */
-          pClass->iFlags |= PH7_CLASS_ABSTRACT;
-          /* Advance the stream cursor */
-          pGen->pIn++;
-          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)) {
-            nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
-            if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
-              iProtection = nKwrd;
-              pGen->pIn++; /* Jump the visibility token */
-            }
-          }
-          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD) && SX_PTR_TO_INT(pGen->pIn->pUserData) == PH7_TKWRD_STATIC) {
-            /* Static method */
-            iAttrflags |= PH7_CLASS_ATTR_STATIC;
-            pGen->pIn++; /* Jump the static keyword */
-          }
-          if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_KEYWORD) == 0 || SX_PTR_TO_INT(pGen->pIn->pUserData) != PH7_TKWRD_FUNCTION) {
-            rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                                     "Unexpected token '%z',Expecting method declaration after 'abstract' keyword inside class '%z'",
-                                     &pGen->pIn->sData, pName);
-            if (rc == SXERR_ABORT) {
-              /* Error count limit reached,abort immediately */
-              return SXERR_ABORT;
-            }
-            goto done;
-          }
-          nKwrd = PH7_TKWRD_FUNCTION;
-        } else if (nKwrd == PH7_TKWRD_FINAL) {
-          /* final method ,record that */
-          iAttrflags |= PH7_CLASS_ATTR_FINAL;
-          pGen->pIn++; /* Jump the final keyword */
-          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)) {
-            /* Extract the keyword */
-            nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
-            if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
-              iProtection = nKwrd;
-              pGen->pIn++; /* Jump the visibility token */
-            }
-          }
-          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD) && SX_PTR_TO_INT(pGen->pIn->pUserData) == PH7_TKWRD_STATIC) {
-            /* Static method */
-            iAttrflags |= PH7_CLASS_ATTR_STATIC;
-            pGen->pIn++; /* Jump the static keyword */
-          }
-          if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_KEYWORD) == 0 || SX_PTR_TO_INT(pGen->pIn->pUserData) != PH7_TKWRD_FUNCTION) {
-            rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                                     "Unexpected token '%z',Expecting method declaration after 'final' keyword inside class '%z'",
-                                     &pGen->pIn->sData, pName);
-            if (rc == SXERR_ABORT) {
-              /* Error count limit reached,abort immediately */
-              return SXERR_ABORT;
-            }
-            goto done;
-          }
-          nKwrd = PH7_TKWRD_FUNCTION;
-        }
-        if (nKwrd != PH7_TKWRD_FUNCTION && nKwrd != PH7_TKWRD_VAR) {
-          rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                                   "Unexpected token '%z',Expecting method declaration inside class '%z'",
-                                   &pGen->pIn->sData, pName);
-          if (rc == SXERR_ABORT) {
-            /* Error count limit reached,abort immediately */
-            return SXERR_ABORT;
-          }
-          goto done;
-        }
-        if (nKwrd == PH7_TKWRD_VAR) {
-          pGen->pIn++; /* Jump the 'var' keyword */
-          if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_DOLLAR /*'$'*/) == 0) {
-            rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                                     "Expecting attribute declaration after 'var' keyword");
-            if (rc == SXERR_ABORT) {
-              /* Error count limit reached,abort immediately */
-              return SXERR_ABORT;
-            }
-            goto done;
-          }
-          /* Attribute declaration */
-          rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
-        } else {
-          /* Process method declaration */
-          rc = GenStateCompileClassMethod(&(*pGen), iProtection, iAttrflags, TRUE, pClass);
-        }
-        if (rc != SXRET_OK) {
-          if (rc == SXERR_ABORT) {
-            return SXERR_ABORT;
-          }
-          goto done;
-        }
-      }
-    } else {
-      /* Attribute declaration */
-      rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
-      if (rc != SXRET_OK) {
-        if (rc == SXERR_ABORT) {
-          return SXERR_ABORT;
-        }
-        goto done;
-      }
-    }
-  }
-  /* Install the class */
-  rc = PH7_VmInstallClass(pGen->pVm, pClass);
-  if (rc == SXRET_OK) {
-    ph7_class **apInterface;
-    sxu32 n;
-    if (pBase) {
-      /* Inherit from base class and mark as a subclass */
-      rc = PH7_ClassInherit(&(*pGen), pClass, pBase);
-    }
-    apInterface = (ph7_class **)SySetBasePtr(&aInterfaces);
-    for (n = 0; n < SySetUsed(&aInterfaces); n++) {
-      /* Implements one or more interface */
-      rc = PH7_ClassImplement(pClass, apInterface[n]);
-      if (rc != SXRET_OK) {
-        break;
-      }
-    }
-  }
-  SySetRelease(&aInterfaces);
-  if (rc != SXRET_OK) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
-    return SXERR_ABORT;
-  }
-done:
-  /* Point beyond the class body */
-  pGen->pIn = &pEnd[1];
-  pGen->pEnd = pTmp;
-#endif
   return PH7_OK;
+done:
+  SyMemBackendPoolFree(&pGen->pVm->sAllocator, pClass);
+  return SXERR_ABORT;  
 }
 
 /*
@@ -5286,7 +5253,7 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
       }
       if (nKwrd == PH7_TKWRD_CONST) {
         /* Process constant declaration */
-        rc = GenStateCompileClassConstant(&(*pGen), iProtection, iAttrflags, pClass);
+        rc = GenStateCompileClassConstant(&(*pGen), iProtection, iAttrflags, pClass, 0);
         if (rc != SXRET_OK) {
           if (rc == SXERR_ABORT) {
             return SXERR_ABORT;
@@ -6517,20 +6484,14 @@ static ProcLangConstruct GenStateGetStatementHandler(
   }
 
   if (pLookahed) {
-    // TODO: enum language construct
-/*
-enum ID [: type] {
-  case Name1 [= Const1] ;
-  case Name2 [= Const2] ;
-  case Name3 [= Const3] ;
-}
-
-*/
     if (nKeywordID == PH7_TKWRD_INTERFACE && (pLookahed->nType & PH7_TK_ID)) {
       return PH7_CompileClassInterface;
     } else if (nKeywordID == PH7_TKWRD_CLASS && (pLookahed->nType & PH7_TK_ID)) {
       return PH7_CompileClass;
-    } else if (nKeywordID == PH7_TKWRD_ENUM && (pLookahed->nType & PH7_TK_ID)) {
+    } else if (nKeywordID == PH7_TKWRD_ENUM /*&& (pLookahed->nType & PH7_TK_ID)*/) {
+      /* We skip Lookahead type match because otherwise error message will be misleading : "unexpected keyword 'enum'"
+         which is wrong. Instead we let the enum parser PH7_CompileEnum hit the syntax error
+       */
       return PH7_CompileEnum;
     } else if (nKeywordID == PH7_TKWRD_ABSTRACT && (pLookahed->nType & PH7_TK_KEYWORD)
                && SX_PTR_TO_INT(pLookahed->pUserData) == PH7_TKWRD_CLASS) {

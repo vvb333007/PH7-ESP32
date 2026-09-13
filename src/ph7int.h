@@ -1145,7 +1145,7 @@ struct ph7_vm_func_closure_env {
 
 /* Valid types for enums */
 #define VM_ENUM_MASK \
-  (PH7_TKWRD_BOOL | PH7_TKWRD_INT | PH7_TKWRD_FLOAT | PH7_TKWRD_STRING)
+  (PH7_TKWRD_BOOL | PH7_TKWRD_INT | PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_MIXED)
 
 
 /*
@@ -1234,9 +1234,10 @@ struct ph7_class_attr {
 };
 /* Attribute configuration */
 #define PH7_CLASS_ATTR_STATIC 0x001   /* Static attribute */
-#define PH7_CLASS_ATTR_CONSTANT 0x002 /* Constant attribute */
+#define PH7_CLASS_ATTR_CONSTANT 0x002 /* Constant attribute OR enum value */
 #define PH7_CLASS_ATTR_ABSTRACT 0x004 /* Abstract method */
 #define PH7_CLASS_ATTR_FINAL 0x008    /* Final method */
+#define PH7_CLASS_ATTR_ENUM 0x0016 /* Used by GenStateCompileEnum() to hind the compiler (..CompileConst) to not require = RVALUE */
 /* 
  * Each class method is parsed out and stored in an instance of the following
  * structure.
