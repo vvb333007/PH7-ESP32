@@ -218,3 +218,8 @@ Done
 Syntax is accepted. Compiler checks for returns from void functions and checks if nothing is returned from a function that should return a value
 NO RETURN TYPECASTING is performed!
 
+
+###10. Overloading: do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.
+###11. Overloading: do not fallback to the last function in the list if there are no good candidates for overloading. Do fallback only if there is only 1 candidate:
+
+       
