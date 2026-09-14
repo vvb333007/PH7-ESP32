@@ -5,18 +5,20 @@
 Architecture: one FreeRTOS task per VM.
 VMs are interruptible and can be executed step by step.
 VMs can be cloned (shared code, private data).
-Add a new CONV A, B, 0 opcode which converts value on the stack to a specified type
-  This is required for correct function return types autocasting. Right now only function args are autocaasted and thus 
-  are guaranteed to have a required type.
+Use PH7_OP_CVT_INT and so on opcodes which converts value on the stack to a specified type
+  This is required for correct function return types autocasting. Tjis will require EmitInstr before 'return'
+  which will convert resulting value to the function type.
+
+  Right now only function args are autocaasted and thus are guaranteed to have a required type.
 
 ```
-  function test(int $z) :int {
-    // type of $z is int no matter what user passed
-    return '7';
-  }
+    function test(int $z) :int {
+      // type of $z is int no matter what user passed
+      return '7';
+    }
 ```
 
-will return a string '7', not integer.
+  will return a string '7', not integer.
 
 ---
 
