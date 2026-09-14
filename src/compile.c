@@ -3078,8 +3078,35 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
       } else if (rc != SXERR_EMPTY) {
         nRet = 1;
       }
+      /* Check if function has return type in its declaration. :mixed does not change function return type
+       * Emit type conversion instruction
+       * TODO: Optimization: only emit CVT if top of the stack has different type
+       */
+      if (nRet && pFunc && (pFunc->iFlags & VM_FUNC_RET_TYPE)) {
+        sxi32 nCvtOp = 0;
+        if (pFunc->iFlags & PH7_TKWRD_INT) {
+          nCvtOp = PH7_OP_CVT_INT;
+        } else if (pFunc->iFlags & PH7_TKWRD_FLOAT) {
+          nCvtOp = PH7_OP_CVT_REAL;
+        } else if (pFunc->iFlags & PH7_TKWRD_STRING) {
+          nCvtOp = PH7_OP_CVT_STR;
+        } else if (pFunc->iFlags & PH7_TKWRD_BOOL) {
+          nCvtOp = PH7_OP_CVT_BOOL;
+        } else if (pFunc->iFlags & PH7_TKWRD_ARRAY) {
+          nCvtOp = PH7_OP_CVT_ARRAY;
+        } else {
+          /* TODO: class name, iterable, callable must be done via type check / instanceof. Generate an error if types are not convertible
+           * void & mixed types never reach here
+           */
+        }
+
+        if (nCvtOp != 0) {
+          PH7_VmEmitInstr(pGen->pVm, nCvtOp, 0, 0, 0, 0);
+          //puts("type convertsion emitted");
+        }
+      }
     } else {
-      // Empty return; statement. incompatible with PHP7-style functions, except :void
+      // Empty 'return;' statement. incompatible with PHP7-style functions, except :void
       if (func_must_return) {
         PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Function must return value");
         return SXERR_ABORT;
