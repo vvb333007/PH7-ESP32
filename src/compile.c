@@ -3644,7 +3644,11 @@ choose_memobj:
       } else {
         SyString *pName = &pIn->sData; /* Class/Enum name */
 
-#if 1
+        /* function name (Something $...)
+         * 'Something' is a class or an enum id. Check if this is an enum and if it is - extract its type.
+         * If it is a class, then we do autocast to the class type (an object)
+         * If it is an enum, then we try to figure out real type for autocast
+         */
         ph7_class *pClass;
         pClass = PH7_VmExtractClass(pGen->pVm, pName->zString, pName->nByte, FALSE, 0);
         if (pClass == NULL) {
@@ -3653,14 +3657,19 @@ choose_memobj:
           return SXERR_ABORT;
         }
         if ((pClass->iFlags & PH7_CLASS_ENUM) != 0) {
-          // TODO: extract overal enum type and use it for autocast (if type is not :mixed)
-          //sArg.nType = MEMOBJ_INT;
-          //puts("enum type");
-             /* When compiled, enum class has its nLine reused to store :type keyword (or zero if there were none)*/
+          /* Extract overal enum type and use it for autocast (if type is not :mixed)
+           * When compiled, enum class has its nLine reused to store :type keyword (or zero 
+           * if there were none)
+           */
              nKey = pClass->nLine; 
+              /* TODO: this is a hack and must be refactored, may be by adding an extra sxi32 to the ph7_class structure
+               * TODO: trace pClass->nLine usage, expecially writes 
+               */
+
+             /* Try to choose memobj type based on this new information */
              goto choose_memobj;
         } else {
-#endif
+          /* Ordinary class, not an enum */
           char *zDup;
           /* Argument must be a class instance,record that*/
           zDup = SyMemBackendStrDup(&pGen->pVm->sAllocator, pName->zString, pName->nByte);
@@ -5049,7 +5058,7 @@ err:
     pGen->pIn++;
 
   return PH7_OK;
-done:
+
   SyMemBackendPoolFree(&pGen->pVm->sAllocator, pClass);
   return SXERR_ABORT;  
 }
