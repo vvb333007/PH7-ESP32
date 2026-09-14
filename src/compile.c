@@ -4197,114 +4197,7 @@ static sxi32 GetProtectionLevel(sxi32 nKeyword) {
  *   Refer to the official documentation for more information on the powerful extension
  *   introduced by the PH7 engine to the OO subsystem.
  */
-#if 0 
-// Original SyMisc algorithm
-//
-static sxi32 GenStateCompileClassConstant(ph7_gen_state *pGen, sxi32 iProtection, sxi32 iFlags, ph7_class *pClass, sxi32 *auto_value) {
-  sxu32 nLine = pGen->pIn->nLine;
-  SySet *pInstrContainer;
-  ph7_class_attr *pCons;
-  SyString *pName;
-  sxi32 rc;
-  /* Extract visibility level */
-  iProtection = GetProtectionLevel(iProtection);
-  pGen->pIn++; /* Jump the 'const' keyword */
-loop:
-  /* Mark as constant */
-  iFlags |= PH7_CLASS_ATTR_CONSTANT;
-  if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_ID) == 0) {
-    /* Invalid constant name */
-    rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Invalid constant name");
-    if (rc == SXERR_ABORT) {
-      /* Error count limit reached,abort immediately */
-      return SXERR_ABORT;
-    }
-    goto Synchronize;
-  }
-  /* Peek constant name */
-  pName = &pGen->pIn->sData;
-  /* Make sure the constant name isn't reserved */
-  if (GenStateIsReservedConstant(pName)) {
-    /* Reserved constant name */
-    rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Cannot redeclare a reserved constant '%z'", pName);
-    if (rc == SXERR_ABORT) {
-      /* Error count limit reached,abort immediately */
-      return SXERR_ABORT;
-    }
-    goto Synchronize;
-  }
-  /* Advance the stream cursor */
-  pGen->pIn++;
-  if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_EQUAL /* '=' */) == 0) {
-    /* Invalid declaration */
-    rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Expected '=' after class constant %z'", pName);
-    if (rc == SXERR_ABORT) {
-      /* Error count limit reached,abort immediately */
-      return SXERR_ABORT;
-    }
-    goto Synchronize;
-  }
-  pGen->pIn++; /* Jump the equal sign */
-  /* Allocate a new class attribute */
-  pCons = PH7_NewClassAttr(pGen->pVm, pName, nLine, iProtection, iFlags);
-  if (pCons == 0) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
-    return SXERR_ABORT;
-  }
-  /* Swap bytecode container */
-  pInstrContainer = PH7_VmGetByteCodeContainer(pGen->pVm);
-  PH7_VmSetByteCodeContainer(pGen->pVm, &pCons->aByteCode);
-  /* Compile constant value.
-   */
-  rc = PH7_CompileExpr(&(*pGen), EXPR_FLAG_COMMA_STATEMENT, 0);
-  if (rc == SXERR_EMPTY) {
-    rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Empty constant '%z' value", pName);
-    if (rc == SXERR_ABORT) {
-      return SXERR_ABORT;
-    }
-  }
-  /* Emit the done instruction */
-  PH7_VmEmitInstr(pGen->pVm, PH7_OP_DONE, 1, 0, 0, 0);
-  PH7_VmSetByteCodeContainer(pGen->pVm, pInstrContainer);
-  if (rc == SXERR_ABORT) {
-    /* Don't worry about freeing memory, everything will be released shortly */
-    return SXERR_ABORT;
-  }
-  /* All done,install the constant */
-  rc = PH7_ClassInstallAttr(pClass, pCons);
-  if (rc != SXRET_OK) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
-    return SXERR_ABORT;
-  }
-  if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_COMMA /*','*/)) {
-    /* Multiple constants declarations [i.e: const min=-1,max = 10] */
-    pGen->pIn++; /* Jump the comma */
-    if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_ID) == 0) {
-      SyToken *pTok = pGen->pIn;
-      if (pTok >= pGen->pEnd) {
-        pTok--;
-      }
-      rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                               "Unexpected token '%z',expecting constant declaration inside class '%z'",
-                               &pTok->sData, &pClass->sName);
-      if (rc == SXERR_ABORT) {
-        return SXERR_ABORT;
-      }
-    } else {
-      if (pGen->pIn->nType & PH7_TK_ID) {
-        goto loop;
-      }
-    }
-  }
-  return SXRET_OK;
-Synchronize:
-  /* Synchronize with the first semi-colon */
-  while (pGen->pIn < pGen->pEnd && ((pGen->pIn->nType & PH7_TK_SEMI /*';'*/) == 0)) {
-    pGen->pIn++;
-  }
-  return SXERR_CORRUPT;
-}
-#else
+
 /* Upgraded version which can compile enum entries (which are class members, constants)
  * When =EXPR is omitted from the 'case ID' enum entry then we simply use pAutoValue (which 
  * monotonically increments). case ID=10 does not affect pAutoValue counter in this release of PH7
@@ -4337,7 +4230,7 @@ loop:
   }
   pName = &pGen->pIn->sData;
   if (GenStateIsReservedConstant(pName)) {
-    rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Cannot redeclare a reserved constant '%z'", pName);
+    rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Cannot redeclare a reserved name '%z'", pName);
     if (rc == SXERR_ABORT) {
       return SXERR_ABORT;
     }
@@ -4450,7 +4343,7 @@ Synchronize:
   }
   return SXERR_CORRUPT;
 }
-#endif
+
 /*
  * complie a class attribute or Properties in the PHP jargon.
  * According to the PHP language reference manual
@@ -4665,8 +4558,35 @@ static sxi32 GenStateCompileClassMethod(
       return SXERR_ABORT;
     }
   }
-  /* Point beyond method signature */
+  /* Collect function return type if any 
+   * Point beyond method signature 
+   */
   pGen->pIn = &pEnd[1];
+
+  if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_COLON /* ':'*/) != 0) {
+  
+    /* 7.x route, skip ':' */
+    pGen->pIn++;
+    if (pGen->pIn < pGen->pEnd) {
+      if (pGen->pIn->nType != PH7_TK_KEYWORD) {
+err:
+        PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type is expected after ':'");
+        return SXERR_ABORT;
+      }
+
+      sxu32 nKey = (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData));
+
+      // Check if nKey is one of a valid types: object, string, array, int, bool, resource
+      //printf("Function '%s' has return type %08x\r\n",zName, (unsigned int)nKey);
+      if ((nKey & VM_FUNC_RET_MASK) == 0)
+        goto err;
+
+      // Add return type to the function flags
+      pMeth->sFunc.iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey);
+      pGen->pIn++;
+    }
+  }
+
   if (doBody) {
     /* Compile method body */
     rc = GenStateCompileFuncBody(&(*pGen), &pMeth->sFunc);

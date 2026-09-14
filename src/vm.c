@@ -717,6 +717,11 @@ static sxi32 VmMountUserClass(
   while ((pEntry = SyHashGetNextEntry(&pClass->hAttr)) != 0) {
     /* Extract the current attribute */
     pAttr = (ph7_class_attr *)pEntry->pUserData;
+    /* statics and consts are executed right here, via LocalExec, to obtain a final value
+     * which is then used when user code accesses that constant.
+     *
+     * Enums are handled here as well since they are implemented as classes with static const attributes 
+     */
     if (pAttr->iFlags & (PH7_CLASS_ATTR_CONSTANT | PH7_CLASS_ATTR_STATIC)) {
       ph7_value *pMemObj;
       /* Reserve a memory object for this constant/static attribute */
@@ -733,6 +738,7 @@ static sxi32 VmMountUserClass(
       }
       /* Record attribute index */
       pAttr->nIdx = pMemObj->nIdx;
+      //printf("memobj %d has been created, via local exec\r\n",pMemObj->nIdx);
       /* Install static attribute in the reference table */
       PH7_VmRefObjInstall(&(*pVm), pMemObj->nIdx, 0, 0, VM_REF_IDX_KEEP);
     }
@@ -5739,6 +5745,9 @@ Exception:
 static sxi32 VmLocalExec(ph7_vm *pVm, SySet *pByteCode, ph7_value *pResult) {
   ph7_value *pStack;
   sxi32 rc;
+
+//  printf("VmLocalExec -> %p\r\n", pByteCode);
+
   /* Allocate a new operand stack */
   pStack = VmNewOperandStack(&(*pVm), SySetUsed(pByteCode));
   if (pStack == 0) {
