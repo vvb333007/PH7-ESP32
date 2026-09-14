@@ -1,13 +1,7 @@
-
-/*
- * ----------------------------------------------------------
- * File: compile.c
- * MD5: 85c9bc2bcbb35e9f704442f7b8f3b993
- * ----------------------------------------------------------
- */
 /*
  * Symisc PH7: An embeddable bytecode compiler and a virtual machine for the PHP(5) programming language.
  * Copyright (C) 2011-2012, Symisc Systems http://ph7.symisc.net/
+ * Copyright (C) 2026-, Viacheslav Logunov vvb333007@gmail.com
  * Version 2.1.4
  * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
  * please contact Symisc Systems via:
@@ -17,7 +11,7 @@
  * or visit:
  *      http://ph7.symisc.net/
  */
-/* $SymiscID: compile.c v6.0 Win7 2012-08-18 05:11 stable <chm@symisc.net> $ */
+
 
 #include "ph7int.h"
 
@@ -3080,7 +3074,12 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
       }
       /* Check if function has return type in its declaration. :mixed does not change function return type
        * Emit type conversion instruction
-       * TODO: Optimization: only emit CVT if top of the stack has different type
+       * TODO:
+       * Compiled expression must leave its value on the stack after execution. For nullable functions we
+       * add a runtime check: if object on the stack is NULL, then we jump CVT opcode
+            LOADC 0,0,0 ; load null on stack
+            TEQ   0,0,0   ; compare two values on stack (strict comparision)
+            JZ    0,xx,0  ; not equal
        */
       if (nRet && pFunc && (pFunc->iFlags & VM_FUNC_RET_TYPE)) {
         sxi32 nCvtOp = 0;
@@ -3088,6 +3087,8 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
           nCvtOp = PH7_OP_CVT_INT;
         } else if (pFunc->iFlags & PH7_TKWRD_FLOAT) {
           nCvtOp = PH7_OP_CVT_REAL;
+        } else if (pFunc->iFlags & PH7_TKWRD_OBJECT) {
+          nCvtOp = PH7_OP_CVT_OBJ; /* TODO: temporary */
         } else if (pFunc->iFlags & PH7_TKWRD_STRING) {
           nCvtOp = PH7_OP_CVT_STR;
         } else if (pFunc->iFlags & PH7_TKWRD_BOOL) {
@@ -4049,15 +4050,27 @@ static sxi32 GenStateCompileFunc(
   }
 
 #if 1
+  /* Class methods are compiled via another piece of code */
   /* Compile return type if exists */
+  int bNullable = 0;
   nLine = pGen->pIn->nLine;
   if (pGen->pIn->nType == PH7_TK_COLON) {
     /* 7.x route, skip ':' */
+again:
     pGen->pIn++;
     if (pGen->pIn < pGen->pEnd) {
       if (pGen->pIn->nType != PH7_TK_KEYWORD) {
+
+        if (pGen->pIn->sData.zString[0] == '?') {
+          /* check for question mark, record nullable type */
+          bNullable = 1;
+          goto again;
+        }
 err:
-        PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type is expected after ':'");
+        PH7_GenCompileError(pGen, E_ERROR, nLine, 
+                            "A function return type is expected after ':' instead of '%z'",
+                            &pGen->pIn->sData
+                            );
         return SXERR_ABORT;
       }
 
@@ -4069,7 +4082,7 @@ err:
         goto err;
 
       // Add return type to the function flags
-      pFunc->iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey);
+      pFunc->iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey | (VM_FUNC_RET_NULLABLE * bNullable));
       pGen->pIn++;
     }
   }
@@ -4562,19 +4575,41 @@ static sxi32 GenStateCompileClassMethod(
    * Point beyond method signature 
    */
   pGen->pIn = &pEnd[1];
-
+  int bNullable = 0;
   if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_COLON /* ':'*/) != 0) {
+
+    sxu32 nKey = 0; /* function type */
   
     /* 7.x route, skip ':' */
+again:
     pGen->pIn++;
     if (pGen->pIn < pGen->pEnd) {
       if (pGen->pIn->nType != PH7_TK_KEYWORD) {
+
+        if (pGen->pIn->sData.zString[0] == '?') {
+          /* Check for question mark, record nullable type */
+
+          bNullable = 1;
+          goto again;
+        }
+        
 err:
         PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type is expected after ':'");
         return SXERR_ABORT;
       }
 
-      sxu32 nKey = (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData));
+      /* TODO: :parent , :self types handling for a class method 
+        #define PH7_TKWRD_SELF
+        #define PH7_TKWRD_PARENT
+      */
+
+
+      nKey = (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData));
+
+      if (nKey == PH7_TKWRD_SELF || nKey == PH7_TKWRD_PARENT || nKey == PH7_TKWRD_STATIC) {
+        nKey = PH7_TKWRD_OBJECT;
+        //puts("cast to Object!");
+      }
 
       // Check if nKey is one of a valid types: object, string, array, int, bool, resource
       //printf("Function '%s' has return type %08x\r\n",zName, (unsigned int)nKey);
@@ -4582,7 +4617,7 @@ err:
         goto err;
 
       // Add return type to the function flags
-      pMeth->sFunc.iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey);
+      pMeth->sFunc.iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey | (VM_FUNC_RET_NULLABLE * bNullable));
       pGen->pIn++;
     }
   }
@@ -6449,15 +6484,20 @@ static ProcLangConstruct GenStateGetStatementHandler(
   SyToken *pLookahed /* Look-ahead token */
 ) {
   sxu32 n = 0;
+
+//  printf("nKeyword=%08x\n",nKeywordID);
   for (;;) {
     if (n >= SX_ARRAYSIZE(aLangConstruct)) {
       break;
     }
     if (aLangConstruct[n].nID == nKeywordID) {
+
       if (nKeywordID == PH7_TKWRD_STATIC && pLookahed && (pLookahed->nType & PH7_TK_OP)) {
+
         const ph7_expr_op *pOp = (const ph7_expr_op *)pLookahed->pUserData;
         if (pOp && pOp->iOp == EXPR_OP_DC /*::*/) {
           /* 'static' (class context),return null */
+          
           return 0;
         }
       }
@@ -6504,6 +6544,7 @@ static int GenStateisLangConstruct(sxu32 nKeyword) {
         || nKeyword == PH7_TKWRD_PRIVATE || nKeyword == PH7_TKWRD_IMPLEMENTS
       */
     ) {
+      puts("1111");
       rc = TRUE;
     }
   }

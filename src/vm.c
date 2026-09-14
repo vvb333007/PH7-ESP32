@@ -1,13 +1,7 @@
-
-/*
- * ----------------------------------------------------------
- * File: vm.c
- * MD5: fed926a5df137d2896badd8911a0b752
- * ----------------------------------------------------------
- */
-/*
+  /*
  * Symisc PH7: An embeddable bytecode compiler and a virtual machine for the PHP(5) programming language.
  * Copyright (C) 2011-2012, Symisc Systems http://ph7.symisc.net/
+ * Copyright (C) 2026-, Viacheslav Logunov vvb333007@gmail.com
  * Version 2.1.4
  * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
  * please contact Symisc Systems via:
@@ -17,7 +11,6 @@
  * or visit:
  *      http://ph7.symisc.net/
  */
-/* $SymiscID: vm.c v1.4 FreeBSD 2012-09-10 00:06 stable <chm@symisc.net> $ */
 
 #include "ph7int.h"
 
@@ -2131,7 +2124,7 @@ static sxi32 VmByteCodeDump(
       break;
     }
     /* Format and call the consumer callback */
-    rc = SyProcFormat(xConsumer, pUserData, "%s %8d %8u %#8x [%u]\n",
+    rc = SyProcFormat(xConsumer, pUserData, "%s %8d %8u %#08x [%u]\n",
                       VmInstrToString(pInstr->iOp), pInstr->iP1, pInstr->iP2,
                       SX_PTR_TO_INT(pInstr->p3), n);
     if (rc != SXRET_OK) {
@@ -5635,13 +5628,16 @@ static sxi32 VmByteCodeExec(
               goto Exception;
             }
           } else {
+/* Foreign Function Call
+ *
+ */
             ph7_user_func *pFunc;
             ph7_context sCtx;
             ph7_value sRet;
             /* Look for an installed foreign function */
             pEntry = SyHashGet(&pVm->hHostFunction, (const void *)sName.zString, sName.nByte);
             if (pEntry == 0) {
-              /* Call to undefined function */
+              /* Call to undefined function: not a compiled nor a foreign function */
               VmErrorFormat(&(*pVm), PH7_CTX_WARNING, "Call to undefined function '%z',NULL will be returned", &sName);
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
@@ -10511,6 +10507,8 @@ static sxi32 VmExecIncludedFile(
   void *pHandle;
   ph7_vm *pVm;
   int isNew;
+
+//  puts("require_once()");
   /* Initialize fields */
   pVm = pCtx->pVm;
   SyBlobInit(&sContents, &pVm->sAllocator);
@@ -10523,20 +10521,25 @@ static sxi32 VmExecIncludedFile(
    */
   pHandle = PH7_StreamOpenHandle(pVm, pStream, pPath->zString, PH7_IO_OPEN_RDONLY, TRUE, 0, TRUE, &isNew);
   if (pHandle == 0) {
+//    puts("require_once() IO");
     return SXERR_IO;
   }
   rc = SXRET_OK; /* Stupid cc warning */
   if (IncludeOnce && !isNew) {
     /* Already included */
+//    puts("require_once() already");
     rc = SXERR_EXISTS;
   } else {
     /* Read the whole file contents */
     rc = PH7_StreamReadWholeFile(pHandle, pStream, &sContents);
     if (rc == SXRET_OK) {
+//      puts("require_once() reqdwhole");
       SyString sScript;
       /* Compile and execute the script */
       SyStringInitFromBuf(&sScript, SyBlobData(&sContents), SyBlobLength(&sContents));
       VmEvalChunk(pCtx->pVm, &(*pCtx), &sScript, 0, TRUE);
+    } else {
+//      puts("require_once() failed readwhole ");
     }
   }
   /* Pop from the set of included file */
@@ -10551,6 +10554,7 @@ static sxi32 VmExecIncludedFile(
   IncludeOnce = 0;
   rc = SXERR_IO;
 #endif /* PH7_DISABLE_BUILTIN_FUNC */
+//  printf("require_once() done %d\n", rc);
   return rc;
 }
 /*
@@ -10678,7 +10682,7 @@ static int vm_builtin_include(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   rc = VmExecIncludedFile(&(*pCtx), &sFile, FALSE);
   if (rc != SXRET_OK) {
     /* Emit a warning and return false */
-    ph7_context_throw_error_format(pCtx, PH7_CTX_WARNING, "IO error while importing: '%z'", &sFile);
+    ph7_context_throw_error_format(pCtx, PH7_CTX_WARNING, "Unable to import module: '%z'", &sFile);
     ph7_result_bool(pCtx, 0);
   }
   return SXRET_OK;
@@ -10716,7 +10720,7 @@ static int vm_builtin_include_once(ph7_context *pCtx, int nArg, ph7_value **apAr
   }
   if (rc != SXRET_OK) {
     /* Emit a warning and return false */
-    ph7_context_throw_error_format(pCtx, PH7_CTX_WARNING, "IO error while importing: '%z'", &sFile);
+    ph7_context_throw_error_format(pCtx, PH7_CTX_WARNING, "Unable to import module: '%z'", &sFile);
     ph7_result_bool(pCtx, 0);
   }
   return SXRET_OK;
@@ -10745,12 +10749,14 @@ static int vm_builtin_require(ph7_context *pCtx, int nArg, ph7_value **apArg) {
     return SXRET_OK;
   }
   /* Open,compile and execute the desired script */
+  
   rc = VmExecIncludedFile(&(*pCtx), &sFile, FALSE);
+
   if (rc != SXRET_OK) {
     /* Fatal,abort VM execution immediately */
-    ph7_context_throw_error_format(pCtx, PH7_CTX_ERR, "Fatal IO error while importing: '%z'", &sFile);
+    ph7_context_throw_error_format(pCtx, PH7_CTX_ERR, "Unable to import a required module: '%z'", &sFile);
     ph7_result_bool(pCtx, 0);
-    return PH7_ABORT;
+    return SXERR_ABORT;
   }
   return SXRET_OK;
 }
@@ -10779,17 +10785,20 @@ static int vm_builtin_require_once(ph7_context *pCtx, int nArg, ph7_value **apAr
   }
   /* Open,compile and execute the desired script */
   rc = VmExecIncludedFile(&(*pCtx), &sFile, TRUE);
+
   if (rc == SXERR_EXISTS) {
     /* File already included,return TRUE */
     ph7_result_bool(pCtx, 1);
     return SXRET_OK;
   }
+
   if (rc != SXRET_OK) {
     /* Fatal,abort VM execution immediately */
-    ph7_context_throw_error_format(pCtx, PH7_CTX_ERR, "Fatal IO error while importing: '%z'", &sFile);
+    ph7_context_throw_error_format(pCtx, PH7_CTX_ERR, "Unable to import a required module: '%z'", &sFile);
     ph7_result_bool(pCtx, 0);
-    return PH7_ABORT;
+    return SXERR_ABORT;
   }
+
   return SXRET_OK;
 }
 /*

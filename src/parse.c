@@ -233,6 +233,9 @@ static const ph7_expr_op aOpTable[] = {
   { { "||", sizeof(char) * 2 }, EXPR_OP_LOR, 16, EXPR_OP_ASSOC_LEFT, PH7_OP_LOR },
   /* Ternary operator */
   /* Precedence 17,left-associative */
+  /* EXPR1 ? EXPR2 : EXPR3
+   TODO: EXPR1 ?? EXPR2
+  */
   { { "?", sizeof(char) }, EXPR_OP_QUESTY, 17, EXPR_OP_ASSOC_LEFT, 0 },
   /* Combined binary operators */
   /* Precedence 18,right-associative */

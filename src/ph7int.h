@@ -1,12 +1,7 @@
 /*
- * ----------------------------------------------------------
- * File: ph7int.h
- * MD5: cdd8bb8c737e7e3ae5b14e01a01b98dd
- * ----------------------------------------------------------
- */
-/*
  * Symisc PH7: An embeddable bytecode compiler and a virtual machine for the PHP(5) programming language.
  * Copyright (C) 2011-2012, Symisc Systems http://ph7.symisc.net/
+ * Copyright (C) 2026-, Viacheslav Logunov vvb333007@gmail.com
  * Version 2.1.4
  * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
  * please contact Symisc Systems via:
@@ -16,7 +11,6 @@
  * or visit:
  *      http://ph7.symisc.net/
  */
-/* $SymiscID: ph7int.h v1.9 FreeBSD 2012-08-13 26:25 devel <chm@symisc.net> $ */
 
 #pragma once
 
@@ -1132,16 +1126,23 @@ struct ph7_vm_func_closure_env {
 #define VM_FUNC_CLASS_METHOD 0x008 /* VM function is in fact a class method */
 #define VM_FUNC_CLOSURE      0x010      /* VM function is a closure */
 #define VM_FUNC_ARG_IGNORE   0x020   /* Do not install argument in the current frame */
-
 #define VM_FUNC_RET_TYPE     0x040   /* PHP 7.0 syntax was used for the function return type (i.e. :void) */
+#define VM_FUNC_RET_NULLABLE 0x080   /* nullable type. ": ?int" */
+#define VM_FUNC_RESERVED1    0x100   /* Reserved for future extensions */
 
-/* Types are keywords with IDs which are power of two integers.  Compiler stores return 
- * function type (if set) into iFlags field (ORed) when VM_FUNC_RET_TYPE is set: this is PHP7.x syntax for function return types (e.g. :void or :int)
+
+/* Types are keywords with IDs which are power of two integers, starting from 0x200.
+ * Compiler stores return function type (if set) into iFlags field (ORed) when VM_FUNC_RET_TYPE is set: this 
+ * is PHP7.x syntax for function return types (e.g. :void or :int)
+ *
+ * WARNING: VM_FUNC_RET_MASK must not occupy lower byte, where VM_FUNC_ values are stored
  */
 #define VM_FUNC_RET_MASK \
   (PH7_TKWRD_ARRAY | PH7_TKWRD_BOOL | PH7_TKWRD_INT | \
    PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_OBJECT | \
    PH7_TKWRD_VOID | PH7_TKWRD_MIXED)
+
+
 
 /* Valid types for enums */
 #define VM_ENUM_MASK \
@@ -1721,17 +1722,17 @@ enum ph7_expr_id {
 // Keyword 0x00000040 is available for use for language extensions
 #define PH7_TKWRD_CLONE    0x00000080         /* clone */
 #define PH7_TKWRD_NEW      0x00000100          /* new */
-#define PH7_TKWRD_ARRAY    0x00000200        /* array: MUST BE A POWER OF TWO */
+  #define PH7_TKWRD_ARRAY    0x00000200        /* array: MUST BE A POWER OF TWO */
 #define PH7_TKWRD_AND      0x00000400          /* and */
 #define PH7_TKWRD_INSTANCEOF 0x000800   /* instanceof */
 #define PH7_TKWRD_OR       0x00001000          /* or */
 #define PH7_TKWRD_UNSET    0x00002000       /* unset */
 #define PH7_TKWRD_XOR      0x00004000         /* xor */
-#define PH7_TKWRD_BOOL     0x00008000     /* bool */
-#define PH7_TKWRD_INT      0x00010000     /* int */ 
-#define PH7_TKWRD_FLOAT    0x00020000     /* float */
-#define PH7_TKWRD_STRING   0x00040000     /* string */ 
-#define PH7_TKWRD_OBJECT   0x00080000     /* object */ 
+  #define PH7_TKWRD_BOOL     0x00008000     /* bool */
+  #define PH7_TKWRD_INT      0x00010000     /* int */ 
+  #define PH7_TKWRD_FLOAT    0x00020000     /* float */
+  #define PH7_TKWRD_STRING   0x00040000     /* string */ 
+  #define PH7_TKWRD_OBJECT   0x00080000     /* object */ 
 #define PH7_TKWRD_SEQ      0x00100000       /* String string comparison operator */ 
 #define PH7_TKWRD_SNE      0x00200000       /* String string comparison operator */ 
 #define PH7_TKWRD_ENDIF    0x00400000     /* endif */ 
@@ -1741,9 +1742,9 @@ enum ph7_expr_id {
 #define PH7_TKWRD_ELIF     0x04000000     /* elseif */ 
 #define PH7_TKWRD_ELSE     0x08000000     /* else */ 
 #define PH7_TKWRD_NEVER    0x10000000     /* :never */
-#define PH7_TKWRD_MIXED    0x20000000     /* :mixed */
+  #define PH7_TKWRD_MIXED    0x20000000     /* :mixed */
 //#define PH7_TKWRD_UNUSED1      0x40000000    /* unused */
-#define PH7_TKWRD_VOID     0x80000000    /* void */
+  #define PH7_TKWRD_VOID     0x80000000    /* void */
 
 /* JSON encoding/decoding related definition */
 enum json_err_code {
@@ -2121,3 +2122,5 @@ struct utsname {
 
 int uname(struct utsname *out);
 #endif /* #ifdef ESP32 */
+
+_Static_assert((VM_FUNC_RET_MASK & 0xffffff00) == VM_FUNC_RET_MASK);
