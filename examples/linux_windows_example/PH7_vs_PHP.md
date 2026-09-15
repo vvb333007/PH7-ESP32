@@ -11,13 +11,42 @@
 | **Backed enum:** `enum Color : int { ... }` - cases may be of any type and value (not matching declared enum type), including complex expressions and function calls; enum has a declared type **used for automatic conversion when a case value is consumed** as that enum type.                                           | **Backed enum:** `enum Color : int { ... }` - every case must conform to the declared `int` backing type.|
 | **String backed enum:** `enum Color : string { ... }` - enum values are converted to `string` when consumed as the enum type.                                        | **String backed enum:** `enum Color : string { ... }` - every case must conform to the declared `string` backing type.                              |
 | **Mixed enum:** case values may have different types. No type check is performed when the cases are declared.                                                        | **Mixed enum:** no equivalent backed-enum construct; a backed enum has one declared backing type.                                                   |
-| `enum E : int { case A = "66.6"; }` - the case itself retains `"66.6"`; the value is converted when used where `E` is expected.                                      | `enum E : int { case A = "66.6"; }` - invalid backed-enum case declaration.                                                                         |
+| `enum E : int { case A = "66.6"; }` - the case itself retains `"66.6"`; the value is converted when used where `E` is expected (e.g. in call of `function func(E $x), the $x will be auto cast to `int` (enum type is `int`)                                   | `enum E : int { case A = "66.6"; }` - invalid backed-enum case declaration.                                                                         |
 | `function foo(E $x) { ... }` - `E` is treated as the enum's declared type; the argument is automatically converted to that type.                                     | `function foo(E $x) { ... }` - the argument must satisfy the enum type; PHP does not treat the enum type as its backing scalar type.                |
 | **Auto-counting:** `case A; case B; case C;` - implicit values are generated automatically.                                                                          | No equivalent general auto-counting enum case values.                                                                                               |
 | **Auto-counting with explicit values:** `case A; case B = 10; case C;` - implicit values continue independently; `A` and `C` receive automatically generated values. | No equivalent mechanism.                                                                                                                            |
 | Enum case values may use the existing PH7 class-constant expression machinery.                                                                                       | Enum case values are subject to PHP's enum constant-expression restrictions.                                                                        |
 
 
+```
+// No-autoconversion enum (mixed):
+//
+enum Loo :mixed {
+  case Name1 = 10;
+  case Name2 = 10.2;
+  case Name3 = 'Hello'.rand_str(4);
+}
+
+// When used as `Suit $x` in function arguments, will be autoconverted to string
+//
+enum Suit :string {
+  case Name1 = 10;
+  case Name2 = 10.2;
+  case Name3 = 'Hello'.rand_str(4);
+}
+
+function test(Suit $x) {   // Equivalent test(string $x)
+  var_dump($x);            // <-- Displays "string(...)"
+}
+
+function test(Loo $x) {       // Equivalent test(mixed $x)
+  var_dump($x);               // <-- Displays real type of $x
+}
+
+
+
+
+```
 
 
 
