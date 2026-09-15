@@ -1,0 +1,26 @@
+# PH7 vs PHP - Language Differences
+
+| PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `function foo(string $x): int { ... }` - parameter type **automatically converts the argument** to `string`; (return type automatically converts the returned value  | `function foo(int $x): int { ... }` - parameter and return types are used to check type compatibility according to PHP's type system.               |
+| `function foo(int $x) { ... }` - `foo("66.6")` receives `66`.                                                                                                        | `function foo(int $x) { ... }` - **type compatibility is checked** according to PHP rules, no conversion is performed                               |
+| `function foo(): int { return "666"; }` - returns `int(666)`.                                                                                                        | `function foo(): int { return "666"; }` - Error                                                                                                     |
+| `function(int $x):mixed { ... }` - anonymous function (closure). Parameter and return types use automatic conversion                                                 | `function(int $x):mixed { ... }` - anonymous function (closure). Parameter and return types are used for type checking only                         |
+| `fn($x): int use ($factor) => $x * $factor` - arrow function **requires explicit variable capture**; return value is converted to `int`.                             | `fn($x): int => $x * $factor` - variables are automatically captured from the outer scope; return type must match closure's return type             |
+| **Normal enum:** `enum Color { case RED; case GREEN; }` - cases are **constants and automatically generated**.                                                       | **Normal enum:** `enum Color { case RED; case GREEN; }` - **cases are enum cases without associated scalar values.**                            |
+| **Backed enum:** `enum Color : int { ... }` - cases may be of any type and value (not matching declared enum type), including complex expressions and function calls; enum has a declared type **used for automatic conversion when a case value is consumed** as that enum type.                                           | **Backed enum:** `enum Color : int { ... }` - every case must conform to the declared `int` backing type.|
+| **String backed enum:** `enum Color : string { ... }` - enum values are converted to `string` when consumed as the enum type.                                        | **String backed enum:** `enum Color : string { ... }` - every case must conform to the declared `string` backing type.                              |
+| **Mixed enum:** case values may have different types. No type check is performed when the cases are declared.                                                        | **Mixed enum:** no equivalent backed-enum construct; a backed enum has one declared backing type.                                                   |
+| `enum E : int { case A = "66.6"; }` - the case itself retains `"66.6"`; the value is converted when used where `E` is expected.                                      | `enum E : int { case A = "66.6"; }` - invalid backed-enum case declaration.                                                                         |
+| `function foo(E $x) { ... }` - `E` is treated as the enum's declared type; the argument is automatically converted to that type.                                     | `function foo(E $x) { ... }` - the argument must satisfy the enum type; PHP does not treat the enum type as its backing scalar type.                |
+| **Auto-counting:** `case A; case B; case C;` - implicit values are generated automatically.                                                                          | No equivalent general auto-counting enum case values.                                                                                               |
+| **Auto-counting with explicit values:** `case A; case B = 10; case C;` - implicit values continue independently; `A` and `C` receive automatically generated values. | No equivalent mechanism.                                                                                                                            |
+| Enum case values may use the existing PH7 class-constant expression machinery.                                                                                       | Enum case values are subject to PHP's enum constant-expression restrictions.                                                                        |
+
+
+
+
+
+
+
+hate .md tables >:-(
