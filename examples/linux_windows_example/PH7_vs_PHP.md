@@ -1,5 +1,16 @@
 # PH7 vs PHP - Language Differences
 
+
+| PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| nullable type is not supported (it compiles but does not keep null, converts it instead breaking whole idea of nullables)                                               | Supported for function/methods args and return types|
+| Short array() and syntax `$x = [1,2,3]; is not supported. [in roadmap] | Full support|
+| Destructuring aka short list syntax: [$a,$b,$c] = $x; is not supported. [in roadmap] | Full support|
+| `__call()` and `__callStatic()` do not return any value [in roadmap] | Full support|
+| Native UTF8 support for strings, ID's, constants , variables and function names (classes etc) | :-) |
+| `??`, `??=` and nullsafe `?->` operators are missing | Full support |
+
+
 | PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 64-bit integer arithmetic for all platforms.                                               | 32 bit on 32bit platforms, 64 bit on 64bit platforms                                                                                                                                                                          |
