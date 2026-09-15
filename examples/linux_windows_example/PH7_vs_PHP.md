@@ -51,7 +51,26 @@ test(10); /* You should see: Expecting a callback */
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Function overloading and method overloading (by argument numbers and argument types)                                                                                 | PHP does not support function overloading |
 
+```php
+function foo(int $a) {
+  echo "a is integer\n";
+  var_dump($a);
+}
+
+function foo(array $a) {
+  echo "a is an array\n";
+  var_dump($a);
+}
+
+foo(52); /* a is integer*/
+foo(array(14,__TIME__,__DATE__)); /* a is an array  */
+
 ```
+| PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Comma operator in expressions and enum cases                                                               | PHP does not support comma operator |
+
+```php
 $a = 25,$b = $a << 1 ,test();
 
 /* Output the value of $a and $b */
@@ -59,7 +78,13 @@ function test(){
   global $a,$b;
   echo "\$a = $a \$b= $b\n"; /* You should see: $a = 25 $b = 50*/
 }
+
+enum Hello: int {
+  case A=1, B=2, C=3;
+  case H = 66;
+}
 ```
+
 | PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `function foo(string $x): int { ... }` - parameter type **automatically converts the argument** to `string`; (return type automatically converts the returned value  | `function foo(int $x): int { ... }` - parameter and return types are used to check type compatibility according to PHP's type system.               |
@@ -68,7 +93,8 @@ function test(){
 | `function(int $x):mixed { ... }` - anonymous function (closure). Parameter and return types use automatic conversion                                                 | `function(int $x):mixed { ... }` - anonymous function (closure). Parameter and return types are used for type checking only                         |
 | `fn($x): int use ($factor) => $x * $factor` - arrow function **requires explicit variable capture**; return value is converted to `int`.                             | `fn($x): int => $x * $factor` - variables are automatically captured from the outer scope; return type must match closure's return type             |
 
-```
+
+```php
 function test(string $x) {
   var_dump($x);            
 }
@@ -106,7 +132,7 @@ var_dump(test4()); // <-- Displays "int(42)", i.e. return value was auto cast to
 | Enum case values may use the existing PH7 class-constant expression machinery.                                                                                       | Enum case values are subject to PHP's enum constant-expression restrictions.                                                                        |
 
 
-```
+```php
 // No-autoconversion enum (mixed):
 //
 enum Loo :mixed {
@@ -131,9 +157,6 @@ function test(Loo $x) {       // Equivalent test(mixed $x)
   var_dump($x);               // <-- Displays real type of $x
 }
 ```
-
-
-
 
 
 hate .md tables >:-(
