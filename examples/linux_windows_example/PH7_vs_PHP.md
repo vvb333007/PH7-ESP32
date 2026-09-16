@@ -4,7 +4,7 @@
 | PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | nullable type is not supported (it compiles but does not keep null, converts it instead breaking whole idea of nullables)                                               | Supported for function/methods args and return types|
-| Short array() and syntax `$x = [1,2,3]; is not supported. [in roadmap] | Full support|
+| Short array() syntax `$x = [1,2,3];` is not supported. [in roadmap] | Full support|
 | Destructuring aka short list syntax: [$a,$b,$c] = $x; is not supported. [in roadmap] | Full support|
 | `__call()` and `__callStatic()` do not return any value [in roadmap] | Full support|
 | Native UTF8 support for strings, ID's, constants , variables and function names (classes etc) | :-) |
@@ -168,6 +168,11 @@ function test(Loo $x) {       // Equivalent test(mixed $x)
   var_dump($x);               // <-- Displays real type of $x
 }
 ```
+
+| PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Closure is a `string`; e.g. `$a = function() {}; var_dump();` will display "string(9,'closure_1')" ro something similar  | Closure is a an object with properties and methods|
+
 
 
 hate .md tables >:-(
