@@ -102,7 +102,7 @@ enum Hello: int {
 | `function foo(int $x) { ... }` - `foo("66.6")` receives `66`.                                                                                                        | `function foo(int $x) { ... }` - **type compatibility is checked** according to PHP rules, no conversion is performed                               |
 | `function foo(): int { return "666"; }` - returns `int(666)`.                                                                                                        | `function foo(): int { return "666"; }` - Error                                                                                                     |
 | `function(int $x):mixed { ... }` - anonymous function (closure). Parameter and return types use automatic conversion                                                 | `function(int $x):mixed { ... }` - anonymous function (closure). Parameter and return types are used for type checking only                         |
-| `fn($x): int use ($factor) => $x * $factor` - arrow function **requires explicit variable capture**; return value is converted to `int`.                             | `fn($x): int => $x * $factor` - variables are automatically captured from the outer scope; return type must match closure's return type             |
+| `fn($x) use ($factor) :int => $x * $factor` - arrow function **requires explicit variable capture**; return value is converted to `int`.                             | `fn($x): int => $x * $factor` - variables are automatically captured from the outer scope; return type must match closure's return type             |
 
 
 ```php
