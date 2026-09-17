@@ -977,6 +977,9 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceCallMagicMethod(
     nArg = 1;
   }
   /* Call the magic method now */
+  /* TODO: use non-null ph7_result to save magic method return value 
+   *       and put it on the stack (PH7_MemObjStore(pValue, pTos);)
+   */
   rc = PH7_VmCallClassMethod(pVm, &(*pThis), pMeth, 0, nArg, apArg);
   /* Clean up */
   if (pAttrName) {

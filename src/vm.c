@@ -4855,14 +4855,20 @@ static sxi32 VmByteCodeExec(
                     pObjAttr = (VmClassAttr *)pEntry->pUserData;
                   }
                 }
+
+                /* Pop the attribute name */
+                VmPopOperand(&pTos, 1);
+
                 if (pObjAttr == 0) {
-                  /* No such attribute,load null */
+                  /* TODO: First call the magic method and only then display error if there is no __get() implemented
+                   * TODO: Check __toString implementation to see how return value is propagated there: magic methods can not return values right now */
                   VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class attribute '%z->%z',PH7 is loading NULL",
                                 &pClass->sName, &sName);
                   /* Call the __get magic method if available */
+//                  printf("%p\r\n", pTos);
                   PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName);
+//                  printf("%p\r\n", pTos);
                 }
-                VmPopOperand(&pTos, 1);
                 /* TICKET 1433-49: Deffer garbage collection until attribute loading.
          * This is due to the following case:
          *     (new TestClass())->foo;
