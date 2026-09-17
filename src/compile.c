@@ -3058,6 +3058,12 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
     if (pBlock->iFlags & (GEN_BLOCK_FUNC | GEN_BLOC_NESTED_FUNC)) {
       pFunc = (ph7_vm_func *)pBlock->pUserData;
       if (pFunc->iFlags & VM_FUNC_RET_TYPE) {
+
+        if (pFunc->iFlags & VM_FUNC_NEVER) {
+          PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Returning from a ':never' function is not permitted");
+          return SXERR_ABORT;
+        }
+
         if (pFunc->iFlags & PH7_TKWRD_VOID)
           func_is_void = 1;
         else
