@@ -2073,11 +2073,23 @@ Consume:
  * and this function takes care of generating the appropriate error
  * message.
  */
+
+/*
+TODO: Work around special case: 'fn( ARGLIST ) [use (ARGLIST)] [:TYPE|never] => EXPR;'
+
+Arrow functions support explicit variable capture using use(). 
+Unlike standard PHP arrow functions, PH7 does not implicitly capture variables from the enclosing scope.
+This is intended. It keeps closure creation lightweight and predictable, and this is dictated by 
+the memory constraints of embedded hardware. 
+
+This part of the PH7 language is not planned to become PHP 8-like in the foreseeable future.
+*/
 static sxi32 PH7_CompileBlock(
   ph7_gen_state *pGen, /* Code generator state */
   sxi32 nKeywordEnd    /* EOF-keyword [i.e: endif;endfor;...]. 0 (zero) otherwise */
 ) {
   sxi32 rc;
+  /* TODO: check for an '=' sign (arrow function) */
   if (pGen->pIn->nType & PH7_TK_OCB /* '{' */) {
     sxu32 nLine = pGen->pIn->nLine;
     rc = GenStateEnterBlock(&(*pGen), GEN_BLOCK_STD, PH7_VmInstrLength(pGen->pVm), 0, 0);
@@ -2085,7 +2097,8 @@ static sxi32 PH7_CompileBlock(
       return SXERR_ABORT;
     }
     pGen->pIn++;
-    /* Compile until we hit the closing braces '}' */
+    /* Normal function bodies: Compile until we hit the closing braces '}' */
+    /* TODO: Arrow Functions: Compile until we hit ';' */
     for (;;) {
       if (pGen->pIn >= pGen->pEnd) {
         rc = GenStateNextChunk(&(*pGen));
@@ -4052,13 +4065,13 @@ static sxi32 GenStateCompileFunc(
     } // if got 'use'
   }
 
-#if 1
+
   /* Class methods are compiled via another piece of code */
   /* Compile return type if exists */
   int bNullable = 0;
   nLine = pGen->pIn->nLine;
   if (pGen->pIn->nType == PH7_TK_COLON) {
-    /* 7.x route, skip ':' */
+    /* 7.x route for function and closures/lambdas, skip ':' */
 again:
     pGen->pIn++;
     if (pGen->pIn < pGen->pEnd) {
@@ -4070,10 +4083,7 @@ again:
           goto again;
         }
 err:
-        PH7_GenCompileError(pGen, E_ERROR, nLine, 
-                            "A function return type is expected after ':' instead of '%z'",
-                            &pGen->pIn->sData
-                            );
+        PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type or 'never' is expected after ':'");
         return SXERR_ABORT;
       }
 
@@ -4083,9 +4093,10 @@ err:
       if (nKey == PH7_TKWRD_NEVER) {  
         /* treat :never as :void, as simple as that.
          * doing so we catch return statements which return expressions from a :never returning function
+         * Mix in VM_FUNC_NEVER flag which controls how `return` statement is compiled
          */
-        nKey = PH7_TKWRD_VOID;
-        puts(":never is replaced with :void");
+        nKey = PH7_TKWRD_VOID | VM_FUNC_NEVER;
+        //puts(":never is replaced with :void");
       }
       /* Check if nKey is one of a valid types: object, string, array, int, bool, callable
       */
@@ -4098,7 +4109,7 @@ err:
       pGen->pIn++;
     }
   }
-#endif
+
 
   /* Compile the body */
   rc = GenStateCompileFuncBody(&(*pGen), pFunc);
@@ -4592,7 +4603,7 @@ static sxi32 GenStateCompileClassMethod(
 
     sxu32 nKey = 0; /* function type */
   
-    /* 7.x route, skip ':' */
+    /* 7.x route for class method, skip ':', read the type */
 again:
     pGen->pIn++;
     if (pGen->pIn < pGen->pEnd) {
@@ -4606,30 +4617,34 @@ again:
         }
         
 err:
-        PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type is expected after ':'");
+        PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type or 'never' is expected after ':'");
         return SXERR_ABORT;
       }
 
-      /* TODO: :parent , :self types handling for a class method 
-        #define PH7_TKWRD_SELF
-        #define PH7_TKWRD_PARENT
-      */
-
-
       nKey = (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData));
 
+      /*TODO: this is a kludge. */
       if (nKey == PH7_TKWRD_SELF || nKey == PH7_TKWRD_PARENT || nKey == PH7_TKWRD_STATIC) {
         nKey = PH7_TKWRD_OBJECT;
         //puts("cast to Object!");
       }
 
-      // Check if nKey is one of a valid types: object, string, array, int, bool, resource
-      //printf("Function '%s' has return type %08x\r\n",zName, (unsigned int)nKey);
+      if (nKey == PH7_TKWRD_NEVER) {  
+        /* treat :never as :void, as simple as that.
+         * doing so we catch return statements which return expressions from a :never returning function
+         * Mix in VM_FUNC_NEVER flag which controls how `return` statement is compiled
+         */
+        nKey = PH7_TKWRD_VOID | VM_FUNC_NEVER;
+        
+      }
+      /* Check if nKey is one of a valid types: object, string, array, int, bool, callable
+      */
       if ((nKey & VM_FUNC_RET_MASK) == 0)
         goto err;
 
-      // Add return type to the function flags
+      /* Add return type to the method flags */
       pMeth->sFunc.iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey | (VM_FUNC_RET_NULLABLE * bNullable));
+
       pGen->pIn++;
     }
   }
@@ -4928,7 +4943,7 @@ static sxi32 GenStateCompileEnum(ph7_gen_state *pGen, sxi32 iFlags) {
     if (pGen->pIn < pGen->pEnd) {
       if (pGen->pIn->nType != PH7_TK_KEYWORD) {
 err:
-        PH7_GenCompileError(pGen, E_ERROR, nLine, "mixed, float, int, bool or string is expected after ':'");
+        PH7_GenCompileError(pGen, E_ERROR, nLine, "mixed, float, int, bool, string or callable is expected after ':'");
         return SXERR_ABORT;
       }
 

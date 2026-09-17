@@ -220,7 +220,7 @@ static sxi32 TokenizePHP(SyStream *pStream, SyToken *pToken, void *pUserData, vo
             pTmp = (SyToken *)SySetPeek(pTokSet);
             if (pTmp->nType & PH7_TK_KEYWORD) {
               sxi32 nID = SX_PTR_TO_INT(pTmp->pUserData);
-              if ((sxu32)nID & (PH7_TKWRD_ARRAY | PH7_TKWRD_INT | PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_OBJECT | PH7_TKWRD_BOOL | PH7_TKWRD_UNSET)) {
+              if ((sxu32)nID & (PH7_TKWRD_ARRAY | PH7_TKWRD_CALLABLE | PH7_TKWRD_INT | PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_OBJECT | PH7_TKWRD_BOOL | PH7_TKWRD_UNSET)) {
                 pTmp = (SyToken *)SySetAt(pTokSet, pTokSet->nUsed - 2);
                 if (pTmp->nType & PH7_TK_LPAREN) {
                   /* Merge the three tokens '(' 'TYPE' ')' into a single one */
@@ -233,6 +233,8 @@ static sxi32 TokenizePHP(SyStream *pStream, SyToken *pToken, void *pUserData, vo
                     zTypeCast = "(string)";
                   } else if (nID & PH7_TKWRD_ARRAY) {
                     zTypeCast = "(array)";
+                  } else if (nID & PH7_TKWRD_CALLABLE) {
+                    zTypeCast = "(callable)";
                   } else if (nID & PH7_TKWRD_OBJECT) {
                     zTypeCast = "(object)";
                   } else if (nID & PH7_TKWRD_UNSET) {

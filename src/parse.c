@@ -186,6 +186,7 @@ static const ph7_expr_op aOpTable[] = {
   { { "!", sizeof(char) }, EXPR_OP_LOGNOT, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_LNOT },
   { { "@", sizeof(char) }, EXPR_OP_ALT, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_ERR_CTRL },
   /* Cast operators */
+  /* NOTE: Adding a new type conversion operator also requires changes to lex.c */
   { { "(int)", sizeof("(int)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_INT },
   { { "(bool)", sizeof("(bool)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_BOOL },
   { { "(string)", sizeof("(string)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_STR },
