@@ -135,6 +135,7 @@ static Keyword aKeywordTable[] = {
   { "unset",           "PH7_TKWRD_UNSET", 1, 0 },
   { "xor",             "PH7_TKWRD_XOR", 1, 0 },
   { "break",           "PH7_TKWRD_BREAK", 1, 6 },
+  { "callable",        "PH7_TKWRD_CALLABLE", 1, 6 },
 };
 
 /* Number of keywords */
