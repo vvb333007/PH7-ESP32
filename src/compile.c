@@ -3096,7 +3096,7 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
         } else if (pFunc->iFlags & PH7_TKWRD_ARRAY) {
           nCvtOp = PH7_OP_CVT_ARRAY;
         } else {
-          /* TODO: class name, iterable, callable must be done via type check / instanceof. Generate an error if types are not convertible
+          /* TODO: class name, iterable, must be done via type check / instanceof. Generate an error if types are not convertible
            * void & mixed types never reach here
            */
         }
@@ -3660,9 +3660,12 @@ choose_memobj:
           sArg.nType = MEMOBJ_STRING;
         } else if (nKey & PH7_TKWRD_FLOAT) {
           sArg.nType = MEMOBJ_REAL;
-        } else if (nKey & PH7_TKWRD_MIXED) {
-          /* 'mixed' as function argument: do not do any autocasting */
-          //puts("mixed type: no automatic cast");
+        } else if (nKey & (PH7_TKWRD_MIXED | PH7_TKWRD_CALLABLE)) {
+          /* 'mixed' as a function argument: do not do any autocasting 
+             'callable' as a function argument: do not do any autocasting (can be string or array)
+              TODO: callables require new opcode for typechecking.
+          */
+
         } else {
           /* unknown typename, treat as mixed + warning*/
           PH7_GenCompileError(&(*pGen), E_WARNING, pGen->pIn->nLine,
@@ -4076,13 +4079,22 @@ err:
 
       sxu32 nKey = (sxu32)(SX_PTR_TO_INT(pGen->pIn->pUserData));
 
-      // Check if nKey is one of a valid types: object, string, array, int, bool, resource
-      //printf("Function '%s' has return type %08x\r\n",zName, (unsigned int)nKey);
+      
+      if (nKey == PH7_TKWRD_NEVER) {  
+        /* treat :never as :void, as simple as that.
+         * doing so we catch return statements which return expressions from a :never returning function
+         */
+        nKey = PH7_TKWRD_VOID;
+        puts(":never is replaced with :void");
+      }
+      /* Check if nKey is one of a valid types: object, string, array, int, bool, callable
+      */
       if ((nKey & VM_FUNC_RET_MASK) == 0)
         goto err;
 
-      // Add return type to the function flags
+      /* Add return type to the function flags */
       pFunc->iFlags |= (VM_FUNC_RET_TYPE | (unsigned int)nKey | (VM_FUNC_RET_NULLABLE * bNullable));
+      
       pGen->pIn++;
     }
   }
@@ -6544,7 +6556,7 @@ static int GenStateisLangConstruct(sxu32 nKeyword) {
         || nKeyword == PH7_TKWRD_PRIVATE || nKeyword == PH7_TKWRD_IMPLEMENTS
       */
     ) {
-      puts("1111");
+      //puts("1111");
       rc = TRUE;
     }
   }
