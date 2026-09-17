@@ -453,33 +453,8 @@ int Impl(vTaskDelay(ph7_context *ctx, int argc, ph7_value **argv) {
   return PH7_OK;
 }
 
-//QueueHandle_t xQueueCreate(UBaseType_t uxQueueLength, UBaseType_t uxItemSize);
-//
-int Impl( xQueueCreate )(ph7_context *ctx, int argc, ph7_value **argv) {
-  return PH7_OK;
-}
-
-// void vQueueDelete(QueueHandle_t xQueue);
-//
-int Impl( vQueueDelete )(ph7_context *ctx, int argc, ph7_value **argv) {
-  return PH7_OK;
-}
-
-//BaseType_t xQueueSend(QueueHandle_t xQueue,
-//                      const void *pvItemToQueue,
-//                      TickType_t xTicksToWait);
-//
-int Impl( xQueueSend )(ph7_context *ctx, int argc, ph7_value **argv) {
-  return PH7_OK;
-}
-
-//BaseType_t xQueueReceive(QueueHandle_t xQueue,
-//                         void *pvBuffer,
-//                         TickType_t xTicksToWait);
-//
-int Impl( xQueueReceive )(ph7_context *ctx, int argc, ph7_value **argv) {
-  return PH7_OK;
-}
+// Queues are implemented as PHP-only queues (you can not pass PHP's Queue_t handle to a foreign C function)
+// see FreeRTOS.php
 
 //BaseType_t xTaskNotify(TaskHandle_t xTaskToNotify,
 //                       uint32_t ulValue,
