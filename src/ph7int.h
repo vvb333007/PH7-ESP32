@@ -1140,13 +1140,13 @@ struct ph7_vm_func_closure_env {
 #define VM_FUNC_RET_MASK \
   (PH7_TKWRD_ARRAY | PH7_TKWRD_BOOL | PH7_TKWRD_INT | \
    PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_OBJECT | \
-   PH7_TKWRD_VOID | PH7_TKWRD_MIXED)
+   PH7_TKWRD_VOID | PH7_TKWRD_MIXED | PH7_TKWRD_CALLABLE)
 
 
 
 /* Valid types for enums */
 #define VM_ENUM_MASK \
-  (PH7_TKWRD_BOOL | PH7_TKWRD_INT | PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_MIXED)
+  (PH7_TKWRD_BOOL | PH7_TKWRD_INT | PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_MIXED | PH7_TKWRD_CALLABLE )
 
 
 /*
@@ -1613,7 +1613,11 @@ enum ph7_expr_id {
   EXPR_OP_XOR_ASSIGN, /* Combined operator: ^= */
   EXPR_OP_SHL_ASSIGN, /* Combined operator: <<= */
   EXPR_OP_SHR_ASSIGN, /* Combined operator: >>= */
-  EXPR_OP_COMMA       /* Comma expression */
+  EXPR_OP_COMMA,       /* Comma expression */
+
+  EXPR_OP_QQ, /* ?? */
+  EXPR_OP_QQE, /* ??= */
+  EXPR_OP_NULLSAFE, /* ?-> */
 };
 /*
  * Very high level tokens.
@@ -1714,25 +1718,20 @@ enum ph7_expr_id {
 #define PH7_TKWRD_BREAK 55           /* break */
 #define PH7_TKWRD_GOTO 56            /* goto */
 #define PH7_TKWRD_ENUM 57            /* enum */
+#define PH7_TKWRD_NEVER 58           /* 'never' function return type */
 
-// Keywords [58..63] are available for use for language extensions
+// Keywords [59..63] are available for use for language extensions
 // Keywords [65..127] are available for use for language extensions
 
 /* Constants which MUST BE A POWER OF TWO  */
-// Keyword 0x00000040 is available for use for language extensions
+
 #define PH7_TKWRD_CLONE    0x00000080         /* clone */
 #define PH7_TKWRD_NEW      0x00000100          /* new */
-  #define PH7_TKWRD_ARRAY    0x00000200        /* array: MUST BE A POWER OF TWO */
 #define PH7_TKWRD_AND      0x00000400          /* and */
 #define PH7_TKWRD_INSTANCEOF 0x000800   /* instanceof */
 #define PH7_TKWRD_OR       0x00001000          /* or */
 #define PH7_TKWRD_UNSET    0x00002000       /* unset */
 #define PH7_TKWRD_XOR      0x00004000         /* xor */
-  #define PH7_TKWRD_BOOL     0x00008000     /* bool */
-  #define PH7_TKWRD_INT      0x00010000     /* int */ 
-  #define PH7_TKWRD_FLOAT    0x00020000     /* float */
-  #define PH7_TKWRD_STRING   0x00040000     /* string */ 
-  #define PH7_TKWRD_OBJECT   0x00080000     /* object */ 
 #define PH7_TKWRD_SEQ      0x00100000       /* String string comparison operator */ 
 #define PH7_TKWRD_SNE      0x00200000       /* String string comparison operator */ 
 #define PH7_TKWRD_ENDIF    0x00400000     /* endif */ 
@@ -1741,10 +1740,17 @@ enum ph7_expr_id {
 #define PH7_TKWRD_END4EACH 0x02000000 /* endforeach */ 
 #define PH7_TKWRD_ELIF     0x04000000     /* elseif */ 
 #define PH7_TKWRD_ELSE     0x08000000     /* else */ 
-#define PH7_TKWRD_NEVER    0x10000000     /* :never */
-  #define PH7_TKWRD_MIXED    0x20000000     /* :mixed */
-//#define PH7_TKWRD_UNUSED1      0x40000000    /* unused */
-  #define PH7_TKWRD_VOID     0x80000000    /* void */
+
+  #define PH7_TKWRD_ARRAY    0x00000200     /* array */
+  #define PH7_TKWRD_BOOL     0x00008000     /* bool */
+  #define PH7_TKWRD_INT      0x00010000     /* int */ 
+  #define PH7_TKWRD_FLOAT    0x00020000     /* float */
+  #define PH7_TKWRD_STRING   0x00040000     /* string */ 
+  #define PH7_TKWRD_OBJECT   0x00080000     /* object */ 
+  #define PH7_TKWRD_RESERVED  0x10000000     /* Unused */
+  #define PH7_TKWRD_MIXED    0x20000000     /* mixed */
+  #define PH7_TKWRD_CALLABLE 0x40000000     /* callable */
+  #define PH7_TKWRD_VOID     0x80000000     /* void */
 
 /* JSON encoding/decoding related definition */
 enum json_err_code {
