@@ -171,6 +171,7 @@ static const ph7_expr_op aOpTable[] = {
   { { "clone", sizeof("clone") - 1 }, EXPR_OP_CLONE, 1, EXPR_OP_NON_ASSOC, PH7_OP_CLONE },
   /* Postfix operators */
   /* Precedence 2(Highest),left-associative */
+
   { { "->", sizeof(char) * 2 }, EXPR_OP_ARROW, 2, EXPR_OP_ASSOC_LEFT, PH7_OP_MEMBER },
   { { "::", sizeof(char) * 2 }, EXPR_OP_DC, 2, EXPR_OP_ASSOC_LEFT, PH7_OP_MEMBER },
   { { "[", sizeof(char) }, EXPR_OP_SUBSCRIPT, 2, EXPR_OP_ASSOC_LEFT, PH7_OP_LOAD_IDX },
@@ -188,6 +189,7 @@ static const ph7_expr_op aOpTable[] = {
   { { "(int)", sizeof("(int)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_INT },
   { { "(bool)", sizeof("(bool)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_BOOL },
   { { "(string)", sizeof("(string)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_STR },
+  { { "(callable)", sizeof("(callable)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_STR }, // callables are strings e.g. "lambda_0" or "closure_5"
   { { "(float)", sizeof("(float)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_REAL },
   { { "(array)", sizeof("(array)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_ARRAY },
   { { "(object)", sizeof("(object)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_OBJ },
@@ -275,6 +277,9 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
   sxu32 n = 0;
   sxi32 rc;
   /* Do a linear lookup on the operators table */
+
+  //printf("ExprExtractOperator() : %.*s\r\n", pStr->nByte, pStr->zString);
+
   for (;;) {
     if (n >= SX_ARRAYSIZE(aOpTable)) {
       break;
@@ -286,11 +291,18 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
       rc = SyStringCmp(pStr, &aOpTable[n].sOp, SyMemcmp);
     }
     if (rc == 0) {
-      if (aOpTable[n].sOp.nByte != sizeof(char) || (aOpTable[n].iOp != EXPR_OP_UMINUS && aOpTable[n].iOp != EXPR_OP_UPLUS) || pLast == 0) {
+
+    //  printf("ExprExtractOperator() : Found: %.*s\r\n", aOpTable[n].sOp.nByte, aOpTable[n].sOp.zString);
+
+      if (aOpTable[n].sOp.nByte != sizeof(char) || 
+          (aOpTable[n].iOp != EXPR_OP_UMINUS && aOpTable[n].iOp != EXPR_OP_UPLUS) || 
+          pLast == 0) {
+
         /* There is no ambiguity here,simply return the first operator seen */
         return &aOpTable[n];
       }
-      /* Handle ambiguity */
+
+
       if (pLast->nType & (PH7_TK_LPAREN /*'('*/ | PH7_TK_OCB /*'{'*/ | PH7_TK_OSB /*'['*/ | PH7_TK_COLON /*:*/ | PH7_TK_COMMA /*,'*/)) {
         /* Unary opertors have prcedence here over binary operators */
         return &aOpTable[n];
@@ -307,6 +319,7 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
     ++n; /* Next operator in the table */
   }
   /* No such operator */
+    printf("ExprExtractOperator() : not found\r\n");
   return 0;
 }
 /*
