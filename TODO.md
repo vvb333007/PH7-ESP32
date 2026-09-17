@@ -5,7 +5,7 @@
 Architecture: one FreeRTOS task per VM.
 VMs are interruptible and can be executed step by step.
 VMs can be cloned (shared code, private data).
-Use PH7_OP_CVT_INT and so on opcodes which converts value on the stack to a specified type
+~~Use PH7_OP_CVT_INT and so on opcodes which converts value on the stack to a specified type
   This is required for correct function return types autocasting. Tjis will require EmitInstr before 'return'
   which will convert resulting value to the function type.
 
@@ -18,7 +18,7 @@ Use PH7_OP_CVT_INT and so on opcodes which converts value on the stack to a spec
     }
 ```
 
-  will return a string '7', not integer.
+  will return a string '7', not integer.~~ Done
 
 ---
 
@@ -75,7 +75,13 @@ So far, `Print`, `Stream`, `Server`, and `Client` have been implemented.
 
 ## Smaller tasks
 
-### 1. UNIX-like `fork()` instead of the FreeRTOS Task API
+### 0. __invoke(), __call(), __callStatic()
+
+Currently do not return any values. That must be fixed ASAP;
+
+
+
+### 1. UNIX-like `fork()` to make a full clone of a VM
 
 Start a new VM by cloning the current VM.
 
@@ -88,7 +94,7 @@ if ($pid == 0) {
     echo 'Child has been spawned, pid=' . $pid;
 }
 ```
-
+### 2. Background PHP services via FreeRTOS tasks
 Start a service from P2HP:
 
 ```php
@@ -133,12 +139,13 @@ php_ipc_sleep($handle, $mask); // sleep until woken up by another VM
 
 ### 3. `mixed` type
 
+~~Add mixed type~~
 Done
 ---
 
 ### 4. `enum`
 
-Add the `enum` keyword.
+~~Add the `enum` keyword.~~
 
 Done.
 
@@ -217,11 +224,14 @@ Done
 
 ###9. Function return arguments
 Done
-Syntax is accepted. Compiler checks for returns from void functions and checks if nothing is returned from a function that should return a value
-NO RETURN TYPECASTING is performed!
+~~Syntax is accepted. Compiler checks for returns from void functions and checks if nothing is returned from a function that should return a value
+NO RETURN TYPECASTING is performed!~~
 
 
 ###10. Overloading: do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.
 ###11. Overloading: do not fallback to the last function in the list if there are no good candidates for overloading. Do fallback only if there is only 1 candidate:
+###12. Nullable types: inject code into return statement which LOADC 0,0,0; TEQ ; JNZ over CVT instruction to skip conversion of null to the function type
+###14. `callable` type: interbally a `string`
+###13. ?? operator ( ?? as a ternary OP, and ??= null coalesce assignment) , ?-> nullsafe operator  
 
        
