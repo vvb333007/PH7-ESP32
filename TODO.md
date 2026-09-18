@@ -228,10 +228,10 @@ Done
 NO RETURN TYPECASTING is performed!~~
 
 
-###10. Overloading: do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.
-###11. Overloading: do not fallback to the last function in the list if there are no good candidates for overloading. Do fallback only if there is only 1 candidate:
+###~~10. Overloading: do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.~~ Done
+###11. Overloading: do not fallback to the last function in the list if there are no good candidates for overloading. Do fallback only if there is only 1 candidate
 ###12. Nullable types: inject code into return statement which LOADC 0,0,0; TEQ ; JNZ over CVT instruction to skip conversion of null to the function type
-###14. `callable` type: interbally a `string`
+###14. ~~`callable` type: interbally a `string`~~ Done
 ###13. ?? operator ( ?? as a ternary OP, and ??= null coalesce assignment) , ?-> nullsafe operator  
 
        
