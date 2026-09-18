@@ -12,7 +12,7 @@
  *      http://ph7.symisc.net/
  */
 
-
+#include <stdint.h>
 #include "ph7int.h"
 
 /*
@@ -469,14 +469,13 @@ PH7_PRIVATE sxi32 PH7_CompileSimpleString(ph7_gen_state *pGen, sxi32 iCompileFla
   /* Delimit the string */
   zIn = pStr->zString;
   zEnd = &zIn[pStr->nByte];
-#if 0 
-  // BUG: empty string is NOT null
+#if PH7_EMPTY_STRING_IS_NULL
   if (zIn >= zEnd) {
     /* Empty string,load NULL */
     PH7_VmEmitInstr(pGen->pVm, PH7_OP_LOADC, 0, 0, 0, 0);
     return SXRET_OK;
   }
-#endif
+#endif /* #if PH7_EMPTY_STRING_IS_NULL */
   if (SXRET_OK == GenStateFindLiteral(&(*pGen), pStr, &nIdx)) {
     /* Already processed,emit the load constant instruction
      * and return.
@@ -553,15 +552,14 @@ static sxi32 PH7_CompileNowDoc(ph7_gen_state *pGen, sxi32 iCompileFlag) {
   sxu32 nIdx;
   nIdx = 0; /* Prevent compiler warning */
 
-#if 0
-  // BUG: same as in SimpleString
+#if PH7_EMPTY_STRING_IS_NULL
   if (pStr->nByte <= 0) {
     /* Empty string,load NULL */
     PH7_VmEmitInstr(pGen->pVm, PH7_OP_LOADC, 0, 0, 0, 0);
     return SXRET_OK;
   }
-#endif
-  puts("NowDoc");
+#endif /* #if PH7_EMPTY_STRING_IS_NULL */
+
   /* Reserve a new constant */
   pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
   if (pObj == 0) {
@@ -693,24 +691,16 @@ static sxi32 GenStateCompileString(ph7_gen_state *pGen) {
   sxi32 rc;
   /* Delimit the string */
   zIn = pStr->zString;
-//XXX
-//  printf("pStr->nByte == %u\r\n", (unsigned int)pStr->nByte);
   zEnd = &zIn[pStr->nByte];
 
-//  char tmp[pStr->nByte+1];
-//  memcpy(tmp, zIn, pStr->nByte);
-//  tmp[pStr->nByte] = 0;
-//  printf("tmp == '%s'\r\n", tmp);
-
-
-
-#if 0
+#if PH7_EMPTY_STRING_IS_NULL
   if (zIn >= zEnd) {
     /* Empty string,load NULL */
     PH7_VmEmitInstr(pGen->pVm, PH7_OP_LOADC, 0, 0, 0, 0);
     return SXRET_OK;
   }
-#endif
+#endif /* #if PH7_EMPTY_STRING_IS_NULL */
+
   zCur = 0;
   /* Compile the node */
   iCons = 0;
@@ -724,7 +714,7 @@ static sxi32 GenStateCompileString(ph7_gen_state *pGen) {
       }
       zIn++;
     }
-    if (zIn > zCur) { // BUG:
+    if (zIn > zCur) { // BUG: >= ?
       if (pObj == 0) {
         pObj = GenStateNewStrObj(&(*pGen), &iCons);
         if (pObj == 0) {
@@ -734,7 +724,6 @@ static sxi32 GenStateCompileString(ph7_gen_state *pGen) {
       PH7_MemObjStringAppend(pObj, zCur, (sxu32)(zIn - zCur));
     }
     if (zIn >= zEnd) {
-  //    puts("EOL!!!");
       break;
     }
     if (zIn[0] == '\\') {
@@ -3058,6 +3047,7 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
   sxi32 rc;
   int func_is_void = 0;
   int func_must_return = 0;
+  int bNullable = 0;
   /* Jump the 'return' keyword */
   pGen->pIn++;
   ph7_vm_func *pFunc = NULL;
@@ -3106,34 +3096,31 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
       }
       /* Check if function has return type in its declaration. :mixed does not change function return type
        * Emit type conversion instruction
-       * TODO:
-       * Compiled expression must leave its value on the stack after execution. For nullable functions we
-       * add a runtime check: if object on the stack is NULL, then we jump CVT opcode
-            LOADC 0,0,0 ; load null on stack
-            TEQ   0,0,0   ; compare two values on stack (strict comparision)
-            JZ    0,xx,0  ; not equal
        */
       if (nRet && pFunc && (pFunc->iFlags & VM_FUNC_RET_TYPE)) {
-        sxi32 nCvtOp = 0;
-        if (pFunc->iFlags & PH7_TKWRD_INT) {
-          nCvtOp = PH7_OP_CVT_INT;
-        } else if (pFunc->iFlags & PH7_TKWRD_FLOAT) {
-          nCvtOp = PH7_OP_CVT_REAL;
-        } else if (pFunc->iFlags & PH7_TKWRD_OBJECT) {
-          nCvtOp = PH7_OP_CVT_OBJ; /* TODO: temporary */
-        } else if (pFunc->iFlags & PH7_TKWRD_STRING) {
-          nCvtOp = PH7_OP_CVT_STR;
-        } else if (pFunc->iFlags & PH7_TKWRD_BOOL) {
-          nCvtOp = PH7_OP_CVT_BOOL;
-        } else if (pFunc->iFlags & PH7_TKWRD_ARRAY) {
-          nCvtOp = PH7_OP_CVT_ARRAY;
-        } else {
-          /* TODO: class name, iterable, must be done via type check / instanceof. Generate an error if types are not convertible
-           * void & mixed types never reach here
-           */
-        }
 
-        if (nCvtOp != 0) {
+        sxi32 nCvtOp = 0;
+        bNullable = ((pFunc->iFlags & VM_FUNC_RET_NULLABLE) != 0);
+
+          if (pFunc->iFlags & PH7_TKWRD_INT) {
+            nCvtOp = PH7_OP_CVT_INT;
+          } else if (pFunc->iFlags & PH7_TKWRD_FLOAT) {
+            nCvtOp = PH7_OP_CVT_REAL;
+          } else if (pFunc->iFlags & PH7_TKWRD_OBJECT) {
+            nCvtOp = PH7_OP_CVT_OBJ; /* TODO: temporary */
+          } else if (pFunc->iFlags & PH7_TKWRD_STRING) {
+            nCvtOp = PH7_OP_CVT_STR;
+          } else if (pFunc->iFlags & PH7_TKWRD_BOOL) {
+            nCvtOp = PH7_OP_CVT_BOOL;
+          } else if (pFunc->iFlags & PH7_TKWRD_ARRAY) {
+            nCvtOp = PH7_OP_CVT_ARRAY;
+          } else {
+            /* TODO: class name, iterable, must be done via type check / instanceof. Generate an error if types are not convertible
+             * void & mixed types never reach here
+             */
+          }
+
+        if (nCvtOp != 0 && !bNullable) {
           PH7_VmEmitInstr(pGen->pVm, nCvtOp, 0, 0, 0, 0);
           //puts("type convertsion emitted");
         }
@@ -3148,8 +3135,16 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
   }
 
 
-  /* Emit the done instruction */
-  PH7_VmEmitInstr(pGen->pVm, PH7_OP_DONE, nRet, 0, 0, 0);
+  /* Emit the done instruction 
+   * Third argument is set to the conversion type which must be done later,
+   * when executing actual OP_DONE. This also means there was no OP_CVT insn emitted by PH7_CompileReturn()
+   */
+  PH7_VmEmitInstr(pGen->pVm,
+                  PH7_OP_DONE,
+                  nRet, //P1
+                  0,    //P2
+                  (void *)(uintptr_t)(bNullable ? (pFunc->iFlags & VM_FUNC_RET_MASK) : 0), // P3
+                  0);
   return SXRET_OK;
 }
 /*
@@ -3672,10 +3667,33 @@ static sxi32 GenStateCollectFuncArgs(ph7_vm_func *pFunc, ph7_gen_state *pGen, Sy
       /* No more arguments to process */
       break;
     }
+
+
+//    SyString *pName = &pGen->pIn->sData;
+//    PH7_GenCompileError(pGen, E_NOTICE, pGen->pIn->nLine, "Next token is '%z'", pName);
+
     SyZero(&sArg, sizeof(ph7_vm_func_arg));
     SySetInit(&sArg.aByteCode, &pGen->pVm->sAllocator, sizeof(VmInstr));
 
-    // Type hint: either a keyword (int, string, mixed, etc) or a class/enum name
+    /* Type hint: either a keyword (int, string, mixed, etc) or a class/enum name
+     * TODO: recognise `?` at the beginning of the type and save a special flag on corresponding sArg
+     * TODO: later, when performing Arg autocasting - do not autocast null values if `?` was used with type
+     * TODO: this is last push to make full support for nullable types.
+     * TODO: Do not include `?` into signature.
+     */
+#if 1
+      /* Refactor this direct byte lookup */
+      if (pIn->sData.zString[0] == '?') {
+        pIn++;
+        if (pIn >= pEnd) {
+          /* No more arguments to process */
+          break;
+        }
+//        puts("nullable arg");
+        sArg.iFlags |= VM_FUNC_ARG_NULLABLE;
+      }
+
+#endif
     if (pIn->nType & (PH7_TK_ID | PH7_TK_KEYWORD)) {
 
       // Built in types: these are keywords
@@ -3753,11 +3771,16 @@ choose_memobj:
     }
     if (pIn->nType & PH7_TK_AMPER) {
       /* Pass by reference,record that */
-      sArg.iFlags = VM_FUNC_ARG_BY_REF;
+      sArg.iFlags |= VM_FUNC_ARG_BY_REF;
       pIn++;
     }
-    if (pIn >= pEnd || (pIn->nType & PH7_TK_DOLLAR) == 0 || &pIn[1] >= pEnd || (pIn[1].nType & (PH7_TK_ID | PH7_TK_KEYWORD)) == 0) {
+//printf("0=%08x, 1=%08x\r\n",pIn[0].nType,pIn[1].nType);
+    if  (pIn >= pEnd || 
+        (pIn->nType & PH7_TK_DOLLAR) == 0 || 
+        &pIn[1] >= pEnd || 
+        (pIn[1].nType & (PH7_TK_ID | PH7_TK_KEYWORD)) == 0) {
       /* Invalid argument */
+      
       rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Invalid argument name");
       return rc;
     }
@@ -3807,6 +3830,7 @@ choose_memobj:
         return rc;
       }
       pIn++; /* Jump the trailing comma */
+
     }
     /* Append argument signature */
     if (sArg.nType > 0) {

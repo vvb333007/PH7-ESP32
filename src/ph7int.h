@@ -1128,6 +1128,7 @@ struct ph7_vm_func_closure_env {
 #define VM_FUNC_ARG_IGNORE   0x020   /* Do not install argument in the current frame */
 #define VM_FUNC_RET_TYPE     0x040   /* PHP 7.0 syntax was used for the function return type (i.e. :void) */
 #define VM_FUNC_RET_NULLABLE 0x080   /* nullable type. ": ?int" */
+#define VM_FUNC_ARG_NULLABLE VM_FUNC_RET_NULLABLE   /* nullable argument type. "?int $x". this flag is used with args only */
 #define VM_FUNC_NEVER        0x100   /* Function must not have 'return' statement in its body. */
 
 
