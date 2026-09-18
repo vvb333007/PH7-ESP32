@@ -3940,6 +3940,8 @@ static sxi32 GenStateCompileFunc(
   sxi32 rc;
   /* Extract line number */
   nLine = pGen->pIn->nLine;
+
+
   /* Jump the left parenthesis '(' */
   pGen->pIn++;
   /* Delimit the function signature */
@@ -3975,6 +3977,41 @@ static sxi32 GenStateCompileFunc(
       return SXERR_ABORT;
     }
   }
+/* Check if we are overwriting an existent function. PH7 allows function overloading
+ * so we compare both function name and arglist signature to see if exactly same function
+ * was already defined somewhere
+ * TODO: add a flag to ph7_engine which instructs compiler not to 
+ *       do this collision check so behavior remains the same as with old PH7 
+ */
+#if 1
+  SyHashEntry *pEntry;
+
+  /* Get the list of functions with the same name */
+  pEntry = SyHashGet(&pGen->pVm->hFunction, (const void *)pName->zString, pName->nByte);
+  if (pEntry) {
+
+    ph7_vm_func *pVmFunc;
+    pVmFunc = (ph7_vm_func *)pEntry->pUserData;
+
+    /* Run through all overloaded functions to see if we already
+     * have one with the same signature 
+     */
+    while(pVmFunc != NULL) {
+
+      if (SyStringCmp(&pFunc->sSignature, &pVmFunc->sSignature, SyMemcmp) == 0)
+        break;
+
+      pVmFunc = pVmFunc->pNextName;
+    }
+
+    /* Did we found such a collision? */
+    if (pVmFunc != NULL) {
+      PH7_GenCompileError(pGen, E_ERROR, nLine, "Can not overload '%z': there is the exactly same function is already defined", pName);
+      return SXERR_ABORT; 
+    }
+  }
+#endif
+
 
   pGen->pIn = &pEnd[1];
 
@@ -5107,10 +5144,10 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
   if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_ID) == 0) {
     /* Syntax error */
     rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Invalid class name");
-    if (rc == SXERR_ABORT) {
+//    if (rc == SXERR_ABORT) {
       /* Error count limit reached,abort immediately */
       return SXERR_ABORT;
-    }
+  //  }
     /* Synchronize with the first semi-colon or curly braces */
     // TODO: this operation is done often and is a candidate for an inline  function
     while (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & (PH7_TK_OCB /*'{'*/ | PH7_TK_SEMI /*';'*/)) == 0) {
@@ -5121,6 +5158,11 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
   /* Extract class name */
   pName = &pGen->pIn->sData;
   /* Advance the stream cursor */
+
+  PH7_GenCompileError(pGen, E_NOTICE, nLine,
+                                 "class name'%z', token is %08x",
+                                 pName,pGen->pIn->nType);
+
   pGen->pIn++;
   /* Obtain a raw class */
   pClass = PH7_NewRawClass(pGen->pVm, pName, nLine);
