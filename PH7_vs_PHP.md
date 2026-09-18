@@ -3,7 +3,6 @@
 
 | PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| nullable type is not supported (it compiles but does not keep null, converts it instead breaking whole idea of nullables)                                               | Supported for function/methods args and return types|
 | Short array() syntax `$x = [1,2,3];` is not supported. [in roadmap] | Full support|
 | Destructuring aka short list syntax: [$a,$b,$c] = $x; is not supported. [in roadmap] | Full support|
 | `__call()` and `__callStatic()` do not return any value [in roadmap] | Full support|
