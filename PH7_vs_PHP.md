@@ -172,6 +172,7 @@ function test(Loo $x) {       // Equivalent test(mixed $x)
 | PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Closure is a `string`; e.g. `$a = function() {}; var_dump();` will display "string(9,'closure_1')" ro something similar  | Closure is a an object with properties and methods|
+| `:never` modifier automatically inserts the `HALT` opcode if execution returns from the function | PHP checks this at compile time, which is not always possible to determine through static analysis |
 
 
 
