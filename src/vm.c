@@ -731,7 +731,7 @@ static sxi32 VmMountUserClass(
       }
       /* Record attribute index */
       pAttr->nIdx = pMemObj->nIdx;
-      //printf("memobj %d has been created, via local exec\r\n",pMemObj->nIdx);
+
       /* Install static attribute in the reference table */
       PH7_VmRefObjInstall(&(*pVm), pMemObj->nIdx, 0, 0, VM_REF_IDX_KEEP);
     }
@@ -2668,7 +2668,7 @@ static sxi32 VmByteCodeExec(
               /* Candidate for expansion via user defined callbacks */
               pEntry = SyHashGet(&pVm->hConstant, SyBlobData(&pObj->sBlob), SyBlobLength(&pObj->sBlob));
               if (pEntry) {
-//                printf("Const is expanded (%s)\r\n", SyBlobData(&pObj->sBlob));
+
                 ph7_constant *pCons = (ph7_constant *)pEntry->pUserData;
                 /* Set a NULL default value */
                 MemObjSetType(pTos, MEMOBJ_NULL);
@@ -2680,7 +2680,7 @@ static sxi32 VmByteCodeExec(
                 break;
               }
             } else {
-//              printf("Const is built-in (%s)\r\n", SyBlobData(&pObj->sBlob));
+
             }
             PH7_MemObjLoad(pObj, pTos);
           } else {
@@ -4865,9 +4865,9 @@ static sxi32 VmByteCodeExec(
                   VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class attribute '%z->%z',PH7 is loading NULL",
                                 &pClass->sName, &sName);
                   /* Call the __get magic method if available */
-//                  printf("%p\r\n", pTos);
+
                   PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName);
-//                  printf("%p\r\n", pTos);
+
                 }
                 /* TICKET 1433-49: Deffer garbage collection until attribute loading.
          * This is due to the following case:
@@ -5747,8 +5747,6 @@ Exception:
 static sxi32 VmLocalExec(ph7_vm *pVm, SySet *pByteCode, ph7_value *pResult) {
   ph7_value *pStack;
   sxi32 rc;
-
-//  printf("VmLocalExec -> %p\r\n", pByteCode);
 
   /* Allocate a new operand stack */
   pStack = VmNewOperandStack(&(*pVm), SySetUsed(pByteCode));
@@ -7435,18 +7433,24 @@ PH7_PRIVATE sxi32 PH7_VmCallUserFunctionAp(
   ph7_value *pResult, /* Store callback return value here. NULL otherwise */
   ...                 /* 0 (Zero) or more Callback arguments */
 ) {
-  ph7_value *pArg;
-  SySet aArg;
+
   va_list ap;
+
+  SySet aArg;
   sxi32 rc;
+  ph7_value *pArg;
+
+  va_start(ap, pResult);
+
   SySetInit(&aArg, &pVm->sAllocator, sizeof(ph7_value *));
   /* Copy arguments one after one */
-  va_start(ap, pResult);
+  
   for (;;) {
     pArg = va_arg(ap, ph7_value *);
     if (pArg == 0) {
       break;
     }
+
     SySetPut(&aArg, (const void *)&pArg);
   }
   /* Call the core routine */
@@ -8682,13 +8686,11 @@ static int vm_builtin_var_dump(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   int i;
   SyBlobInit(&sDump, &pCtx->pVm->sAllocator);
   /* Dump one or more expressions */
-  //printf("nArg=%d\r\n",nArg);
   for (i = 0; i < nArg; i++) {
     ph7_value *pObj = apArg[i];
     /* Reset the working buffer */
     SyBlobReset(&sDump);
     /* Dump the given expression */
-    //printf("Dump\r\n");
     PH7_MemObjDump(&sDump, pObj, TRUE, 0, 0, 0);
     /* Output */
     if (1 /*SyBlobLength(&sDump) > 0*/) {
@@ -10514,7 +10516,6 @@ static sxi32 VmExecIncludedFile(
   ph7_vm *pVm;
   int isNew;
 
-//  puts("require_once()");
   /* Initialize fields */
   pVm = pCtx->pVm;
   SyBlobInit(&sContents, &pVm->sAllocator);
@@ -10527,25 +10528,21 @@ static sxi32 VmExecIncludedFile(
    */
   pHandle = PH7_StreamOpenHandle(pVm, pStream, pPath->zString, PH7_IO_OPEN_RDONLY, TRUE, 0, TRUE, &isNew);
   if (pHandle == 0) {
-//    puts("require_once() IO");
     return SXERR_IO;
   }
   rc = SXRET_OK; /* Stupid cc warning */
   if (IncludeOnce && !isNew) {
     /* Already included */
-//    puts("require_once() already");
     rc = SXERR_EXISTS;
   } else {
     /* Read the whole file contents */
     rc = PH7_StreamReadWholeFile(pHandle, pStream, &sContents);
     if (rc == SXRET_OK) {
-//      puts("require_once() reqdwhole");
       SyString sScript;
       /* Compile and execute the script */
       SyStringInitFromBuf(&sScript, SyBlobData(&sContents), SyBlobLength(&sContents));
       VmEvalChunk(pCtx->pVm, &(*pCtx), &sScript, 0, TRUE);
     } else {
-//      puts("require_once() failed readwhole ");
     }
   }
   /* Pop from the set of included file */
@@ -10560,7 +10557,7 @@ static sxi32 VmExecIncludedFile(
   IncludeOnce = 0;
   rc = SXERR_IO;
 #endif /* PH7_DISABLE_BUILTIN_FUNC */
-//  printf("require_once() done %d\n", rc);
+
   return rc;
 }
 /*
@@ -12798,7 +12795,7 @@ static sxi32 VmXMLStartElementHandler(SyXMLRawStr *pStart, SyXMLRawStr *pNS, sxu
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTag, pAttr, 0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTag, pAttr, (void *)0);
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pTag);
   ph7_context_release_value(pEngine->pCtx, pAttr);
@@ -12834,11 +12831,12 @@ static sxi32 VmXMLEndElementHandler(SyXMLRawStr *pEnd, SyXMLRawStr *pNS, void *p
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTag, 0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTag, (void *)0);
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pTag);
   return SXRET_OK;
 }
+
 /*
  * Character data handler.
  *  The user defined callback must accept two parameters:
@@ -12869,7 +12867,8 @@ static sxi32 VmXMLTextHandler(SyXMLRawStr *pText, void *pUserData) {
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pData, 0);
+
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pData, (void *)0);
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pData);
   return SXRET_OK;
@@ -12905,7 +12904,7 @@ static sxi32 VmXMLPIHandler(SyXMLRawStr *pTargetStr, SyXMLRawStr *pDataStr, void
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTarget, pData, 0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTarget, pData, (void *)0);
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pTarget);
   ph7_context_release_value(pEngine->pCtx, pData);
@@ -12942,7 +12941,7 @@ static sxi32 VmXMLNSStartHandler(SyXMLRawStr *pUriStr, SyXMLRawStr *pPrefixStr, 
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pUri, pPrefix, 0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pUri, pPrefix, (void *)0);
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pUri);
   ph7_context_release_value(pEngine->pCtx, pPrefix);
@@ -12976,7 +12975,7 @@ static sxi32 VmXMLNSEndHandler(SyXMLRawStr *pPrefixStr, void *pUserData) {
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pPrefix, 0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pPrefix, (void *)0);
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pPrefix);
   return SXRET_OK;
@@ -13027,6 +13026,7 @@ static int vm_builtin_xml_parse(ph7_context *pCtx, int nArg, ph7_value **apArg) 
   }
   /* Point to the XML engine */
   pEngine = (ph7_xml_engine *)ph7_value_to_resource(apArg[0]);
+
   if (IS_INVALID_XML_ENGINE(pEngine)) {
     /* Corrupt engine,return FALSE */
     ph7_result_bool(pCtx, 0);

@@ -561,6 +561,7 @@ static sxi32 PH7_CompileNowDoc(ph7_gen_state *pGen, sxi32 iCompileFlag) {
     return SXRET_OK;
   }
 #endif
+  puts("NowDoc");
   /* Reserve a new constant */
   pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
   if (pObj == 0) {
@@ -683,6 +684,7 @@ static ph7_value *GenStateNewStrObj(ph7_gen_state *pGen, sxi32 *pCount) {
  * The most important feature of double-quoted strings is the fact that variable names will be expanded.
  * See string parsing for details.
  */
+//#include <string.h>
 static sxi32 GenStateCompileString(ph7_gen_state *pGen) {
   SyString *pStr = &pGen->pIn->sData; /* Raw token value */
   const char *zIn, *zCur, *zEnd;
@@ -691,7 +693,17 @@ static sxi32 GenStateCompileString(ph7_gen_state *pGen) {
   sxi32 rc;
   /* Delimit the string */
   zIn = pStr->zString;
+//XXX
+//  printf("pStr->nByte == %u\r\n", (unsigned int)pStr->nByte);
   zEnd = &zIn[pStr->nByte];
+
+//  char tmp[pStr->nByte+1];
+//  memcpy(tmp, zIn, pStr->nByte);
+//  tmp[pStr->nByte] = 0;
+//  printf("tmp == '%s'\r\n", tmp);
+
+
+
 #if 0
   if (zIn >= zEnd) {
     /* Empty string,load NULL */
@@ -712,7 +724,7 @@ static sxi32 GenStateCompileString(ph7_gen_state *pGen) {
       }
       zIn++;
     }
-    if (zIn >= zCur) {
+    if (zIn > zCur) { // BUG:
       if (pObj == 0) {
         pObj = GenStateNewStrObj(&(*pGen), &iCons);
         if (pObj == 0) {
@@ -722,6 +734,7 @@ static sxi32 GenStateCompileString(ph7_gen_state *pGen) {
       PH7_MemObjStringAppend(pObj, zCur, (sxu32)(zIn - zCur));
     }
     if (zIn >= zEnd) {
+  //    puts("EOL!!!");
       break;
     }
     if (zIn[0] == '\\') {

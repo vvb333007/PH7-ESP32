@@ -1,4 +1,3 @@
-
 /*
  * ----------------------------------------------------------
  * File: lib.c
@@ -3998,9 +3997,13 @@ static sxi32 XMLExtractEndTag(SyXMLParser *pParse, SyToken *pToken, SyXMLRawStrN
 }
 static void TokenToXMLString(SyToken *pTok, SyXMLRawStrNS *pOut) {
   /* Remove leading and trailing white spaces first */
+  
   SyStringFullTrim(&pTok->sData);
+
   pOut->zString = SyStringData(&pTok->sData);
+
   pOut->nByte = SyStringLength(&pTok->sData);
+
 }
 static sxi32 XMLExtractNS(SyXMLParser *pParse, SyToken *pToken, SyXMLRawStrNS *pTag, SyXMLRawStr *pnsUri) {
   SyXMLRawStr *pUri, sPrefix;
@@ -4116,6 +4119,7 @@ static sxi32 ProcessXML(SyXMLParser *pParse, SySet *pTagStack, SySet *pWorker) {
     SyZero(&sNs, sizeof(SyXMLRawStr));
     SySetInit(&sEntry.sNSset, pParse->pAllocator, sizeof(SyHashEntry *));
     sEntry.nLine = sNs.nLine = pToken->nLine;
+    //printf("Token type %08x\r\n",(unsigned int )pToken->nType);
     switch (pToken->nType) {
       case SXML_TOK_DOCTYPE:
         if (SySetUsed(pTagStack) > 1 || bGotTag) {
@@ -4178,17 +4182,24 @@ static sxi32 ProcessXML(SyXMLParser *pParse, SySet *pTagStack, SySet *pWorker) {
           break;
         }
       case SXML_TOK_RAW:
+
         if (SySetUsed(pTagStack) < 1) {
+
           if (pParse->xError) {
+
             rc = pParse->xError("Text (Raw data) without matching tag", SXML_ERROR_TAG_MISMATCH, pToken, pParse->pUserData);
+
             if (rc == SXERR_ABORT) {
               return SXERR_ABORT;
             }
           }
+
           break;
         }
         /* Invoke the supplied callback if any */
+
         if (pParse->xRaw) {
+
           TokenToXMLString(pToken, &sEntry);
           rc = pParse->xRaw((SyXMLRawStr *)&sEntry, pParse->pUserData);
           if (rc == SXERR_ABORT) {
@@ -4387,7 +4398,9 @@ PH7_PRIVATE sxi32 SyXMLProcess(SyXMLParser *pParser, const char *zInput, sxu32 n
     rc = SXRET_OK;
   } else {
     /* Process XML Tokens */
+    
     rc = ProcessXML(&(*pParser), &sTagStack, &sWorker);
+    
     if (pParser->nFlags & SXML_ENABLE_NAMESPACE) {
       if (SySetUsed(&sTagStack) > 0) {
         SyXMLRawStrNS *pEntry;
