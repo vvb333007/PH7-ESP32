@@ -3891,6 +3891,15 @@ static sxi32 GenStateCompileFuncBody(
 
   /* Fix exception jumps now the destination is resolved */
   GenStateFixJumps(pGen->pCurrent, PH7_OP_THROW, PH7_VmInstrLength(pGen->pVm));
+  
+  /* Emit explicit halt instruction at the end the function body
+   * if function is marked as :never returning
+  */
+  if (pFunc->iFlags & VM_FUNC_NEVER) {
+    //puts("OP_HALT emitted");
+    PH7_VmEmitInstr(pGen->pVm, PH7_OP_HALT, 0, 0, 0, 0);
+  }
+
   /* Emit the final return if not yet done */
   PH7_VmEmitInstr(pGen->pVm, PH7_OP_DONE, 0, 0, 0, 0);
   /* Fix gotos jumps now the destination is resolved */
@@ -5158,11 +5167,14 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
   /* Extract class name */
   pName = &pGen->pIn->sData;
   /* Advance the stream cursor */
-
+/*
   PH7_GenCompileError(pGen, E_NOTICE, nLine,
                                  "class name'%z', token is %08x",
                                  pName,pGen->pIn->nType);
-
+*/
+  /* TODO: don't let class name to be a reserved word or a constant.
+   *        right now class null {} can be defined with no warnings from the compiler
+  */
   pGen->pIn++;
   /* Obtain a raw class */
   pClass = PH7_NewRawClass(pGen->pVm, pName, nLine);
