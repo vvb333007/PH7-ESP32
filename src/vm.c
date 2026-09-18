@@ -11,8 +11,11 @@
  * or visit:
  *      http://ph7.symisc.net/
  */
-
+#include <stdint.h>
 #include "ph7int.h"
+
+/* Forward declaration */
+static const char *VmInstrToString(sxi32 nOp);
 
 /*
  * The code in this file implements execution method of the PH7 Virtual Machine.
@@ -394,6 +397,15 @@ PH7_PRIVATE sxi32 PH7_VmEmitInstr(
     /* Instruction index in the bytecode array */
     *pIndex = SySetUsed(pVm->pByteContainer);
   }
+/*
+  printf("%s %8d %8u %#08x [%u]\n",
+          VmInstrToString(sInstr.iOp),
+          sInstr.iP1,
+          sInstr.iP2,
+          SX_PTR_TO_INT(sInstr.p3),
+          pIndex ? *pIndex : 666
+         );
+  */
   /* Finally,record the instruction */
   rc = SySetPut(pVm->pByteContainer, (const void *)&sInstr);
   if (rc != SXRET_OK) {
@@ -1302,7 +1314,9 @@ PH7_PRIVATE sxi32 PH7_VmInit(
   pVm->nMagic = PH7_VM_INIT;
   SyStringInitFromBuf(&sBuiltin, PH7_BUILTIN_LIB, sizeof(PH7_BUILTIN_LIB) - 1);
   /* Compile the built-in library */
+  
   VmEvalChunk(&(*pVm), 0, &sBuiltin, PH7_PHP_ONLY, FALSE);
+  
   /* Reset the code generator */
   PH7_ResetCodeGenerator(&(*pVm), pEngine->xConf.xErr, pEngine->xConf.pErrData);
   return SXRET_OK;
@@ -2089,8 +2103,6 @@ PH7_PRIVATE sxi32 PH7_VmConfigure(
   }
   return rc;
 }
-/* Forward declaration */
-static const char *VmInstrToString(sxi32 nOp);
 /*
  * This routine is used to dump PH7 byte-code instructions to a human readable
  * format.
@@ -2330,10 +2342,15 @@ static sxi32 VmByteCodeExec(
  */
     switch (pInstr->iOp) {
       /*
- * DONE: P1 * * 
+ * DONE: P1 * P3
  *
  * Program execution completed: Clean up the mess left behind
  * and return immediately.
+ *
+ * P1 = 1 : we do have return value on the stack
+ * P3 = 0 : Return typecasting was done by the prior CVT instruction.
+ * P3 = x : Result is nullable, prior CVT was not emitted by PH7_CompileReturn()
+ *          OP_DONE must check the top of the stack and convert that object to a type P2.
  */
       case PH7_OP_DONE:
         if (pInstr->iP1) {
@@ -2348,6 +2365,35 @@ static sxi32 VmByteCodeExec(
           if (pResult) {
             /* Execution result */
             PH7_MemObjStore(pTos, pResult);
+            /* Request to perform a typecast for a nullable type? */
+            unsigned int nType = (unsigned int)((uintptr_t)pInstr->p3 & 0xffffffff); // We only need lower 32 bit, it is not an address
+            if (nType != 0) {
+              /* Only do conversion when result is not NULL */
+              if ((pResult->iFlags & MEMOBJ_NULL) == 0) {
+                /* Convert to appropriate type */
+                //printf("OP_DONE: converting to %d\r\n", nType);
+                if (nType & PH7_TKWRD_INT) {
+                  PH7_MemObjToInteger(pResult);
+                } else if (nType & PH7_TKWRD_FLOAT) {
+                  PH7_MemObjToReal(pResult);
+                } else if (nType & PH7_TKWRD_OBJECT) {
+                  PH7_MemObjToObject(pResult);
+                } else if (nType & PH7_TKWRD_STRING) {
+                  PH7_MemObjToString(pResult);
+                } else if (nType & PH7_TKWRD_BOOL) {
+                  PH7_MemObjToBool(pResult);
+                } else if (nType & PH7_TKWRD_ARRAY) {
+                  PH7_MemObjToHashmap(pResult);
+                } else {
+                    //printf("No convert on type %d\r\n", nType);
+                  /* TODO: class name, iterable, must be done via type check / instanceof. Generate an error if types are not convertible
+                   * void & mixed types never reach here
+                   */
+                }
+
+              }
+            }
+            
           }
           VmPopOperand(&pTos, 1);
         } else if (pLastRef) {
@@ -5446,9 +5492,20 @@ static sxi32 VmByteCodeExec(
                       }
                     }
                   } else if (((pArg->iFlags & aFormalArg[n].nType) == 0)) {
-                    ProcMemObjCast xCast = PH7_MemObjCastMethod(aFormalArg[n].nType);
-                    /* Cast to the desired type */
-                    xCast(pArg);
+                    
+                    int bConv = 1;
+                    if ((aFormalArg[n].iFlags & VM_FUNC_ARG_NULLABLE) != 0) {
+                      if ((pArg->iFlags & MEMOBJ_NULL) != 0) {
+                        //puts("null nullable, no type conversion");
+                        bConv = 0;
+                      }
+                    }
+                    if (bConv) {
+                      //puts("auto cast arg");
+                      ProcMemObjCast xCast = PH7_MemObjCastMethod(aFormalArg[n].nType);
+                      /* Cast to the desired type */
+                      xCast(pArg);
+                    }
                   }
                 }
                 if (aFormalArg[n].iFlags & VM_FUNC_ARG_BY_REF) {
@@ -12795,7 +12852,13 @@ static sxi32 VmXMLStartElementHandler(SyXMLRawStr *pStart, SyXMLRawStr *pNS, sxu
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTag, pAttr, (void *)0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm,
+                           pCallback,
+                           0,
+                           &pEngine->sParserValue,
+                           pTag,
+                           pAttr, (void *)0 /* Heisenbug. This value must be a pointer because it is read from the stack as a pointer */
+                          );
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pTag);
   ph7_context_release_value(pEngine->pCtx, pAttr);
@@ -12831,7 +12894,9 @@ static sxi32 VmXMLEndElementHandler(SyXMLRawStr *pEnd, SyXMLRawStr *pNS, void *p
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTag, (void *)0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTag, 
+                          (void *)0 /* Must be a pointer! NOT INT */
+                          );
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pTag);
   return SXRET_OK;
@@ -12868,7 +12933,9 @@ static sxi32 VmXMLTextHandler(SyXMLRawStr *pText, void *pUserData) {
   }
   /* Invoke the user callback */
 
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pData, (void *)0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pData,
+                            (void *)0 /* Must be a pointer! NOT INT */
+                          );
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pData);
   return SXRET_OK;
@@ -12904,7 +12971,9 @@ static sxi32 VmXMLPIHandler(SyXMLRawStr *pTargetStr, SyXMLRawStr *pDataStr, void
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTarget, pData, (void *)0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pTarget, pData,
+                           (void *)0 /* Must be a pointer! NOT INT */
+                          );
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pTarget);
   ph7_context_release_value(pEngine->pCtx, pData);
@@ -12941,7 +13010,9 @@ static sxi32 VmXMLNSStartHandler(SyXMLRawStr *pUriStr, SyXMLRawStr *pPrefixStr, 
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pUri, pPrefix, (void *)0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pUri, pPrefix,
+                            (void *)0 /* Must be a pointer! NOT INT */
+                          );
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pUri);
   ph7_context_release_value(pEngine->pCtx, pPrefix);
@@ -12975,7 +13046,9 @@ static sxi32 VmXMLNSEndHandler(SyXMLRawStr *pPrefixStr, void *pUserData) {
     return SXRET_OK;
   }
   /* Invoke the user callback */
-  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pPrefix, (void *)0);
+  PH7_VmCallUserFunctionAp(pEngine->pVm, pCallback, 0, &pEngine->sParserValue, pPrefix,
+                            (void *)0 /* Must be a pointer! NOT INT */
+                            );
   /* Clean-up the mess left behind */
   ph7_context_release_value(pEngine->pCtx, pPrefix);
   return SXRET_OK;
