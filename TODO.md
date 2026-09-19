@@ -123,39 +123,16 @@ php_ipc_sleep($handle, $mask); // sleep until woken up by another VM
 
 ---
 
-~~### 3. `mixed` type
+### 3. `mixed` type
 
-Add mixed type~~
+~~Add mixed type~~
 
 ---
 
-~~### 4. `enum`
+### 4. `enum`
 
-Add the `enum` keyword.~~
+~~Add the `enum` keyword.~~
 
-// Integer enum, comma-separated
-enum Suit3
-{
-    case Hearts;                // 0
-    case Diamonds = 99;         // 99
-    case Clubs = 1, Spades = 2;   // Allowed 1, 2
-    //case Clubs, Spades;         // Syntax error
-}
-
-function do_stuff(Suit $s)
-{
-    // ...
-}
-
-
-function do_stuff2(Suit2 $s)
-{
-    // ...
-}
-
-do_stuff(Suit::Spades); // <-- no autocast, value passed as is
-do_stuff2('66');   // <-- autocast to int, since Suit2 enum is of type int
-```
 
 ---
 
@@ -179,23 +156,27 @@ $arr = [];
 
 Implement `function_exists()`.
 
-~~###8. empty strings are === null which is wrong.~~
+###8. ~~empty strings are === null which is wrong.~~
 
 
-~~###9. Function return arguments
+###9. Function return arguments
 
-Syntax is accepted. Compiler checks for returns from void functions and checks if nothing is returned from a function that should return a value
+~~Syntax is accepted. Compiler checks for returns from void functions and checks if nothing is returned from a function that should return a value
 NO RETURN TYPECASTING is performed!~~
 
 
-###~~10. Overloading: do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.~~
+###10. Overloading:
+
+~~do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.~~
 
 
-###11. Overloading: do not fallback to the last function in the list if there are no good candidates for overloading. Do fallback only if there is only 1 candidate
+###11. Overloading:
 
-~~###12. Nullable types:
+do not fallback to the last function in the list if there are no good candidates for overloading. Do fallback only if there is only 1 candidate
 
-inject code into return statement which LOADC 0,0,0; TEQ ; JNZ over CVT instruction to skip conversion of null to the function type~~
+###12. Nullable types:
+
+~~inject code into return statement which LOADC 0,0,0; TEQ ; JNZ over CVT instruction to skip conversion of null to the function type~~
 
 ###14. ~~`callable` type: interbally a `string`~~
 
