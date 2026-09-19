@@ -5,20 +5,6 @@
 Architecture: one FreeRTOS task per VM.
 VMs are interruptible and can be executed step by step.
 VMs can be cloned (shared code, private data).
-~~Use PH7_OP_CVT_INT and so on opcodes which converts value on the stack to a specified type
-  This is required for correct function return types autocasting. Tjis will require EmitInstr before 'return'
-  which will convert resulting value to the function type.
-
-  Right now only function args are autocaasted and thus are guaranteed to have a required type.
-
-```
-    function test(int $z) :int {
-      // type of $z is int no matter what user passed
-      return '7';
-    }
-```
-
-  will return a string '7', not integer.~~ Done
 
 ---
 
@@ -137,40 +123,15 @@ php_ipc_sleep($handle, $mask); // sleep until woken up by another VM
 
 ---
 
-### 3. `mixed` type
+~~### 3. `mixed` type
 
-~~Add mixed type~~
-Done
+Add mixed type~~
+
 ---
 
-### 4. `enum`
+~~### 4. `enum`
 
-~~Add the `enum` keyword.~~
-
-Done.
-
-```php
-//Example
-
-// Mixed-type enum
-enum Suit :mixed
-{
-    case Hearts;                // 0
-    case Diamonds = 99;         // 99
-    case Clubs;                 // 1
-    case Spades;                // 2
-    case Huh = 6.7;             // 6.7 a floating point number
-    case Huh2 = 'A string';     // 'A string'
-}
-
-// Integer enum, autoincrement
-enum Suit2 :int
-{
-    case Hearts;                // 0
-    case Diamonds = 99;         // 99
-    case Clubs;                 // 1
-    case Spades;                // 2
-}
+Add the `enum` keyword.~~
 
 // Integer enum, comma-separated
 enum Suit3
@@ -218,20 +179,27 @@ $arr = [];
 
 Implement `function_exists()`.
 
-###8. empty strings are === null which is wrong.
-Done
+~~###8. empty strings are === null which is wrong.~~
 
 
-###9. Function return arguments
-Done
-~~Syntax is accepted. Compiler checks for returns from void functions and checks if nothing is returned from a function that should return a value
+~~###9. Function return arguments
+
+Syntax is accepted. Compiler checks for returns from void functions and checks if nothing is returned from a function that should return a value
 NO RETURN TYPECASTING is performed!~~
 
 
-###~~10. Overloading: do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.~~ Done
+###~~10. Overloading: do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.~~
+
+
 ###11. Overloading: do not fallback to the last function in the list if there are no good candidates for overloading. Do fallback only if there is only 1 candidate
-###12. Nullable types: inject code into return statement which LOADC 0,0,0; TEQ ; JNZ over CVT instruction to skip conversion of null to the function type
-###14. ~~`callable` type: interbally a `string`~~ Done
+
+~~###12. Nullable types:
+
+inject code into return statement which LOADC 0,0,0; TEQ ; JNZ over CVT instruction to skip conversion of null to the function type~~
+
+###14. ~~`callable` type: interbally a `string`~~
+
+
 ###13. ?? operator ( ?? as a ternary OP, and ??= null coalesce assignment) , ?-> nullsafe operator  
 
        
