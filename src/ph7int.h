@@ -1123,7 +1123,7 @@ struct ph7_vm_func_closure_env {
              */
 };
 
-/* Function configuration flags */
+/* Function & function arguments configuration flags */
 #define VM_FUNC_ARG_BY_REF   0x001   /* Argument passed by reference */
 #define VM_FUNC_ARG_HAS_DEF  0x002  /* Argument has default value associated with it */
 #define VM_FUNC_REF_RETURN   0x004   /* Return by reference */
@@ -1132,8 +1132,12 @@ struct ph7_vm_func_closure_env {
 #define VM_FUNC_ARG_IGNORE   0x020   /* Do not install argument in the current frame */
 #define VM_FUNC_RET_TYPE     0x040   /* PHP 7.0 syntax was used for the function return type (i.e. :void) */
 #define VM_FUNC_RET_NULLABLE 0x080   /* nullable type. ": ?int" */
-#define VM_FUNC_ARG_NULLABLE VM_FUNC_RET_NULLABLE   /* nullable argument type. "?int $x". this flag is used with args only */
 #define VM_FUNC_NEVER        0x100   /* Function must not have 'return' statement in its body. */
+
+/* These are used in Arg.iFlags (function argument descriptor ) 
+*/
+#define VM_FUNC_ARG_NULLABLE VM_FUNC_RET_NULLABLE   /* nullable argument type. "?int $x". this flag is used with args only */
+#define VM_FUNC_ARG_CALLABLE VM_FUNC_CLOSURE
 
 
 /* Types are keywords with IDs which are power of two integers, starting from 0x200.

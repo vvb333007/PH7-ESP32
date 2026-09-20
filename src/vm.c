@@ -656,6 +656,7 @@ static int VmOverloadCompare(SyString *pCall, SyString *pDecl) {
 #endif
 /*
  * Select the appropriate VM function for the current call context.
+ * Returns NULL if there are overloaded functions but nothing matches
  * This is the implementation of the powerful 'function overloading' feature
  * introduced by the version 2 of the PH7 engine.
  * Refer to the official documentation for more information.
@@ -669,7 +670,7 @@ static ph7_vm_func *VmOverload(
   int nArg            /* Total number of passed arguments  */
 ) {
   int iTarget, i, j, iCur, iMax;
-  ph7_vm_func *apSet[10]; /* Maximum number of candidates */
+  ph7_vm_func *apSet[10]; /* TODO: Maximum number of candidates */
   ph7_vm_func *pLink;
   SyString sArgSig;
   SyBlob sSig;
@@ -690,7 +691,8 @@ static ph7_vm_func *VmOverload(
   }
   if (i < 1) {
     /* No candidates,return the head of the list */
-    return pList;
+    //return pList; // Head of the list is an UB
+    return NULL;
   }
   if (nArg < 1 || i < 2) {
     /* Return the only candidate */
@@ -732,20 +734,22 @@ static ph7_vm_func *VmOverload(
     }
   }
   SyStringInitFromBuf(&sArgSig, SyBlobData(&sSig), SyBlobLength(&sSig));
-  iTarget = 0;
+  iTarget = -1;  /* TODO: this was not verified */
   iMax = INT_MIN;
   /* Select the appropriate function */
   for (j = 0; j < i; j++) {
     /* Compare the two signatures */
+
     iCur = VmOverloadCompare(&sArgSig, &apSet[j]->sSignature);
     if (iCur > iMax) {
+
       iMax = iCur;
       iTarget = j;
     }
   }
   SyBlobRelease(&sSig);
   /* Appropriate function for the current call context */
-  return apSet[iTarget];
+  return iTarget >= 0 ? apSet[iTarget] : NULL;
 }
 /* Forward declaration */
 static sxi32 VmLocalExec(ph7_vm *pVm, SySet *pByteCode, ph7_value *pResult);
@@ -5454,6 +5458,14 @@ static sxi32 VmByteCodeExec(
             if (pVmFunc->pNextName) {
               /* Function is candidate for overloading,select the appropriate function to call */
               pVmFunc = VmOverload(&(*pVm), pVmFunc, pArg, (int)(pTos - pArg));
+              if (pVmFunc == NULL) {
+
+                /* More than one function is defined but nothing matches. 
+                 * This is bad, better if we abort execution: this is logic error, not a runtime
+                 */
+                PH7_VmThrowError(&(*pVm),0, PH7_CTX_ERR,"Function has overloads but nothing matches. Abort." /* TODO: &pVmFunc->sName */);
+                goto Abort;
+              }
             }
             /* Extract the formal argument set */
             aFormalArg = (ph7_vm_func_arg *)SySetBasePtr(&pVmFunc->aArgs);
@@ -5519,7 +5531,18 @@ static sxi32 VmByteCodeExec(
                     goto Abort;
                   }
                 }
-                /* Make sure the given arguments are of the correct type */
+                /* Make sure the given arguments are of the correct type.
+                 * 'callable' is not a real type, so it is checked here
+                */
+#if 1
+                if ((aFormalArg[n].iFlags & VM_FUNC_ARG_CALLABLE) != 0)
+                  if (!ph7_value_is_callable(pArg)) {
+                    VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Function '%z', a callable is expected", &pVmFunc->sName);
+                    /* This is a serious bug, better to abort execution */
+                    goto Abort;
+                  }
+#endif
+    
                 if (aFormalArg[n].nType > 0) {
                   if (aFormalArg[n].nType == SXU32_HIGH) {
                     /* Argument must be a class instance [i.e: object] */
@@ -5557,12 +5580,14 @@ static sxi32 VmByteCodeExec(
                     }
                     if (bConv) {
                       //puts("auto cast arg");
+                      // Input Arguments Type Casting
                       ProcMemObjCast xCast = PH7_MemObjCastMethod(aFormalArg[n].nType);
                       /* Cast to the desired type */
                       xCast(pArg);
                     }
                   }
                 }
+                
                 if (aFormalArg[n].iFlags & VM_FUNC_ARG_BY_REF) {
                   /* Pass by reference */
                   if (pArg->nIdx == SXU32_HIGH) {

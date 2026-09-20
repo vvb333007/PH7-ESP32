@@ -3710,12 +3710,14 @@ choose_memobj:
           sArg.nType = MEMOBJ_STRING;
         } else if (nKey & PH7_TKWRD_FLOAT) {
           sArg.nType = MEMOBJ_REAL;
-        } else if (nKey & (PH7_TKWRD_MIXED | PH7_TKWRD_CALLABLE)) {
-          /* 'mixed' as a function argument: do not do any autocasting 
-             'callable' as a function argument: do not do any autocasting (can be string or array)
-              TODO: callables require new opcode for typechecking.
-          */
-
+        } else if (nKey & PH7_TKWRD_MIXED) {
+          /* 'mixed' as a function argument: do not do any autocasting  */
+        } else if (nKey & PH7_TKWRD_CALLABLE) {
+           /* 'callable' as a function argument: do not do any autocasting (can be string or array) 
+              TODO: store VM_FUNC_ARG_CALLABLE somewhere if it the case
+              TODO: Later, on function entry (autocasting stage) we can check if arg is a callable */
+          sArg.iFlags |= VM_FUNC_ARG_CALLABLE;
+          //puts("callable type, arg is marked as a callable type");
         } else {
           /* unknown typename, treat as mixed + warning*/
           PH7_GenCompileError(&(*pGen), E_WARNING, pGen->pIn->nLine,
@@ -6678,7 +6680,7 @@ static int GenStateisLangConstruct(sxu32 nKeyword) {
         || nKeyword == PH7_TKWRD_PRIVATE || nKeyword == PH7_TKWRD_IMPLEMENTS
       */
     ) {
-      //puts("1111");
+
       rc = TRUE;
     }
   }
