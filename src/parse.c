@@ -190,7 +190,7 @@ static const ph7_expr_op aOpTable[] = {
   { { "(int)", sizeof("(int)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_INT },
   { { "(bool)", sizeof("(bool)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_BOOL },
   { { "(string)", sizeof("(string)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_STR },
-  { { "(callable)", sizeof("(callable)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_STR }, // callables are strings e.g. "lambda_0" or "closure_5"
+  { { "(callable)", sizeof("(callable)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_STR }, // TODO: this is wrong. Must check if arg is array or string and fail otherwise.
   { { "(float)", sizeof("(float)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_REAL },
   { { "(array)", sizeof("(array)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_ARRAY },
   { { "(object)", sizeof("(object)") - 1 }, EXPR_OP_TYPECAST, 4, EXPR_OP_ASSOC_RIGHT, PH7_OP_CVT_OBJ },

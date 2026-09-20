@@ -593,6 +593,7 @@ static void VmLeaveFrame(ph7_vm *pVm) {
     SyMemBackendPoolFree(&pVm->sAllocator, pFrame);
   }
 }
+#if 0
 /*
  * Compare two functions signature and return the comparison result.
  */
@@ -615,12 +616,52 @@ static int VmOverloadCompare(SyString *pFirst, SyString *pSecond) {
   }
   return (int)(zFin - zPtr);
 }
+#else
+/* Rewritten. There were UB's related to mixing typed and nontyped arguments
+ * Now it is a score system
+<?php
+
+function test(callable $a, int $a, $b, int $c) {  echo '1'; }
+function test(mixed $a, int $a, $b, string $c) {  echo '2'; }
+
+test(1,1,1,1);
+test(1,1,1,'1');
+?>
+
+ */
+static int VmOverloadCompare(SyString *pCall, SyString *pDecl) {
+
+  const char *a = pCall->zString, *aEnd = a + pCall->nByte;
+  const char *b = pDecl->zString, *bEnd = b + pDecl->nByte;
+  int score = 0;
+
+  while (a < aEnd && b < bEnd) {
+    const char *ta = a, *tb = b;
+    /* Class resolution is not done yet. Must change compiler side as well 'oClassName;' */
+    //if (*a == 'o') { while (a < aEnd && *a != ';') a++; if (a < aEnd) a++; } else a++;
+    a++;
+    //if (*b == 'o') { while (b < bEnd && *b != ';') b++; if (b < bEnd) b++; } else b++;
+    b++;
+
+    if (*tb == 'm') {
+      score += 1; /* mixed type/no-type (callable is a mixed type too)*/
+    } else if ((a - ta) == (b - tb) && SyMemcmp(ta, tb, (sxu32)(a - ta)) == 0) {
+      score += 3; /* exact match */
+    } else {
+      score -= 10; /* miss */
+    }
+  }
+  return score;
+}
+#endif
 /*
  * Select the appropriate VM function for the current call context.
  * This is the implementation of the powerful 'function overloading' feature
  * introduced by the version 2 of the PH7 engine.
  * Refer to the official documentation for more information.
  */
+#include <limits.h>
+
 static ph7_vm_func *VmOverload(
   ph7_vm *pVm,        /* Target VM */
   ph7_vm_func *pList, /* Linked list of candidates for overloading */
@@ -658,7 +699,9 @@ static ph7_vm_func *VmOverload(
   /* Calculate function signature */
   SyBlobInit(&sSig, &pVm->sAllocator);
   for (j = 0; j < nArg; j++) {
+
     int c = 'n'; /* null */
+
     if (aArg[j].iFlags & MEMOBJ_HASHMAP) {
       /* Hashmap */
       c = 'h';
@@ -678,16 +721,19 @@ static ph7_vm_func *VmOverload(
       /* Class instance */
       ph7_class *pClass = ((ph7_class_instance *)aArg[j].x.pOther)->pClass;
       SyString *pName = &pClass->sName;
+      // TODO: append 'o'
       SyBlobAppend(&sSig, (const void *)pName->zString, pName->nByte);
+      // TODO: append class_name+';'
       c = -1;
     }
     if (c > 0) {
+      //printf("%c+",c);
       SyBlobAppend(&sSig, (const void *)&c, sizeof(char));
     }
   }
   SyStringInitFromBuf(&sArgSig, SyBlobData(&sSig), SyBlobLength(&sSig));
   iTarget = 0;
-  iMax = -1;
+  iMax = INT_MIN;
   /* Select the appropriate function */
   for (j = 0; j < i; j++) {
     /* Compare the two signatures */
@@ -2371,7 +2417,7 @@ static sxi32 VmByteCodeExec(
               /* Only do conversion when result is not NULL */
               if ((pResult->iFlags & MEMOBJ_NULL) == 0) {
                 /* Convert to appropriate type */
-                //printf("OP_DONE: converting to %d\r\n", nType);
+
                 if (nType & PH7_TKWRD_INT) {
                   PH7_MemObjToInteger(pResult);
                 } else if (nType & PH7_TKWRD_FLOAT) {
@@ -2402,7 +2448,7 @@ static sxi32 VmByteCodeExec(
         }
         goto Done;
       /*
- * HALT: P1 * *
+ * HALT: P1 P2 *
  *
  * Program execution aborted: Clean up the mess left behind
  * and abort immediately.
@@ -2436,6 +2482,15 @@ static sxi32 VmByteCodeExec(
           /* Nothing referenced */
           *pLastRef = SXU32_HIGH;
         }
+
+        /* Overwrite exit status in special case OP_HALP * P2 * 
+         * This instruction is emitted when continuing is unacceptable (e.g. return from a :never function)
+         */
+        if (pInstr->iP2 != 0) {
+          pVm->iExitStatus = pInstr->iP2;
+          PH7_VmThrowError(&(*pVm), 0, PH7_CTX_WARNING,"Return from a :never returning function is detected");
+        }
+
         goto Abort;
       /*
  * JMP: * P2 *

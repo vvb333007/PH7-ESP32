@@ -25,9 +25,10 @@
 
 
 /* Common string literals */
-
+#ifndef AMALGAM
 static char s_Space[] = { ' ', 0 };
 static char s_NaN[] = { 'N','a','N', 0 };
+#endif
 
 /* This file implement built-in 'foreign' functions for the PH7 engine */
 /*

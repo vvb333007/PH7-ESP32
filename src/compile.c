@@ -3862,17 +3862,26 @@ choose_memobj:
             /* String */
             c = 's';
             break;
-        /* Mixed type is NOT a candidate for overloading */
+        /* Strange type, May be a class or enum */
+        /* TODO: check how overload works when args are classes */
           default:
             break;
         }
+        //printf("%c-",c);
         SyBlobAppend(&sSig, (const void *)&c, sizeof(char));
       }
     } else {
+        //printf("m-");
       /* No type is associated with this parameter which mean
        * that this function is not condidate for overloading. 
        */
-      SyBlobRelease(&sSig);
+
+      /* BUG: function test(int $a, $b, int $c) --> signature will be lost on parsing $b
+      SyBlobRelease(&sSig); 
+      */
+
+      /* mixed or no-type goes here */
+      SyBlobAppend(&sSig, "m", 1);
     }
     /* Save in the argument set */
     SySetPut(&pFunc->aArgs, (const void *)&sArg);
@@ -3931,10 +3940,11 @@ static sxi32 GenStateCompileFuncBody(
   
   /* Emit explicit halt instruction at the end the function body
    * if function is marked as :never returning
+   * TODO: Emit throw(new Exception()) here instead of emitting OP_HALT here 
   */
   if (pFunc->iFlags & VM_FUNC_NEVER) {
-    //puts("OP_HALT emitted");
-    PH7_VmEmitInstr(pGen->pVm, PH7_OP_HALT, 0, 0, 0, 0);
+    
+    PH7_VmEmitInstr(pGen->pVm, PH7_OP_HALT, 0, 1, 0, 0);
   }
 
   /* Emit the final return if not yet done */

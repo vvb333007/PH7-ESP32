@@ -23,8 +23,12 @@
 #endif
 
 /* Internal interface definitions for PH7. */
+#ifdef AMALGAM
+#define PH7_PRIVATE static
+#else
 #define PH7_PRIVATE
 #include "ph7.h"
+#endif
 
 #ifndef PH7_PI
 /* Value of PI */
