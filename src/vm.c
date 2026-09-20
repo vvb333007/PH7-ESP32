@@ -16,6 +16,7 @@
 
 /* Forward declaration */
 static const char *VmInstrToString(sxi32 nOp);
+PH7_PRIVATE int PH7_VmIsCallable(ph7_vm *pVm, ph7_value *pValue, int CallInvoke);
 
 /*
  * The code in this file implements execution method of the PH7 Virtual Machine.
@@ -677,6 +678,7 @@ static ph7_vm_func *VmOverload(
 
   pLink = pList;
   i = 0;
+
   /* Put functions expecting the same number of passed arguments */
   while (i < (int)SX_ARRAYSIZE(apSet)) {
     if (pLink == 0) {
@@ -692,10 +694,12 @@ static ph7_vm_func *VmOverload(
   if (i < 1) {
     /* No candidates,return the head of the list */
     //return pList; // Head of the list is an UB
+
     return NULL;
   }
   if (nArg < 1 || i < 2) {
     /* Return the only candidate */
+
     return apSet[0];
   }
   /* Calculate function signature */
@@ -733,23 +737,25 @@ static ph7_vm_func *VmOverload(
       SyBlobAppend(&sSig, (const void *)&c, sizeof(char));
     }
   }
+
   SyStringInitFromBuf(&sArgSig, SyBlobData(&sSig), SyBlobLength(&sSig));
   iTarget = -1;  /* TODO: this was not verified */
-  iMax = INT_MIN;
+  iMax = -1; //INT_MIN;
   /* Select the appropriate function */
   for (j = 0; j < i; j++) {
     /* Compare the two signatures */
 
     iCur = VmOverloadCompare(&sArgSig, &apSet[j]->sSignature);
     if (iCur > iMax) {
-
+      //printf("candidate iMax=%d, iCur=%d\n",iMax,iCur);
       iMax = iCur;
       iTarget = j;
     }
   }
   SyBlobRelease(&sSig);
   /* Appropriate function for the current call context */
-  return iTarget >= 0 ? apSet[iTarget] : NULL;
+  /* TODO: iMax >= 0 !? */
+  return (iMax >= 0 && iTarget >= 0) ? apSet[iTarget] : NULL;
 }
 /* Forward declaration */
 static sxi32 VmLocalExec(ph7_vm *pVm, SySet *pByteCode, ph7_value *pResult);
@@ -5457,13 +5463,14 @@ static sxi32 VmByteCodeExec(
             }
             if (pVmFunc->pNextName) {
               /* Function is candidate for overloading,select the appropriate function to call */
+              ph7_vm_func *pTmp = pVmFunc;
               pVmFunc = VmOverload(&(*pVm), pVmFunc, pArg, (int)(pTos - pArg));
               if (pVmFunc == NULL) {
 
                 /* More than one function is defined but nothing matches. 
                  * This is bad, better if we abort execution: this is logic error, not a runtime
                  */
-                PH7_VmThrowError(&(*pVm),0, PH7_CTX_ERR,"Function has overloads but nothing matches. Abort." /* TODO: &pVmFunc->sName */);
+                VmErrorFormat(&(*pVm), PH7_CTX_ERR,"Function '%z()' has number of overloads but nothing matches. Abort." ,&pTmp->sName);
                 goto Abort;
               }
             }
@@ -5536,8 +5543,9 @@ static sxi32 VmByteCodeExec(
                 */
 #if 1
                 if ((aFormalArg[n].iFlags & VM_FUNC_ARG_CALLABLE) != 0)
-                  if (!ph7_value_is_callable(pArg)) {
-                    VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Function '%z', a callable is expected", &pVmFunc->sName);
+                  
+                  if (PH7_VmIsCallable(pVm, pArg, FALSE) == 0) {
+                    VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Function '%z': a 'callable' type expects a string or am array", &pVmFunc->sName);
                     /* This is a serious bug, better to abort execution */
                     goto Abort;
                   }
