@@ -1,5 +1,5 @@
-/* Amalgamated source
- *
+/* Amalgamated source. Enables 'static' attribute on most of functions
+ * Allows for an aggressive compiler optimization, allows better inlining
  */
 #define AMALGAM 1
 
@@ -20,3 +20,4 @@
 #include "../../src/builtin.c"
 #include "../../src/esp32/builtins.c"
 #include "../../src/api.c"
+#include "../../src/regexp.c"
