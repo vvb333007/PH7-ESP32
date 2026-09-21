@@ -3839,35 +3839,34 @@ choose_memobj:
     /* Append argument signature */
     if (sArg.nType > 0) {
       if (SyStringLength(&sArg.sClass) > 0) {
-        /* Class name */
+        /* Class name
+           TODO: This is wrong, since class name 
+            can be 'f', 'h', 'i' and so on interfering with sentinels below
+           Class must be encoded as 'oClassname;' sentinel only
+         */
+        
         SyBlobAppend(&sSig, SyStringData(&sArg.sClass), SyStringLength(&sArg.sClass));
       } else {
         int c;
         c = 'n'; /* cc warning */
         /* Type leading character */
+        /* TODO: overloading with callable type does not work as intended in all cases
+         * It generates 'm' as its type signature which is 'mixed' or 'no type' so callable
+         * interferes with mixed and no-type args and thus overloading sometimes might be not possible
+         * If we add 'c' signature here then we'll get problems in VmOverload because there we only
+         * can have null, array or string - VmOverload has to do assumptions that this particular 's' 
+         * or 'a' can actually be 'c'. 
+         */
         switch (sArg.nType) {
-          case MEMOBJ_HASHMAP:
-            /* Hashmap aka 'array' */
-            c = 'h';
-            break;
-          case MEMOBJ_INT:
-            /* Integer */
-            c = 'i';
-            break;
-          case MEMOBJ_BOOL:
-            /* Bool */
-            c = 'b';
-            break;
-          case MEMOBJ_REAL:
-            /* Float */
-            c = 'f';
-            break;
-          case MEMOBJ_STRING:
-            /* String */
-            c = 's';
-            break;
-        /* Strange type, May be a class or enum */
-        /* TODO: check how overload works when args are classes */
+          
+          case MEMOBJ_HASHMAP:  c = 'h'; break; /* Hashmap aka 'array' */
+          case MEMOBJ_INT:      c = 'i'; break; /* Integer */
+          case MEMOBJ_BOOL:     c = 'b'; break; /* Bool */
+          case MEMOBJ_REAL:     c = 'f'; break; /* Float */
+          case MEMOBJ_STRING:   c = 's'; break; /* String */
+          //case MEMOBJ_OBJECT: c = 'o'; break; TODO: add a class name plus ';' so VmOverload() can resolve different classes
+        /* Strange type, May be a class or enum
+         */
           default:
             break;
         }

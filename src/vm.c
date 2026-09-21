@@ -2648,7 +2648,7 @@ static sxi32 VmByteCodeExec(
           goto Abort;
 
         }
-        puts("CVT_CALLABLE ok");
+        //puts("CVT_CALLABLE ok");
         break;
 
       /*
