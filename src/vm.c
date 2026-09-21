@@ -2631,6 +2631,26 @@ static sxi32 VmByteCodeExec(
           PH7_MemObjToString(pTos);
         }
         break;
+
+/* CVT_CALLABLE: * * *
+ *
+ * Check if top of the stack is a callable or die()
+ */
+      case PH7_OP_CVT_CALLABLE:
+#ifdef UNTRUST
+        if (pTos < pStack) {
+          goto Abort;
+        }
+#endif
+        if ((pTos->iFlags & (MEMOBJ_STRING|MEMOBJ_HASHMAP)) == 0) {
+          PH7_VmThrowError(&(*pVm), 0, PH7_CTX_WARNING,
+                           "Can not convert value to a callable. Aborted.");
+          goto Abort;
+
+        }
+        puts("CVT_CALLABLE ok");
+        break;
+
       /*
  * CVT_BOOL: * * *
  *
@@ -5542,13 +5562,19 @@ static sxi32 VmByteCodeExec(
                  * 'callable' is not a real type, so it is checked here
                 */
 #if 1
-                if ((aFormalArg[n].iFlags & VM_FUNC_ARG_CALLABLE) != 0)
-                  
-                  if (PH7_VmIsCallable(pVm, pArg, FALSE) == 0) {
-                    VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Function '%z': a 'callable' type expects a string or am array", &pVmFunc->sName);
-                    /* This is a serious bug, better to abort execution */
-                    goto Abort;
+                if ((aFormalArg[n].iFlags & VM_FUNC_ARG_CALLABLE) != 0) {
+
+                  if ( ((aFormalArg[n].iFlags & VM_FUNC_ARG_NULLABLE) != 0) &&
+                       ((pArg->iFlags & MEMOBJ_NULL) != 0))  {
+                        // null in nullable arg is ok
+                  } else {
+                    if (PH7_VmIsCallable(pVm, pArg, FALSE) == 0) {
+                      VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Function '%z': a 'callable' type expects a string or am array", &pVmFunc->sName);
+                      /* This is a serious bug, better to abort execution */
+                      goto Abort;
+                    }
                   }
+                }
 #endif
     
                 if (aFormalArg[n].nType > 0) {
@@ -6052,6 +6078,7 @@ static const char *VmInstrToString(sxi32 nOp) {
     case PH7_OP_CVT_INT: zOp = "CVT_INT    "; break;
     case PH7_OP_CVT_STR: zOp = "CVT_STR    "; break;
     case PH7_OP_CVT_REAL: zOp = "CVT_REAL   "; break;
+    case PH7_OP_CVT_CALLABLE: zOp = "CVT_CALLABLE    "; break;
     case PH7_OP_CALL: zOp = "CALL       "; break;
     case PH7_OP_UMINUS: zOp = "UMINUS     "; break;
     case PH7_OP_UPLUS: zOp = "UPLUS      "; break;

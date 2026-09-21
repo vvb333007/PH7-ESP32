@@ -1,13 +1,32 @@
-#include "regexp.h"
+/* 
+ * This is the SLRE of 2025 (a fork from Aquefir) which was patched where possible against
+ * known bugs and then wrapped in a PCRE-like API.
+ * 
+ * This is NOT a PHP PCRE. This is very similar regexp engine
+ * which has some limitation, comparing to PCRE:
+ * In particular, "/regexp/i" is not a valid sytax: '/' and flags are not supported (flags are supported through API, not through regexp itself)
+ * Separators and flags are not required.
+ *
+ * Does it support SLRE or PCRE syntax? It support both: PCRE syntax is used in pl_ functions, SLRE syntax is used in slre_match()
+ * PL wrapper works by converting a given regexp into something that SLRE (a patched version!) can understand
+ *
+ * No lookarounds, no UTF8 (only byte matching, no ranges e.g. [à-ÿ])
+ *
+ * Copyright (C) 2004-2013 Sergey Lyubka.
+ * Copyright (C) 2013 Cesanta Software Limited.
+ * Copyright (C) 2025 Aquefir Consulting LLC.
+ * Copyright (C) 2026 Viacheslav Logunov (bug fixes)
+ * Released under GNU General Public License v2
 
+ *
+ * CODING STYLE IS KEPT SAME AS THE CODING STYLE OF THE SLRE LIBRARY!
+ */
+#include "regexp.h"
 
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-
-
 
 #define PL_MAX_DEPTH 32
 #define PL_MAX_SLRE_CAPS 64 /* total '(' in the translated pattern, incl. wrapper */
@@ -27,31 +46,44 @@ struct pl_regex {
 /* Rubbery string buffer (can grow)
 */
 typedef struct {
-  char *p;
-  size_t len, cap;
-  int oom;
+  char  *p;
+  size_t len;
+  size_t cap;
+  int    oom;
 } sbuf;
 
 /* Put data into sbuf, reallocing for bigger size if needed.
  *
  */
 static void sb_put(sbuf *b, const char *s, size_t n) {
-  if (b->oom) return;
-  if (b->len + n + 1 > b->cap) {
-    size_t nc = b->cap ? b->cap : 64;
-    char *np;
-    while (nc < b->len + n + 1) nc *= 2;
-    np = (char *) realloc(b->p, nc);
-    if (np == NULL) {
-      b->oom = 1;
-      return;
+
+  if (!b->oom) {
+
+    if (b->len + n + 1 > b->cap) {
+
+      size_t nc = b->cap ? b->cap : 64;
+      char *np;
+
+      while (nc < b->len + n + 1)
+        nc *= 2;
+
+      np = (char *)realloc(b->p, nc);
+
+      if (np == NULL) {
+        b->oom = 1;
+        return;
+      }
+
+      b->p = np;
+      b->cap = nc;
     }
-    b->p = np;
-    b->cap = nc;
+
+    if (n > 0)
+      memcpy(b->p + b->len, s, n);
+
+    b->len += n;
+    b->p[b->len] = '\0';
   }
-  if (n > 0) memcpy(b->p + b->len, s, n);
-  b->len += n;
-  b->p[b->len] = '\0';
 }
 
 static inline void sb_putc(sbuf *b, char c) {
@@ -90,61 +122,95 @@ static void put_hex(sbuf *b, unsigned char c) {
   sb_puts(b, tmp);
 }
 
-/* t->p points at the backslash. */
+/* t->p points at the backslash.
+*/
 static int tr_escape(tr_t *t, int in_class) {
+
   unsigned char c = (unsigned char) t->p[1];
   char tmp[3];
 
-  if (c == '\0') return PL_E_SYNTAX; /* trailing backslash */
+  if (c == '\0')
+    return PL_E_SYNTAX; /* trailing backslash */
+
   t->p += 2;
 
   switch (c) {
+
     case 'S':
 #ifndef PL_SLRE_PATCHED
       /* stock SLRE: in a positive set \S would also match the terminating NUL past the end */
-      if (in_class && !t->class_neg) return PL_E_UNSUPPORTED;
+      if (in_class && !t->class_neg)
+        return PL_E_UNSUPPORTED;
 #endif
       sb_puts(&t->out, "\\S");
       return PL_OK;
-    case 'd': case 's':
-    case 'n': case 'r': case 't': case 'f': case 'v':
-      tmp[0] = '\\'; tmp[1] = (char) c; tmp[2] = '\0';
+
+    case 'd':
+    case 's':
+    case 'n':
+    case 'r':
+    case 't':
+    case 'f':
+    case 'v':
+      tmp[0] = '\\';
+      tmp[1] = (char) c;
+      tmp[2] = '\0';
       sb_puts(&t->out, tmp);
       return PL_OK;
+
     case 'b':
       /* PCRE: word boundary. SLRE: backspace. Only the class meaning is compatible. */
-      if (!in_class) return PL_E_UNSUPPORTED;
+      if (!in_class)
+        return PL_E_UNSUPPORTED;
+
       sb_puts(&t->out, "\\b");
       return PL_OK;
+
     case 'w':
       sb_puts(&t->out, in_class ? "a-zA-Z0-9_" : "[a-zA-Z0-9_]");
       return PL_OK;
+
     case 'W':
-      if (in_class) return PL_E_UNSUPPORTED;
+      if (in_class)
+        return PL_E_UNSUPPORTED;
+
       sb_puts(&t->out, "[^a-zA-Z0-9_]");
       return PL_OK;
+
     case 'D':
-      if (in_class) return PL_E_UNSUPPORTED;
+      if (in_class)
+        return PL_E_UNSUPPORTED;
+
       sb_puts(&t->out, "[^0-9]");
       return PL_OK;
+
     case 'z':
-      if (in_class) return PL_E_UNSUPPORTED;
+      if (in_class)
+        return PL_E_UNSUPPORTED;
+
       sb_putc(&t->out, '$');
       t->atom_pos = -1;
       return PL_OK;
+
     case 'x':
-      if (!isxdigit((unsigned char) t->p[0]) || !isxdigit((unsigned char) t->p[1]))
+      if (!isxdigit((unsigned char) t->p[0]) ||
+          !isxdigit((unsigned char) t->p[1]))
         return PL_E_UNSUPPORTED; /* \x{...} etc. */
 #ifndef PL_SLRE_PATCHED
-      if (in_class && t->p[0] == '0' && t->p[1] == '0') return PL_E_UNSUPPORTED; /* see comment above */
+      if (in_class && t->p[0] == '0' &&
+          t->p[1] == '0')
+        return PL_E_UNSUPPORTED; /* see comment above */
 #endif
       sb_puts(&t->out, "\\x");
       sb_put(&t->out, t->p, 2);
       t->p += 2;
       return PL_OK;
+
     default:
       /* \B \1 \p{..} \h \Z etc */
-      if (isalnum(c)) return PL_E_UNSUPPORTED;
+      if (isalnum(c))
+        return PL_E_UNSUPPORTED;
+
       /* Escaped punctuation: emit as \xHH, which SLRE always accepts. */
       put_hex(&t->out, c);
       return PL_OK;
@@ -161,7 +227,9 @@ static inline int is_set_special(unsigned char c) {
 }
 
 static int tr_class(tr_t *t) {
+
   int rc;
+
   begin_atom(t);
   sb_putc(&t->out, '[');
   t->p++;
@@ -172,71 +240,115 @@ static int tr_class(tr_t *t) {
     t->class_neg = 1;
 #ifndef PL_SLRE_PATCHED
     /*
-     * Stock SLRE does not bounds-check sets: at the end of the subject a negated set matches
-     * the terminating NUL as if it were a character. Excluding NUL up front (first element,
-     * so it cannot interfere with ranges) makes that harmless. Costs: NUL bytes inside the
-     * subject are not matched by negated sets or '.'.
+     * Stock SLRE does not bound check sets - at the end of the subject a negated set matches
+     * the terminating NUL as if it was a char
      */
     sb_puts(&t->out, "\\x00");
 #endif
   }
+
   if (*t->p == ']') { /* leading ']' is literal in PCRE */
     put_hex(&t->out, ']');
     t->p++;
   }
+
   while (*t->p != '\0' && *t->p != ']') {
+
     unsigned char c = (unsigned char) *t->p;
+
     if (c == '\\') {
+
       char e = t->p[1];
       int shorthand = (e == 'w' || e == 'd' || e == 's' || e == 'S');
+
       rc = tr_escape(t, 1);
-      if (rc != PL_OK) return rc;
-      if (*t->p == '-' && t->p[1] != ']' && t->p[1] != '\0') {
+
+      if (rc != PL_OK)
+        return rc;
+
+      if ( *t->p == '-' &&
+            t->p[1] != ']' &&
+            t->p[1] != '\0') {
         /* SLRE ranges need plain-character endpoints, so "[\x41-Z]" would silently become
          * three literals. For "[\w-.]" PCRE treats '-' as literal: make that explicit. */
-        if (!shorthand) return PL_E_UNSUPPORTED;
+        if (!shorthand)
+          return PL_E_UNSUPPORTED;
+
         put_hex(&t->out, '-');
         t->p++;
       }
-    } else if (c == '[' && t->p[1] == ':') {
+    } else if ( c == '[' &&
+                t->p[1] == ':') {
       return PL_E_UNSUPPORTED; /* POSIX classes [:alpha:] */
-    } else if (c != '-' && t->p[1] == '-' && t->p[2] != ']' && t->p[2] != '\0') {
+
+    } else if ( c != '-' &&
+                t->p[1] == '-' &&
+                t->p[2] != ']' &&
+                t->p[2] != '\0') {
+
       unsigned char hi = (unsigned char) t->p[2]; /* range c-hi */
-      if (hi == '\\' || is_set_special(c) || is_set_special(hi)) return PL_E_UNSUPPORTED;
+
+      if (hi == '\\' ||
+          is_set_special(c) ||
+          is_set_special(hi))
+        return PL_E_UNSUPPORTED;
+
       sb_putc(&t->out, (char) c);
       sb_putc(&t->out, '-');
       sb_putc(&t->out, (char) hi);
+
       t->p += 3;
+
     } else if (is_set_special(c)) {
+
       put_hex(&t->out, c);
       t->p++;
+
     } else {
+
       sb_putc(&t->out, (char) c);
       t->p++;
+
     }
   }
-  if (*t->p != ']') return PL_E_SYNTAX;
+
+  if (*t->p != ']') {
+    puts("regex: expecting ']'");
+    return PL_E_SYNTAX;
+  }
+
   sb_putc(&t->out, ']');
   t->p++;
+
   return PL_OK;
 }
 
 static int tr_open(tr_t *t) {
+
   int hidden = 0;
+
   if (t->p[1] == '?') {
-    if (t->p[2] != ':') return PL_E_UNSUPPORTED; /* lookaround, named groups, inline flags */
+    if (t->p[2] != ':')
+      return PL_E_UNSUPPORTED; /* lookaround, named groups, inline flags */
     hidden = 1;
     t->p += 2;
   }
-  if (t->depth >= PL_MAX_DEPTH || t->ncaps >= PL_MAX_SLRE_CAPS) return PL_E_LIMITS;
-  if (!hidden && t->nuser >= PL_MAX_GROUPS) return PL_E_LIMITS;
+
+  if (t->depth >= PL_MAX_DEPTH ||
+      t->ncaps >= PL_MAX_SLRE_CAPS)
+    return PL_E_LIMITS;
+
+  if (!hidden && t->nuser >= PL_MAX_GROUPS)
+    return PL_E_LIMITS;
 
   t->stk[t->depth].pos = (int) t->out.len;
   t->stk[t->depth].caps = t->ncaps;
   t->stk[t->depth].user = t->nuser;
   t->depth++;
 
-  if (!hidden) t->map[++t->nuser] = (unsigned char) t->ncaps;
+  if (!hidden)
+    t->map[++t->nuser] = (unsigned char) t->ncaps;
+
   t->ncaps++;
   sb_putc(&t->out, '(');
   t->p++;
@@ -245,25 +357,41 @@ static int tr_open(tr_t *t) {
 }
 
 static int tr_close(tr_t *t) {
-  if (t->depth == 0) return PL_E_SYNTAX;
-  if (t->out.len > 0 && t->out.p[t->out.len - 1] == '(') return PL_E_UNSUPPORTED; /* "()": SLRE never matches it */
+
+  if (t->depth == 0)
+    return PL_E_SYNTAX;
+
+  if (t->out.len > 0 &&
+      t->out.p[t->out.len - 1] == '(')
+    return PL_E_UNSUPPORTED; /* "()": SLRE never matches it */
+
   t->depth--;
   sb_putc(&t->out, ')');
+
   t->atom_pos = t->stk[t->depth].pos;
   t->atom_caps = t->stk[t->depth].caps;
   t->atom_user = t->stk[t->depth].user;
+
   t->p++;
+
   return PL_OK;
 }
 
 static int tr_quant(tr_t *t) {
+
   char q = *t->p++;
-  if (t->atom_pos < 0) return PL_E_SYNTAX; /* nothing to repeat */
+
+  if (t->atom_pos < 0)
+    return PL_E_SYNTAX; /* nothing to repeat */
+
   sb_putc(&t->out, q);
+
   if (*t->p == '?') { /* lazy: *? +? are supported, ?? is not */
-    if (q == '?') return PL_E_UNSUPPORTED;
+    if (q == '?')
+      return PL_E_UNSUPPORTED;
     sb_putc(&t->out, '?');
     t->p++;
+
   } else if (*t->p == '+') {
     return PL_E_UNSUPPORTED; /* possessive */
   }
@@ -271,8 +399,9 @@ static int tr_quant(tr_t *t) {
   return PL_OK;
 }
 
-/* {n}  {n,}  {n,m}  -> expanded by repeating the previous atom. */
+/* {n}  {n,} and  {n,m} are expanded by repeating the previous atom */
 static int tr_brace(tr_t *t) {
+
   const char *q = t->p + 1;
   int n = 0, m, digits = 0, inner, inst, i;
   size_t alen;
@@ -283,40 +412,58 @@ static int tr_brace(tr_t *t) {
     digits++;
     if (n > PL_MAX_REPEAT) return PL_E_LIMITS;
   }
+
   m = n;
+
   if (digits && *q == ',') {
     q++;
     if (isdigit((unsigned char) *q)) {
       m = 0;
       while (isdigit((unsigned char) *q)) {
         m = m * 10 + (*q++ - '0');
-        if (m > PL_MAX_REPEAT) return PL_E_LIMITS;
+        if (m > PL_MAX_REPEAT)
+          return PL_E_LIMITS;
       }
     } else {
       m = -1; /* unbounded */
     }
   }
-  if (!digits || *q != '}') { /* not a quantifier: literal '{' (as in PCRE) */
+  if (!digits || *q != '}') { /* not a quantifier! literal '{' (as in PCRE) */
     begin_atom(t);
     put_hex(&t->out, '{');
     t->p++;
     return PL_OK;
   }
+
   q++;
-  if (*q == '?' || *q == '+') return PL_E_UNSUPPORTED; /* lazy / possessive range */
-  if (t->atom_pos < 0) return PL_E_SYNTAX;
-  if (m != -1 && m < n) return PL_E_SYNTAX;
-  /* Repeating a capturing group would create several SLRE groups for one PCRE group. */
-  if (t->nuser != t->atom_user) return PL_E_UNSUPPORTED;
+
+  if (*q == '?' || *q == '+')
+    return PL_E_UNSUPPORTED; /* lazy / possessive range */
+
+  if (t->atom_pos < 0)
+    return PL_E_SYNTAX;
+
+  if (m != -1 && m < n)
+    return PL_E_SYNTAX;
+
+  /* Repeating a capgroup wwill create a number of SLRE groups for just one PCRE group */
+  if (t->nuser != t->atom_user)
+    return PL_E_UNSUPPORTED;
 
   inner = t->ncaps - t->atom_caps; /* hidden groups inside the atom */
   inst = (m == -1) ? (n == 0 ? 1 : n) : m; /* how many copies will be emitted */
   alen = t->out.len - (size_t) t->atom_pos;
-  if (alen * (size_t) (inst > 0 ? inst : 1) > PL_MAX_PATTERN) return PL_E_LIMITS;
+
+  if (alen * (size_t) (inst > 0 ? inst : 1) > PL_MAX_PATTERN)
+    return PL_E_LIMITS;
 
   atom = (char *) malloc(alen ? alen : 1);
-  if (atom == NULL) return PL_E_NOMEM;
+
+  if (atom == NULL)
+    return PL_E_NOMEM;
+
   memcpy(atom, t->out.p + t->atom_pos, alen);
+
   t->out.len = (size_t) t->atom_pos;
   t->out.p[t->out.len] = '\0';
 
@@ -351,7 +498,9 @@ static int tr_step(tr_t *t) {
     case '[': return tr_class(t);
     case '(': return tr_open(t);
     case ')': return tr_close(t);
-    case '*': case '+': case '?': return tr_quant(t);
+    case '*': 
+    case '+': 
+    case '?': return tr_quant(t);
     case '{': return tr_brace(t);
     case '^': return PL_E_UNSUPPORTED; /* only supported at the very start of the pattern */
     case '|':
@@ -434,7 +583,8 @@ static int check_slre_pattern(const char *p) {
     } else if (c == ')') {
       if (sp == 0) return PL_E_SYNTAX;
 #ifndef PL_SLRE_FIXED_GROUPS
-      if (st[sp].total > 0 && st[sp].index != sp) return PL_E_GROUPS;
+      if (st[sp].total > 0 && st[sp].index != sp)
+        return PL_E_GROUPS;
 #endif
       sp--;
       if (p[i + 1] == '*' || p[i + 1] == '+' || p[i + 1] == '?') st[sp].direct--;
@@ -442,7 +592,8 @@ static int check_slre_pattern(const char *p) {
     } else if (c == '|') {
       if (++nbranch > 100) return PL_E_LIMITS;
 #ifndef PL_SLRE_FIXED_GROUPS
-      if (st[sp].total > 0 && st[sp].index != sp) return PL_E_GROUPS;
+      if (st[sp].total > 0 && st[sp].index != sp)
+        return PL_E_GROUPS;
 #endif
       st[sp].direct = 0;
       i++;
@@ -515,12 +666,13 @@ void pl_free(pl_regex *re) {
   }
 }
 
-const char *pl_slre_pattern(const pl_regex *re) { return re->pat; }
+const char *pl_slre_pattern(const pl_regex *re) {
+  return re->pat;
+}
 
-/* ------------------------------------------------------------------ */
-/* Matching                                                            */
-/* ------------------------------------------------------------------ */
 
+/* Matching
+*/
 int pl_exec(const pl_regex *re, const char *s, int len, int start, pl_match *m) {
   struct slre_cap caps[PL_MAX_SLRE_CAPS];
   int r, i, ms, me;

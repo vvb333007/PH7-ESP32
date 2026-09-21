@@ -3112,6 +3112,8 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
             nCvtOp = PH7_OP_CVT_STR;
           } else if (pFunc->iFlags & PH7_TKWRD_BOOL) {
             nCvtOp = PH7_OP_CVT_BOOL;
+          } else if (pFunc->iFlags & PH7_TKWRD_CALLABLE) {
+            nCvtOp = PH7_OP_CVT_CALLABLE;
           } else if (pFunc->iFlags & PH7_TKWRD_ARRAY) {
             nCvtOp = PH7_OP_CVT_ARRAY;
           } else {
