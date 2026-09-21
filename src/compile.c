@@ -3716,8 +3716,8 @@ choose_memobj:
           /* 'mixed' as a function argument: do not do any autocasting  */
         } else if (nKey & PH7_TKWRD_CALLABLE) {
            /* 'callable' as a function argument: do not do any autocasting (can be string or array) 
-              TODO: store VM_FUNC_ARG_CALLABLE somewhere if it the case
-              TODO: Later, on function entry (autocasting stage) we can check if arg is a callable */
+               store VM_FUNC_ARG_CALLABLE somewhere if it the case
+               Later, on function entry (autocasting stage) we can check if arg is a callable */
           sArg.iFlags |= VM_FUNC_ARG_CALLABLE;
           //puts("callable type, arg is marked as a callable type");
         } else {
@@ -3733,19 +3733,18 @@ choose_memobj:
          * 'Something' is a class or an enum id. Check if this is an enum and if it is - extract its type.
          * If it is a class, then we do autocast to the class type (an object)
          * If it is an enum, then we try to figure out real type for autocast
+         * TODO: this conflicts with late binding idea. If Enum is not defined yet, then
+         * function will be compiled as having class arg, and further autocast will fail.
+         * To fix it, there shoud be extra logic at class arg processing site: enums must be processed separately there
          */
         ph7_class *pClass;
         pClass = PH7_VmExtractClass(pGen->pVm, pName->zString, pName->nByte, FALSE, 0);
-        if (pClass == NULL) {
-          // undefined type hint, abort compilation
-          PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unknown type '%z'", pName);
-          return SXERR_ABORT;
-        }
-        if ((pClass->iFlags & PH7_CLASS_ENUM) != 0) {
-          /* Extract overal enum type and use it for autocast (if type is not :mixed)
-           * When compiled, enum class has its nLine reused to store :type keyword (or zero 
-           * if there were none)
-           */
+        if (pClass != NULL) {
+          if ((pClass->iFlags & PH7_CLASS_ENUM) != 0) {
+            /* Extract overal enum type and use it for autocast (if type is not :mixed)
+             * When compiled, enum class has its nLine reused to store :type keyword (or zero 
+             * if there were none)
+             */
              nKey = pClass->nLine; 
               /* TODO: this is a hack and must be refactored, may be by adding an extra sxi32 to the ph7_class structure
                * TODO: trace pClass->nLine usage, expecially writes 
@@ -3753,15 +3752,17 @@ choose_memobj:
 
              /* Try to choose memobj type based on this new information */
              goto choose_memobj;
-        } else {
-          /* Ordinary class, not an enum */
-          char *zDup;
-          /* Argument must be a class instance,record that*/
-          zDup = SyMemBackendStrDup(&pGen->pVm->sAllocator, pName->zString, pName->nByte);
-          if (zDup) {
-            sArg.nType = SXU32_HIGH; /* 0xFFFFFFFF as sentinel */
-            SyStringInitFromBuf(&sArg.sClass, zDup, pName->nByte);
           }
+        } else
+          printf("Warning, Typename %.*s is not yet known, assuming a class. If it is an ENUM, this will not gonna work\n", pName->nByte,pName->zString);
+        
+        /* Ordinary class, not an enum */
+        char *zDup;
+        /* Argument must be a class instance,record that*/
+        zDup = SyMemBackendStrDup(&pGen->pVm->sAllocator, pName->zString, pName->nByte);
+        if (zDup) {
+          sArg.nType = SXU32_HIGH; /* 0xFFFFFFFF as sentinel */
+          SyStringInitFromBuf(&sArg.sClass, zDup, pName->nByte);
         }
       }
       pIn++;
