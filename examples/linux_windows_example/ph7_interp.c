@@ -116,7 +116,7 @@ int main(int argc,char **argv)
   ph7 *pEngine; /* PH7 engine */
   ph7_vm *pVm;  /* Compiled PHP program */
   int dump_vm = 0;    /* Dump VM instructions if TRUE */
-  int err_report = 0; /* Report run-time errors if TRUE */
+  int err_report = 1; /* Report run-time errors if TRUE */
   int n;              /* Script arguments */
   int rc;
   /* Process interpreter arguments first*/
