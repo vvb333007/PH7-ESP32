@@ -184,12 +184,22 @@ PH7_PRIVATE sxi32 PH7_VmRegisterConstant(
   char *zDupName;
   sxi32 rc;
   pEntry = SyHashGet(&pVm->hConstant, (const void *)pName->zString, pName->nByte);
+
   if (pEntry) {
+#if 0
     /* Overwrite the old definition and return immediately */
     pCons = (ph7_constant *)pEntry->pUserData;
     pCons->xExpand = xExpand;
     pCons->pUserData = pUserData;
     return SXRET_OK;
+#else
+    /* NOTE: Message below will not be displayed in runtime, so VM has to print diagnostics messages.
+       NOTE: Message below will appear during compilation phase only (the func is called both from
+      compiler and runtime / define() language construct )
+    */
+    PH7_GenCompileError(&pVm->sCodeGen, E_ERROR, 1, "Read-only literal '%.*s' is already defined", pName->nByte, pName->zString);
+    return SXERR_EXISTS;
+#endif
   }
   /* Allocate a new constant instance */
   pCons = (ph7_constant *)SyMemBackendPoolAlloc(&pVm->sAllocator, sizeof(ph7_constant));
@@ -4975,17 +4985,29 @@ static sxi32 VmByteCodeExec(
                   pMeth = PH7_ClassExtractMethod(pClass, sName.zString, sName.nByte);
                 }
                 if (pMeth == 0) {
+                  /* TODO: first try to call magic then display a warning.
+                     TODO: propagate error from ClassInstanceCallMagicMethod() so we can check if __call() was actually called.
+                     TODO: If it wasnt: display a warning message then
+                     TODO: This whole TODO: statement goes to all magic method calls 
+                  */
                   VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class method '%z->%z',PH7 is loading NULL",
                                 &pClass->sName, &sName);
-                  /* Call the '__Call()' magic method if available */
+                  /* Call the '__Call()' magic method if available 
+                   * TODO: propagate return value and if it is not empty - push it on stack (remove method name tho)
+                  */
                   PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__call", sizeof("__call") - 1, &sName);
-                  /* Pop the method name from the stack */
-                  VmPopOperand(&pTos, 1);
-                  PH7_MemObjRelease(pTos);
+                  /* Pop the method name from the stack 
+                     TODO: can we execute PopOperand before we call magic method? sName uses pTos, so we have to resolve that
+                     TODO: inside the CallMagicMethod
+                  */
+                  VmPopOperand(&pTos, 1);   // remove method name, move SP
+                  PH7_MemObjRelease(pTos);  // ???
                 } else {
-                  /* Push method name on the stack */
+                  /* Push real method name on the stack */
                   PH7_MemObjRelease(pTos);
                   SyBlobAppend(&pTos->sBlob, SyStringData(&pMeth->sVmName), SyStringLength(&pMeth->sVmName));
+                  // __ClassName@MethodName_RANDOMSTRING
+                  //printf("Real method name in VM is %.*s\n",SyStringLength(&pMeth->sVmName), SyStringData(&pMeth->sVmName));
                   MemObjSetType(pTos, MEMOBJ_STRING);
                 }
                 pTos->nIdx = SXU32_HIGH;
@@ -5384,9 +5406,16 @@ static sxi32 VmByteCodeExec(
               PH7_MemObjStore(&sResult, pTos);
               PH7_MemObjRelease(&sResult);
             } else {
+              /* class name as function: invoke magic __invoke() call
+               *
+               */
               if (pTos->iFlags & MEMOBJ_OBJ) {
                 ph7_class_instance *pThis = (ph7_class_instance *)pTos->x.pOther;
-                /* Call the magic method '__invoke' if available */
+                /* Call the magic method '__invoke' if available 
+                   TODO: propagate return  value and copy it to the stack
+                  PH7_MemObjStore(&sResult, pTos);
+                  PH7_MemObjRelease(&sResult);
+                */
                 PH7_ClassInstanceCallMagicMethod(&(*pVm), pThis->pClass, pThis, "__invoke", sizeof("__invoke") - 1, 0);
               } else {
                 /* Raise exception: Invalid function name */
@@ -7815,7 +7844,10 @@ static int vm_builtin_define(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   rc = ph7_create_constant(pCtx->pVm, zName, VmExpandUserConstant, pValue);
   if (rc != SXRET_OK) {
     SyMemBackendPoolFree(&pCtx->pVm->sAllocator, pValue);
-    ph7_context_throw_error(pCtx, PH7_CTX_NOTICE, "Cannot register constant due to a memory failure");
+    if (rc == SXERR_EXISTS)
+      ph7_context_throw_error(pCtx, PH7_CTX_NOTICE, "Can not change a constant: attempt ignored");
+    else
+      ph7_context_throw_error(pCtx, PH7_CTX_NOTICE, "Cannot register constant due to a memory failure");
     ph7_result_bool(pCtx, 0);
     return SXRET_OK;
   }

@@ -914,7 +914,7 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceDump(SyBlob *pOut, ph7_class_instance *pThis,
  * Notes on magic methods.
  * According to the PHP language reference manual.
  *  The function names __construct(), __destruct(), __call(), __callStatic()
- *  __get(),  __toString(), __invoke(), __clone() are magical in PHP classes.
+ *  __set(), __get(),  __toString(), __invoke(), __clone() are magical in PHP classes.
  * You cannot have functions with these names in any of your classes unless
  * you want the magic functionality associated with them.
  * Example of magical methods:
@@ -969,6 +969,7 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceCallMagicMethod(
     return SXERR_NOTFOUND;
   }
   nArg = 0;
+
   /* Copy arguments */
   if (pAttrName) {
     PH7_MemObjInitFromString(pVm, &sAttr, pAttrName);

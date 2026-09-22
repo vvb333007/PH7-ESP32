@@ -803,7 +803,7 @@ PH7_PRIVATE sxi32 PH7_MemObjStringAppend(ph7_value *pObj, const char *zData, sxu
   return rc;
 }
 #if 0
-/*
+/* TODO: this useful to CHANGE a ph7_value on VM's stack 
  * Format and append some contents to the internal buffer of a given ph7_value.
  * If the given ph7_value is not of type string,this function invalidate
  * any prior representation and set the string type.
