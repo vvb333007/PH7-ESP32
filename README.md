@@ -1,4 +1,6 @@
-### An ESP32 port and a further development of PH7 PHP Engine. Uses [TARFS](https://github.com/vvb333007/tarfs)
+### A further development of PH7 PHP Engine. 
+
+#### Compiles and runs on ESP32-family, Linux and Windows (Cygwin).
 
 
 ### Memory footprint: requires about 100KiB of memory for the Engine plus ~180 KiB per virtual machine; Running PH7 without external RAM is barely possible. Modern ESP32 chips are all equipped with plenty of PSRAM (4..8MiB)
