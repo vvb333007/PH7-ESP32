@@ -394,11 +394,13 @@ static ph7_value *GenStateInstallNumLiteral(ph7_gen_state *pGen, sxu32 *pIdx) {
     return 0;
   }
   *pIdx = nIdx;
-  /* TODO(chems): Create a numeric table (64bit int keys) same as 
-   * the constant string iterals table [optimization purposes].
+  /* TODO: (chems): Create a numeric table (64bit int keys) same as 
+   * the constant string iterals table [memory optimization purposes]
+   * we can reuse numeric literals in the way we reuse string literals
    */
   return pObj;
 }
+
 /*
  * Implementation of the PHP language constructs.
  */
@@ -433,6 +435,9 @@ static sxi32 PH7_CompileNumLiteral(ph7_gen_state *pGen, sxi32 iCompileFlag) {
       return SXERR_ABORT;
     }
     PH7_MemObjInitFromInt(pGen->pVm, pObj, iValue);
+#if DISASM
+    printf(".integer %d = %lld\n",nIdx, (signed long long)iValue);
+#endif
   } else {
     /* Real number */
     ph7_value *pObj;
@@ -445,6 +450,10 @@ static sxi32 PH7_CompileNumLiteral(ph7_gen_state *pGen, sxi32 iCompileFlag) {
     }
     PH7_MemObjInitFromString(pGen->pVm, pObj, &pToken->sData);
     PH7_MemObjToReal(pObj);
+#if DISASM
+    printf(".real %d = %f\n",nIdx, pObj->rVal);
+#endif
+
   }
   /* Emit the load constant instruction */
   PH7_VmEmitInstr(pGen->pVm, PH7_OP_LOADC, 0, nIdx, 0, 0);
@@ -553,6 +562,9 @@ PH7_PRIVATE sxi32 PH7_CompileSimpleString(ph7_gen_state *pGen, sxi32 iCompileFla
 
 
   /* Install in the literal table */
+#if DISASM
+  printf(".string %d = '%.*s'\n",nIdx, pStr->nByte,pStr->zString);
+#endif
   GenStateInstallLiteral(pGen, pObj, nIdx);
 
   /* Node successfully compiled */
@@ -1421,6 +1433,10 @@ PH7_PRIVATE sxi32 PH7_CompileLangConstruct(ph7_gen_state *pGen, sxi32 iCompileFl
       }
       PH7_MemObjInitFromString(pGen->pVm, pObj, pName);
       /* Install in the literal table */
+#if DISASM
+      printf(".string %d = '%.*s'\n",nIdx, pName->nByte,pName->zString);
+#endif
+
       GenStateInstallLiteral(&(*pGen), pObj, nIdx);
     }
     /* Emit the call instruction */
@@ -1608,6 +1624,9 @@ static sxi32 GenStateLoadLiteral(ph7_gen_state *pGen) {
       return SXERR_ABORT;
     }
     PH7_MemObjInitFromString(pGen->pVm, pObj, &pToken->sData);
+#if DISASM
+  printf(".string %d = '%.*s'\n",nIdx, pToken->sData.nByte,pToken->sData.zString);
+#endif
     GenStateInstallLiteral(&(*pGen), pObj, nIdx);
   }
   /* Emit the load constant instruction */
@@ -1742,6 +1761,16 @@ static sxi32 PH7_CompileConstant(ph7_gen_state *pGen) {
     goto Synchronize;
   }
   pGen->pIn++; /*Jump the equal sign */
+
+  /* check if constant is already defined and if it is abort compilation immediately;
+   * 'const' statement is a hard error; define() generates warnings instead
+  */
+  if (PH7_VmIsConstantRegistered(pGen->pVm, pName)) {
+    PH7_GenCompileError(pGen, E_ERROR, nLine, "const: A constant '%z' is already defined, abort.\n",pName);
+    return SXERR_ABORT;
+  }
+
+
   /* Allocate a new constant value container */
   pConsCode = (SySet *)SyMemBackendPoolAlloc(&pGen->pVm->sAllocator, sizeof(SySet));
   if (pConsCode == 0) {
@@ -1752,6 +1781,9 @@ static sxi32 PH7_CompileConstant(ph7_gen_state *pGen) {
   SySetInit(pConsCode, &pGen->pVm->sAllocator, sizeof(VmInstr));
   /* Swap bytecode container */
   pInstrContainer = PH7_VmGetByteCodeContainer(pGen->pVm);
+#if DISASM
+  printf(".section .const.%.*s\n",pName->nByte, pName->zString);
+#endif
   PH7_VmSetByteCodeContainer(pGen->pVm, pConsCode);
   /* Compile constant value */
   rc = PH7_CompileExpr(&(*pGen), 0, 0);
