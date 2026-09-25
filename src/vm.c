@@ -160,6 +160,15 @@ struct SyhttpHeader {
  */
 #define HTTP_PROTO_10 1 /* HTTP/1.0 */
 #define HTTP_PROTO_11 2 /* HTTP/1.1 */
+
+
+PH7_PRIVATE sxi32 PH7_VmIsConstantRegistered(
+  ph7_vm *pVm,           /* Target VM */
+  const SyString *pName /* Constant name */
+) {
+  return NULL != SyHashGet(&pVm->hConstant, (const void *)pName->zString, pName->nByte);
+}
+
 /*
  * Register a constant and it's associated expansion callback so that
  * it can be expanded from the target PHP program.
@@ -411,13 +420,14 @@ PH7_PRIVATE sxi32 PH7_VmEmitInstr(
     *pIndex = SySetUsed(pVm->pByteContainer);
   }
 #if DISASM
-  printf("  %s %8d %8u %#08x # PC=%u\n",
+  printf("  % 10s %d %u %p # PC=%u\n",
           VmInstrToString(sInstr.iOp),
+
           sInstr.iP1,
           sInstr.iP2,
-          SX_PTR_TO_INT(sInstr.p3),
-          SySetUsed(pVm->pByteContainer)
-         );
+          sInstr.p3,
+          SySetUsed(pVm->pByteContainer));
+
 #endif 
   /* Finally,record the instruction */
   rc = SySetPut(pVm->pByteContainer, (const void *)&sInstr);
@@ -2221,9 +2231,12 @@ static sxi32 VmByteCodeDump(
       break;
     }
     /* Format and call the consumer callback */
-    rc = SyProcFormat(xConsumer, pUserData, "%s %8d %8u %#08x [%u]\n",
-                      VmInstrToString(pInstr->iOp), pInstr->iP1, pInstr->iP2,
-                      SX_PTR_TO_INT(pInstr->p3), n);
+    rc = SyProcFormat(xConsumer, pUserData, "  % 10s %d %u %p # PC=%u\n",
+                      VmInstrToString(pInstr->iOp), 
+                      pInstr->iP1,
+                      pInstr->iP2,
+                      pInstr->p3,
+                      n);
     if (rc != SXRET_OK) {
       /* Consumer routine request an operation abort */
       return rc;
@@ -5541,7 +5554,7 @@ static sxi32 VmByteCodeExec(
                 /* More than one function is defined but nothing matches. 
                  * This is bad, better if we abort execution: this is logic error, not a runtime
                  */
-                VmErrorFormat(&(*pVm), PH7_CTX_ERR,"Function '%z()' has number of overloads but nothing matches. Abort." ,&pTmp->sName);
+                VmErrorFormat(&(*pVm), PH7_CTX_ERR,"No matching function '%z()' for given argument list. Abort." ,&pTmp->sName);
                 goto Abort;
               }
             }
@@ -5974,6 +5987,7 @@ static sxi32 VmLocalExec(ph7_vm *pVm, SySet *pByteCode, ph7_value *pResult) {
   sxi32 rc;
 
     //printf("VmLocalExec() %p\n",pByteCode);
+
   /* Allocate a new operand stack */
   pStack = VmNewOperandStack(&(*pVm), SySetUsed(pByteCode));
   if (pStack == 0) {
@@ -6112,7 +6126,7 @@ PH7_PRIVATE sxi32 PH7_VmOutputConsumeAp(
  * to a null terminated string.
  */
 static const char *VmInstrToString(sxi32 nOp) {
-  const char *zOp = "Unknown";
+  const char *zOp = "ILL";
   switch (nOp) {
     case PH7_OP_DONE: zOp = "DONE"; break;
     case PH7_OP_HALT: zOp = "HALT"; break;

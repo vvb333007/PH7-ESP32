@@ -7045,7 +7045,7 @@ PH7_PRIVATE sxi32 PH7_InitCodeGenerator(
   /* Initial state */
   pGen->pVm = &(*pVm);
   pGen->xErr = xErr;
-  printf("Init codegen: %p\n",pGen->xErr);
+
   pGen->pErrData = pErrData;
   SySetInit(&pGen->aLabel, &pVm->sAllocator, sizeof(Label));
   SySetInit(&pGen->aGoto, &pVm->sAllocator, sizeof(JumpFixup));

@@ -109,7 +109,7 @@ static sxi32 EngineConfig(ph7 *pEngine, sxi32 nOp, va_list ap) {
         
         pConf->xErr = xConsumer;
         pConf->pErrData = pUserData;
-        printf("PH7_CONFIG_ERR_OUTPUT %p\n",pConf->xErr);
+
         break;
       }
     case PH7_CONFIG_ERR_LOG:
