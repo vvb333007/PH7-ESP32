@@ -659,10 +659,10 @@ static int VmOverloadCompare(SyString *pCall, SyString *pDecl) {
   while (a < aEnd && b < bEnd) {
     const char *ta = a, *tb = b;
     /* Class resolution is not done yet. Must change compiler side as well 'oClassName;' */
-    //if (*a == 'o') { while (a < aEnd && *a != ';') a++; if (a < aEnd) a++; } else a++;
-    a++;
-    //if (*b == 'o') { while (b < bEnd && *b != ';') b++; if (b < bEnd) b++; } else b++;
-    b++;
+    if (*a == 'o') { while (a < aEnd && *a != ';') a++; if (a < aEnd) a++; } else a++;
+    //a++;
+    if (*b == 'o') { while (b < bEnd && *b != ';') b++; if (b < bEnd) b++; } else b++;
+    //b++;
 
     if (*tb == 'm') {
       score += 1; /* mixed type/no-type (callable is a mixed type too)*/
