@@ -1,11 +1,14 @@
 # TODO
 
+Text marked as ~~this~~ means that it is done.
+
 ## Milestones
 
 Architecture: one FreeRTOS task per VM.
 VMs are interruptible and can be executed step by step.
 VMs can be cloned (shared code, private data).
-
+Refactor memory subsystem. Now it is a malloc() for everything
+PH7_VmCallUserFunction must be optimized (no mallocs).
 ---
 
 ### 1. Interrupt subsystem
@@ -145,7 +148,7 @@ php_ipc_sleep($handle, $mask); // sleep until woken up by another VM
 Support:
 
 ```php
-$arr = [];
+$arr = [1,2,3];
 ```
 
 `lex.c` and `compile.c` must be updated.
@@ -161,8 +164,7 @@ Implement `function_exists()`.
 
 ###9. Function return arguments
 
-~~Syntax is accepted. Compiler checks for returns from void functions and checks if nothing is returned from a function that should return a value
-NO RETURN TYPECASTING is performed!~~
+~~Support for function return types syntax (PHP7.x)~~
 
 
 ###10. Overloading:
@@ -172,13 +174,14 @@ NO RETURN TYPECASTING is performed!~~
 
 ###11. Overloading:
 
-do not fallback to the last function in the list if there are no good candidates for overloading. Do fallback only if there is only 1 candidate
+~~do not fallback to the last function in the list if there are no good candidates for overloading.
+Do fallback only if there is only 1 candidate~~
 
 ###12. Nullable types:
 
 ~~inject code into return statement which LOADC 0,0,0; TEQ ; JNZ over CVT instruction to skip conversion of null to the function type~~
 
-###14. ~~`callable` type: interbally a `string`~~
+###14. ~~`callable` type ~~
 
 
 ###13. ?? operator ( ?? as a ternary OP, and ??= null coalesce assignment) , ?-> nullsafe operator  
