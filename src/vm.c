@@ -726,7 +726,7 @@ static ph7_vm_func *VmOverload(
   SyBlobInit(&sSig, &pVm->sAllocator);
   for (j = 0; j < nArg; j++) {
 
-    int c = 'n'; /* null */
+    char c = 'm'; /* mixed type */
 
     if (aArg[j].iFlags & MEMOBJ_HASHMAP) {
       /* Hashmap */
@@ -747,9 +747,13 @@ static ph7_vm_func *VmOverload(
       /* Class instance */
       ph7_class *pClass = ((ph7_class_instance *)aArg[j].x.pOther)->pClass;
       SyString *pName = &pClass->sName;
-      // TODO: append 'o'
+
+      c = 'o';
+      SyBlobAppend(&sSig, (const void *)&c, 1);
       SyBlobAppend(&sSig, (const void *)pName->zString, pName->nByte);
-      // TODO: append class_name+';'
+      c = ';';
+      SyBlobAppend(&sSig, (const void *)&c, 1);
+      
       c = -1;
     }
     if (c > 0) {
@@ -1348,6 +1352,7 @@ PH7_PRIVATE sxi32 PH7_VmInit(
   /* Set a default recursion limit */
 
   pVm->nMaxDepth = 32;
+  //pVm->bErrReport = 1;
 
   /* Default assertion flags */
   pVm->iAssertFlags = PH7_ASSERT_WARNING; /* Issue a warning for each failed assertion */
@@ -1426,7 +1431,7 @@ PH7_PRIVATE sxi32 PH7_VmBlobConsumer(
   return rc;
 }
 #define VM_STACK_GUARD 16
-/*
+/* TODO: this is a hotpath. Refactor.
  * Allocate a new operand stack so that we can start executing
  * our compiled PHP program.
  * Return a pointer to the operand stack (array of ph7_values)
@@ -2457,6 +2462,7 @@ static sxi32 VmByteCodeExec(
                 } else if (nType & PH7_TKWRD_FLOAT) {
                   PH7_MemObjToReal(pResult);
                 } else if (nType & PH7_TKWRD_OBJECT) {
+                  /* Convert to a stdClass, if it is not a class */
                   PH7_MemObjToObject(pResult);
                 } else if (nType & PH7_TKWRD_STRING) {
                   PH7_MemObjToString(pResult);
@@ -2522,7 +2528,7 @@ static sxi32 VmByteCodeExec(
          */
         if (pInstr->iP2 != 0) {
           pVm->iExitStatus = pInstr->iP2;
-          PH7_VmThrowError(&(*pVm), 0, PH7_CTX_WARNING,"Return from a :never returning function is detected");
+          PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"Return from a never returning function is detected. Aborted.");
         }
 
         goto Abort;
@@ -5001,7 +5007,7 @@ static sxi32 VmByteCodeExec(
                      TODO: inside the CallMagicMethod
                   */
                   VmPopOperand(&pTos, 1);   // remove method name, move SP
-                  PH7_MemObjRelease(pTos);  // ???
+                  PH7_MemObjRelease(pTos);  // ??? causes followwing OP_CALL to fail.
                 } else {
                   /* Push real method name on the stack */
                   PH7_MemObjRelease(pTos);
@@ -5409,6 +5415,7 @@ static sxi32 VmByteCodeExec(
               /* class name as function: invoke magic __invoke() call
                *
                */
+              
               if (pTos->iFlags & MEMOBJ_OBJ) {
                 ph7_class_instance *pThis = (ph7_class_instance *)pTos->x.pOther;
                 /* Call the magic method '__invoke' if available 
@@ -6105,100 +6112,100 @@ PH7_PRIVATE sxi32 PH7_VmOutputConsumeAp(
  * to a null terminated string.
  */
 static const char *VmInstrToString(sxi32 nOp) {
-  const char *zOp = "Unknown     ";
+  const char *zOp = "Unknown";
   switch (nOp) {
-    case PH7_OP_DONE: zOp = "DONE       "; break;
-    case PH7_OP_HALT: zOp = "HALT       "; break;
-    case PH7_OP_LOAD: zOp = "LOAD       "; break;
-    case PH7_OP_LOADC: zOp = "LOAD.C      "; break;
-    case PH7_OP_LOAD_MAP: zOp = "LOAD.MAP   "; break;
-    case PH7_OP_LOAD_LIST: zOp = "LOAD.LIST  "; break;
-    case PH7_OP_LOAD_IDX: zOp = "LOAD.IDX   "; break;
-    case PH7_OP_LOAD_CLOSURE: zOp = "LOAD.CL "; break;
-    case PH7_OP_NOOP: zOp = "NOOP       "; break;
-    case PH7_OP_JMP: zOp = "JMP        "; break;
-    case PH7_OP_JZ: zOp = "JZ         "; break;
-    case PH7_OP_JNZ: zOp = "JNZ        "; break;
-    case PH7_OP_POP: zOp = "POP        "; break;
-    case PH7_OP_CAT: zOp = "CAT        "; break;
-    case PH7_OP_CVT_INT: zOp = "CVT.INT    "; break;
-    case PH7_OP_CVT_STR: zOp = "CVT.STR    "; break;
-    case PH7_OP_CVT_REAL: zOp = "CVT.REAL   "; break;
-    case PH7_OP_CVT_CALLABLE: zOp = "CVT.CALL    "; break;
-    case PH7_OP_CALL: zOp = "CALL       "; break;
-    case PH7_OP_UMINUS: zOp = "NEG        "; break;
-    case PH7_OP_UPLUS: zOp = "UPLUS      "; break;
-    case PH7_OP_BITNOT: zOp = "NOT.B     "; break;
-    case PH7_OP_LNOT: zOp = "NOT.L     "; break;
-    case PH7_OP_MUL: zOp = "MUL        "; break;
-    case PH7_OP_DIV: zOp = "DIV        "; break;
-    case PH7_OP_MOD: zOp = "MOD        "; break;
-    case PH7_OP_ADD: zOp = "ADD        "; break;
-    case PH7_OP_SUB: zOp = "SUB        "; break;
-    case PH7_OP_SHL: zOp = "SHL        "; break;
-    case PH7_OP_SHR: zOp = "SHR        "; break;
-    case PH7_OP_LT: zOp = "LT         "; break;
-    case PH7_OP_LE: zOp = "LE         "; break;
-    case PH7_OP_GT: zOp = "GT         "; break;
-    case PH7_OP_GE: zOp = "GE         "; break;
-    case PH7_OP_EQ: zOp = "EQ         "; break;
-    case PH7_OP_NEQ: zOp = "NEQ        "; break;
-    case PH7_OP_TEQ: zOp = "EQ.T        "; break;
-    case PH7_OP_TNE: zOp = "NEQ.T        "; break;
-    case PH7_OP_BAND: zOp = "AND.B     "; break;
-    case PH7_OP_BXOR: zOp = "XOR.B     "; break;
-    case PH7_OP_BOR: zOp = "OR.B      "; break;
-    case PH7_OP_LAND: zOp = "AND.L     "; break;
-    case PH7_OP_LOR: zOp = "OR.L      "; break;
-    case PH7_OP_LXOR: zOp = "XOR.L     "; break;
-    case PH7_OP_STORE: zOp = "STORE      "; break;
-    case PH7_OP_STORE_IDX: zOp = "STORE.IDX  "; break;
+    case PH7_OP_DONE: zOp = "DONE"; break;
+    case PH7_OP_HALT: zOp = "HALT"; break;
+    case PH7_OP_LOAD: zOp = "LOAD"; break;
+    case PH7_OP_LOADC: zOp = "LOAD.C"; break;
+    case PH7_OP_LOAD_MAP: zOp = "LOAD.MAP"; break;
+    case PH7_OP_LOAD_LIST: zOp = "LOAD.LIST"; break;
+    case PH7_OP_LOAD_IDX: zOp = "LOAD.IDX"; break;
+    case PH7_OP_LOAD_CLOSURE: zOp = "LOAD.CL"; break;
+    case PH7_OP_NOOP: zOp = "NOOP"; break;
+    case PH7_OP_JMP: zOp = "JMP"; break;
+    case PH7_OP_JZ: zOp = "JZ"; break;
+    case PH7_OP_JNZ: zOp = "JNZ"; break;
+    case PH7_OP_POP: zOp = "POP"; break;
+    case PH7_OP_CAT: zOp = "CAT"; break;
+    case PH7_OP_CVT_INT: zOp = "CVT.INT"; break;
+    case PH7_OP_CVT_STR: zOp = "CVT.STR"; break;
+    case PH7_OP_CVT_REAL: zOp = "CVT.REAL"; break;
+    case PH7_OP_CVT_CALLABLE: zOp = "CVT.CALL"; break;
+    case PH7_OP_CALL: zOp = "CALL"; break;
+    case PH7_OP_UMINUS: zOp = "NEG"; break;
+    case PH7_OP_UPLUS: zOp = "UPLUS"; break;
+    case PH7_OP_BITNOT: zOp = "NOT.B"; break;
+    case PH7_OP_LNOT: zOp = "NOT.L"; break;
+    case PH7_OP_MUL: zOp = "MUL"; break;
+    case PH7_OP_DIV: zOp = "DIV"; break;
+    case PH7_OP_MOD: zOp = "MOD"; break;
+    case PH7_OP_ADD: zOp = "ADD"; break;
+    case PH7_OP_SUB: zOp = "SUB"; break;
+    case PH7_OP_SHL: zOp = "SHL"; break;
+    case PH7_OP_SHR: zOp = "SHR"; break;
+    case PH7_OP_LT: zOp = "LT"; break;
+    case PH7_OP_LE: zOp = "LE"; break;
+    case PH7_OP_GT: zOp = "GT"; break;
+    case PH7_OP_GE: zOp = "GE"; break;
+    case PH7_OP_EQ: zOp = "EQ"; break;
+    case PH7_OP_NEQ: zOp = "NEQ"; break;
+    case PH7_OP_TEQ: zOp = "EQ.T"; break;
+    case PH7_OP_TNE: zOp = "NEQ.T"; break;
+    case PH7_OP_BAND: zOp = "AND.B"; break;
+    case PH7_OP_BXOR: zOp = "XOR.B"; break;
+    case PH7_OP_BOR: zOp = "OR.B"; break;
+    case PH7_OP_LAND: zOp = "AND.L"; break;
+    case PH7_OP_LOR: zOp = "OR.L"; break;
+    case PH7_OP_LXOR: zOp = "XOR.L"; break;
+    case PH7_OP_STORE: zOp = "STORE"; break;
+    case PH7_OP_STORE_IDX: zOp = "STORE.IDX"; break;
     case PH7_OP_STORE_IDX_REF: zOp = "STORE.IDX.R"; break;
-    case PH7_OP_PULL: zOp = "STACK.PULL       "; break;
-    case PH7_OP_SWAP: zOp = "STACK.SWAP       "; break;
-    case PH7_OP_YIELD: zOp = "STACK.YIELD      "; break;
-    case PH7_OP_CVT_BOOL: zOp = "CVT.BOOL   "; break;
-    case PH7_OP_CVT_NULL: zOp = "CVT.NULL   "; break;
-    case PH7_OP_CVT_ARRAY: zOp = "CVT.ARRAY  "; break;
-    case PH7_OP_CVT_OBJ: zOp = "CVT.OBJ    "; break;
-    case PH7_OP_CVT_NUMC: zOp = "CVT.NUMC   "; break;
-    case PH7_OP_INCR: zOp = "INC       "; break;
-    case PH7_OP_DECR: zOp = "DEC       "; break;
-    case PH7_OP_SEQ: zOp = "EQ.S        "; break;
-    case PH7_OP_SNE: zOp = "NEQ.S        "; break;
-    case PH7_OP_NEW: zOp = "NEW        "; break;
-    case PH7_OP_CLONE: zOp = "CLONE      "; break;
-    case PH7_OP_ADD_STORE: zOp = "ADD.STORE  "; break;
-    case PH7_OP_SUB_STORE: zOp = "SUB.STORE  "; break;
-    case PH7_OP_MUL_STORE: zOp = "MUL.STORE  "; break;
-    case PH7_OP_DIV_STORE: zOp = "DIV.STORE  "; break;
-    case PH7_OP_MOD_STORE: zOp = "MOD.STORE  "; break;
-    case PH7_OP_CAT_STORE: zOp = "CAT.STORE  "; break;
-    case PH7_OP_SHL_STORE: zOp = "SHL.STORE  "; break;
-    case PH7_OP_SHR_STORE: zOp = "SHR.STORE  "; break;
-    case PH7_OP_BAND_STORE: zOp = "AND.B.STORE "; break;
-    case PH7_OP_BOR_STORE: zOp = "OR.B.STORE  "; break;
-    case PH7_OP_BXOR_STORE: zOp = "XOR.B.STORE "; break;
-    case PH7_OP_CONSUME: zOp = "ECHO    "; break;
-    case PH7_OP_LOAD_REF: zOp = "LOAD.&   "; break;
-    case PH7_OP_STORE_REF: zOp = "STORE.&  "; break;
-    case PH7_OP_MEMBER: zOp = "MEMBER     "; break;
-    case PH7_OP_UPLINK: zOp = "UPLINK     "; break;
-    case PH7_OP_ERR_CTRL: zOp = "ERR.CTRL   "; break;
-    case PH7_OP_IS_A: zOp = "IS.A       "; break;
-    case PH7_OP_SWITCH: zOp = "SWITCH     "; break;
+    case PH7_OP_PULL: zOp = "STACK.PULL"; break;
+    case PH7_OP_SWAP: zOp = "STACK.SWAP"; break;
+    case PH7_OP_YIELD: zOp = "STACK.YIELD"; break;
+    case PH7_OP_CVT_BOOL: zOp = "CVT.BOOL"; break;
+    case PH7_OP_CVT_NULL: zOp = "CVT.NULL"; break;
+    case PH7_OP_CVT_ARRAY: zOp = "CVT.ARRAY"; break;
+    case PH7_OP_CVT_OBJ: zOp = "CVT.OBJ"; break;
+    case PH7_OP_CVT_NUMC: zOp = "CVT.NUMC"; break;
+    case PH7_OP_INCR: zOp = "INC"; break;
+    case PH7_OP_DECR: zOp = "DEC"; break;
+    case PH7_OP_SEQ: zOp = "EQ.S"; break;
+    case PH7_OP_SNE: zOp = "NEQ.S"; break;
+    case PH7_OP_NEW: zOp = "NEW"; break;
+    case PH7_OP_CLONE: zOp = "CLONE"; break;
+    case PH7_OP_ADD_STORE: zOp = "ADD.STORE"; break;
+    case PH7_OP_SUB_STORE: zOp = "SUB.STORE"; break;
+    case PH7_OP_MUL_STORE: zOp = "MUL.STORE"; break;
+    case PH7_OP_DIV_STORE: zOp = "DIV.STORE"; break;
+    case PH7_OP_MOD_STORE: zOp = "MOD.STORE"; break;
+    case PH7_OP_CAT_STORE: zOp = "CAT.STORE"; break;
+    case PH7_OP_SHL_STORE: zOp = "SHL.STORE"; break;
+    case PH7_OP_SHR_STORE: zOp = "SHR.STORE"; break;
+    case PH7_OP_BAND_STORE: zOp = "AND.B.STORE"; break;
+    case PH7_OP_BOR_STORE: zOp = "OR.B.STORE"; break;
+    case PH7_OP_BXOR_STORE: zOp = "XOR.B.STORE"; break;
+    case PH7_OP_CONSUME: zOp = "ECHO"; break;
+    case PH7_OP_LOAD_REF: zOp = "LOAD.&"; break;
+    case PH7_OP_STORE_REF: zOp = "STORE.&"; break;
+    case PH7_OP_MEMBER: zOp = "MEMBER"; break;
+    case PH7_OP_UPLINK: zOp = "UPLINK"; break;
+    case PH7_OP_ERR_CTRL: zOp = "ERR.CTRL"; break;
+    case PH7_OP_IS_A: zOp = "IS.A"; break;
+    case PH7_OP_SWITCH: zOp = "SWITCH"; break;
     case PH7_OP_LOAD_EXCEPTION:
-      zOp = "LOAD_EXCEP ";
+      zOp = "LOAD_EXCEP";
       break;
     case PH7_OP_POP_EXCEPTION:
-      zOp = "POP_EXCEP  ";
+      zOp = "POP_EXCEP";
       break;
-    case PH7_OP_THROW: zOp = "THROW      "; break;
+    case PH7_OP_THROW: zOp = "THROW"; break;
     case PH7_OP_FOREACH_INIT:
-      zOp = "4EACH_INIT ";
+      zOp = "4EACH_INIT";
       break;
     case PH7_OP_FOREACH_STEP:
-      zOp = "4EACH_STEP ";
+      zOp = "4EACH_STEP";
       break;
     default:
       break;
@@ -10755,6 +10762,8 @@ static sxi32 VmExecIncludedFile(
     rc = SXERR_EXISTS;
   } else {
     /* Read the whole file contents */
+    
+    /* TODO: use mmap() if available */
     rc = PH7_StreamReadWholeFile(pHandle, pStream, &sContents);
     if (rc == SXRET_OK) {
       SyString sScript;

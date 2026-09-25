@@ -193,7 +193,8 @@ static sxi32 GenStateEnterBlock(
     /* If the supplied memory subsystem is so sick that we are unable to allocate
      * a tiny chunk of memory, there is no much we can do here.
      */
-    PH7_GenCompileError(&(*pGen), E_ERROR, 1, "Fatal, PH7 engine is running out-of-memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "Fatal, PH7 engine is running out-of-memory");
+    PH7_GenCompileOOM(pGen);
     /* Abort processing immediately */
     return SXERR_ABORT;
   }
@@ -336,7 +337,7 @@ static sxi32 GenStateFixGoto(ph7_gen_state *pGen, sxu32 nOfft) {
     }
     /* Make sure the target label is reachable */
     if (pLabel->pFunc != pJump->pFunc) {
-      rc = PH7_GenCompileError(&(*pGen), E_ERROR, pJump->nLine, "Label '%z' is unreachable", &pJump->sLabel);
+      rc = PH7_GenCompileError(&(*pGen), E_ERROR, pJump->nLine, "Label '%z' is unreachable (out of the scope)", &pJump->sLabel);
       if (rc == SXERR_ABORT) {
         return SXERR_ABORT;
       }
@@ -351,8 +352,7 @@ static sxi32 GenStateFixGoto(ph7_gen_state *pGen, sxu32 nOfft) {
   for (n = 0; n < SySetUsed(&pGen->aLabel); ++n) {
     if (aLabel[n].bRef == FALSE) {
       /* Emit a warning */
-      PH7_GenCompileError(&(*pGen), E_WARNING, aLabel[n].nLine,
-                          "Label '%z' is defined but not referenced", &aLabel[n].sName);
+      PH7_GenCompileError(&(*pGen), E_WARNING, aLabel[n].nLine,"Label '%z' is defined but not referenced", &aLabel[n].sName);
     }
   }
   return SXRET_OK;
@@ -389,7 +389,8 @@ static ph7_value *GenStateInstallNumLiteral(ph7_gen_state *pGen, sxu32 *pIdx) {
   /* Reserve a new constant */
   pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
   if (pObj == 0) {
-    PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out of memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return 0;
   }
   *pIdx = nIdx;
@@ -438,7 +439,8 @@ static sxi32 PH7_CompileNumLiteral(ph7_gen_state *pGen, sxi32 iCompileFlag) {
     /* Reserve a new constant */
     pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
     if (pObj == 0) {
-      PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out of memory");
+      //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out of memory");
+      PH7_GenCompileOOM(pGen);
       return SXERR_ABORT;
     }
     PH7_MemObjInitFromString(pGen->pVm, pObj, &pToken->sData);
@@ -451,6 +453,15 @@ static sxi32 PH7_CompileNumLiteral(ph7_gen_state *pGen, sxi32 iCompileFlag) {
 }
 /*
  * Compile a single quoted string.
+ * Compiler calls this callback every time it finds a string literal (e.g. 'Hello!').
+ * First, compiler tries to find if the same string was already registered as a literal
+ * and fetch its index nIdx
+ *
+ * If it is registered before, then simple 'ld.c' instruction emitted with a string id.
+ * Otherwise compiler creates new literal and installs its value.
+ *
+ * If literal is too long, it is NOT installed
+ *
  * According to the PHP language reference manual:
  *
  *   The simplest way to specify a string is to enclose it in single quotes (the character ' ).
@@ -469,6 +480,7 @@ PH7_PRIVATE sxi32 PH7_CompileSimpleString(ph7_gen_state *pGen, sxi32 iCompileFla
   /* Delimit the string */
   zIn = pStr->zString;
   zEnd = &zIn[pStr->nByte];
+
 #if PH7_EMPTY_STRING_IS_NULL
   if (zIn >= zEnd) {
     /* Empty string,load NULL */
@@ -476,6 +488,17 @@ PH7_PRIVATE sxi32 PH7_CompileSimpleString(ph7_gen_state *pGen, sxi32 iCompileFla
     return SXRET_OK;
   }
 #endif /* #if PH7_EMPTY_STRING_IS_NULL */
+
+  if (pStr->nByte >= MAX_LITERAL_SIZE) {
+
+    pStr->nByte = MAX_LITERAL_SIZE - 1;
+    zEnd = &zIn[pStr->nByte];
+
+    PH7_GenCompileError(&(*pGen), E_WARNING, pGen->pIn->nLine, 
+        "String literal is too large, value is truncated.\n"
+        "Maximum allowed string literal size is %d bytes (can be adjusted)\n",MAX_LITERAL_SIZE - 1);
+  }
+
   if (SXRET_OK == GenStateFindLiteral(&(*pGen), pStr, &nIdx)) {
     /* Already processed,emit the load constant instruction
      * and return.
@@ -486,11 +509,13 @@ PH7_PRIVATE sxi32 PH7_CompileSimpleString(ph7_gen_state *pGen, sxi32 iCompileFla
   /* Reserve a new constant */
   pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
   if (pObj == 0) {
-    PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out of memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out of memory");
+    PH7_GenCompileOOM(pGen);
     SXUNUSED(iCompileFlag); /* cc warning */
     return SXERR_ABORT;
   }
   PH7_MemObjInitFromString(pGen->pVm, pObj, 0);
+
   /* Compile the node */
   for (;;) {
     if (zIn >= zEnd) {
@@ -525,10 +550,11 @@ PH7_PRIVATE sxi32 PH7_CompileSimpleString(ph7_gen_state *pGen, sxi32 iCompileFla
   }
   /* Emit the load constant instruction */
   PH7_VmEmitInstr(pGen->pVm, PH7_OP_LOADC, 0, nIdx, 0, 0);
-  if (pStr->nByte < 1024) {
-    /* Install in the literal table */
-    GenStateInstallLiteral(pGen, pObj, nIdx);
-  }
+
+
+  /* Install in the literal table */
+  GenStateInstallLiteral(pGen, pObj, nIdx);
+
   /* Node successfully compiled */
   return SXRET_OK;
 }
@@ -563,7 +589,8 @@ static sxi32 PH7_CompileNowDoc(ph7_gen_state *pGen, sxi32 iCompileFlag) {
   /* Reserve a new constant */
   pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
   if (pObj == 0) {
-    PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "PH7 engine is running out of memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "PH7 engine is running out of memory");
+    PH7_GenCompileOOM(pGen);
     SXUNUSED(iCompileFlag); /* cc warning */
     return SXERR_ABORT;
   }
@@ -635,7 +662,8 @@ static ph7_value *GenStateNewStrObj(ph7_gen_state *pGen, sxi32 *pCount) {
   /* Reserve a new constant */
   pConstObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
   if (pConstObj == 0) {
-    PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "PH7 engine is running out of memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "PH7 engine is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return 0;
   }
   (*pCount)++;
@@ -1041,7 +1069,7 @@ static sxi32 GenStateArrayNodeValidator(ph7_gen_state *pGen, ph7_expr_node *pRoo
         && pRoot->pOp->iOp != EXPR_OP_ARROW /* -> */ && pRoot->pOp->iOp != EXPR_OP_DC /* :: */) {
       /* Unexpected expression */
       rc = PH7_GenCompileError(&(*pGen), E_ERROR, pRoot->pStart ? pRoot->pStart->nLine : 0,
-                               "array(): Expecting a variable/array member/function call after reference operator '&'");
+                               "array(): Expecting a variable/array member/function call after operator '&'");
       if (rc != SXERR_ABORT) {
         rc = SXERR_INVALID;
       }
@@ -1284,7 +1312,8 @@ PH7_PRIVATE sxi32 PH7_CompileAnnonFunc(ph7_gen_state *pGen, sxi32 iCompileFlag) 
   /* Reserve a constant for the lambda */
   pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
   if (pObj == 0) {
-    PH7_GenCompileError(&(*pGen), E_ERROR, 1, "Fatal, PH7 engine is running out of memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "Fatal, PH7 engine is running out of memory");
+    PH7_GenCompileOOM(pGen);
     SXUNUSED(iCompileFlag); /* cc warning */
     return SXERR_ABORT;
   }
@@ -1315,15 +1344,13 @@ PH7_PRIVATE sxi32 PH7_CompileAnnonFunc(ph7_gen_state *pGen, sxi32 iCompileFlag) 
  * Compile a backtick quoted string.
  */
 static sxi32 PH7_CompileBacktic(ph7_gen_state *pGen, sxi32 iCompileFlag) {
-  /* TICKET 1433-40: This construct is disabled in the current release of the PH7 engine.
-   * If you want this feature,please contact symisc systems via contact@symisc.net
-   */
-  PH7_GenCompileError(&(*pGen), E_NOTICE, pGen->pIn->nLine,
-                      "Command line invocation is disabled in the current release of the PH7(%s) engine",
-                      ph7_lib_version());
+
+  PH7_GenCompileError(&(*pGen), E_NOTICE, pGen->pIn->nLine,"Command line invocation is disabled for security reasons");
+
   /* Load NULL */
   PH7_VmEmitInstr(pGen->pVm, PH7_OP_LOADC, 0, 0, 0, 0);
-  SXUNUSED(iCompileFlag); /* cc warning */
+  SXUNUSED(iCompileFlag);
+
   /* Node successfully compiled */
   return SXRET_OK;
 }
@@ -1387,7 +1414,8 @@ PH7_PRIVATE sxi32 PH7_CompileLangConstruct(ph7_gen_state *pGen, sxi32 iCompileFl
       /* Emit the call instruction */
       pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
       if (pObj == 0) {
-        PH7_GenCompileError(&(*pGen), E_ERROR, 1, "Fatal, PH7 engine is running out of memory");
+        //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "Fatal, PH7 engine is running out of memory");
+        PH7_GenCompileOOM(pGen);
         SXUNUSED(iCompileFlag); /* cc warning */
         return SXERR_ABORT;
       }
@@ -1474,7 +1502,8 @@ PH7_PRIVATE sxi32 PH7_CompileVariable(ph7_gen_state *pGen, sxi32 iCompileFlag) {
       /* Duplicate name */
       zName = SyMemBackendStrDup(&pGen->pVm->sAllocator, pName->zString, pName->nByte);
       if (zName == 0) {
-        PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+        //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+        PH7_GenCompileOOM(pGen);
         return SXERR_ABORT;
       }
       /* Install in the hashtable */
@@ -1530,7 +1559,8 @@ static sxi32 GenStateLoadLiteral(ph7_gen_state *pGen) {
     /* TICKET 1433-004: __LINE__ constant must be resolved at compile time,not run time */
     pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
     if (pObj == 0) {
-      PH7_GenCompileError(pGen, E_ERROR, pToken->nLine, "Fatal, PH7 engine is running out of memory");
+      //PH7_GenCompileError(pGen, E_ERROR, pToken->nLine, "Fatal, PH7 engine is running out of memory");
+      PH7_GenCompileOOM(pGen);
       return SXERR_ABORT;
     }
     PH7_MemObjInitFromInt(pGen->pVm, pObj, pToken->nLine);
@@ -1556,7 +1586,8 @@ static sxi32 GenStateLoadLiteral(ph7_gen_state *pGen) {
       } else {
         pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
         if (pObj == 0) {
-          PH7_GenCompileError(pGen, E_ERROR, pToken->nLine, "Fatal, PH7 engine is running out of memory");
+          //PH7_GenCompileError(pGen, E_ERROR, pToken->nLine, "Fatal, PH7 engine is running out of memory");
+          PH7_GenCompileOOM(pGen);
           return SXERR_ABORT;
         }
         PH7_MemObjInitFromString(pGen->pVm, pObj, &pFunc->sName);
@@ -1572,7 +1603,8 @@ static sxi32 GenStateLoadLiteral(ph7_gen_state *pGen) {
     /* Unknown literal,install it in the literal table */
     pObj = PH7_ReserveConstObj(pGen->pVm, &nIdx);
     if (pObj == 0) {
-      PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out of memory");
+      //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out of memory");
+      PH7_GenCompileOOM(pGen);
       return SXERR_ABORT;
     }
     PH7_MemObjInitFromString(pGen->pVm, pObj, &pToken->sData);
@@ -1713,7 +1745,8 @@ static sxi32 PH7_CompileConstant(ph7_gen_state *pGen) {
   /* Allocate a new constant value container */
   pConsCode = (SySet *)SyMemBackendPoolAlloc(&pGen->pVm->sAllocator, sizeof(SySet));
   if (pConsCode == 0) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   SySetInit(pConsCode, &pGen->pVm->sAllocator, sizeof(VmInstr));
@@ -1898,7 +1931,8 @@ static sxi32 PH7_CompileLabel(ph7_gen_state *pGen) {
     /* Duplicate label name */
     zDup = SyMemBackendStrDup(&pGen->pVm->sAllocator, pTarget->zString, pTarget->nByte);
     if (zDup == 0) {
-      PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Fatal, PH7 is running out of memory");
+      //PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Fatal, PH7 is running out of memory");
+      PH7_GenCompileOOM(pGen);
       return SXERR_ABORT;
     }
     SyStringInitFromBuf(&sLabel.sName, zDup, pTarget->nByte);
@@ -1966,7 +2000,8 @@ static sxi32 PH7_CompileGoto(ph7_gen_state *pGen) {
     /* Duplicate label name */
     zDup = SyMemBackendStrDup(&pGen->pVm->sAllocator, pTarget->zString, pTarget->nByte);
     if (zDup == 0) {
-      PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Fatal, PH7 is running out of memory");
+      //PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Fatal, PH7 is running out of memory");
+      PH7_GenCompileOOM(pGen);
       return SXERR_ABORT;
     }
     SyStringInitFromBuf(&sJump.sLabel, zDup, pTarget->nByte);
@@ -2019,7 +2054,8 @@ Consume:
   while (pGen->pRawIn < pGen->pRawEnd && pGen->pRawIn->nType != PH7_TOKEN_PHP) {
     pRawObj = PH7_ReserveConstObj(pGen->pVm, &nObjIdx);
     if (pRawObj == 0) {
-      PH7_GenCompileError(pGen, E_ERROR, 1, "Fatal, PH7 engine is running out of memory");
+      //PH7_GenCompileError(pGen, E_ERROR, 1, "Fatal, PH7 engine is running out of memory");
+      PH7_GenCompileOOM(pGen);
       return SXERR_ABORT;
     }
     /* Mark as constant and emit the load constant instruction */
@@ -2244,7 +2280,7 @@ static sxi32 PH7_CompileWhile(ph7_gen_state *pGen) {
   }
   /* Update token stream */
   while (pGen->pIn < pEnd) {
-    rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unexpected token '%z'", &pGen->pIn->sData);
+    rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unexpected token '%z' in a 'while' statement", &pGen->pIn->sData);
     if (rc == SXERR_ABORT) {
       return SXERR_ABORT;
     }
@@ -2379,7 +2415,7 @@ static sxi32 PH7_CompileDoWhile(ph7_gen_state *pGen) {
   }
   /* Update token stream */
   while (pGen->pIn < pEnd) {
-    rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unexpected token '%z'", &pGen->pIn->sData);
+    rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unexpected token '%z' in 'do/while' statement", &pGen->pIn->sData);
     if (rc == SXERR_ABORT) {
       return SXERR_ABORT;
     }
@@ -2709,7 +2745,8 @@ static sxi32 PH7_CompileForeach(ph7_gen_state *pGen) {
   /* Create the foreach context */
   pInfo = (ph7_foreach_info *)SyMemBackendAlloc(&pGen->pVm->sAllocator, sizeof(ph7_foreach_info));
   if (pInfo == 0) {
-    PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Fatal, PH7 engine is running out-of-memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Fatal, PH7 engine is running out-of-memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   /* Zero the structure */
@@ -2886,7 +2923,7 @@ static sxi32 PH7_CompileIf(ph7_gen_state *pGen) {
     rc = PH7_CompileExpr(&(*pGen), 0, 0);
     /* Update token stream */
     while (pGen->pIn < pEnd) {
-      PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unexpected token '%z'", &pGen->pIn->sData);
+      PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unexpected token '%z' while compiling 'if'", &pGen->pIn->sData);
       pGen->pIn++;
     }
     pGen->pIn = &pEnd[1];
@@ -3107,7 +3144,7 @@ static sxi32 PH7_CompileReturn(ph7_gen_state *pGen) {
           } else if (pFunc->iFlags & PH7_TKWRD_FLOAT) {
             nCvtOp = PH7_OP_CVT_REAL;
           } else if (pFunc->iFlags & PH7_TKWRD_OBJECT) {
-            nCvtOp = PH7_OP_CVT_OBJ; /* TODO: temporary */
+            nCvtOp = PH7_OP_CVT_OBJ; /* Generic class type */
           } else if (pFunc->iFlags & PH7_TKWRD_STRING) {
             nCvtOp = PH7_OP_CVT_STR;
           } else if (pFunc->iFlags & PH7_TKWRD_BOOL) {
@@ -3279,7 +3316,8 @@ static sxi32 PH7_CompileStatic(ph7_gen_state *pGen) {
   /* Duplicate variable name */
   zDup = SyMemBackendStrDup(&pGen->pVm->sAllocator, pName->zString, pName->nByte);
   if (zDup == 0) {
-    PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   SyStringInitFromBuf(&sStatic.sName, zDup, pName->nByte);
@@ -3406,6 +3444,7 @@ static sxi32 PH7_CompileNamespace(ph7_gen_state *pGen) {
     }
   }
   /* Emit a warning */
+  /* TODO: create a namespace block */
   PH7_GenCompileError(&(*pGen), E_WARNING, nLine,
                       "Namespace support is disabled in the current release of the PH7(%s) engine", ph7_lib_version());
   return SXRET_OK;
@@ -3678,27 +3717,23 @@ static sxi32 GenStateCollectFuncArgs(ph7_vm_func *pFunc, ph7_gen_state *pGen, Sy
     SySetInit(&sArg.aByteCode, &pGen->pVm->sAllocator, sizeof(VmInstr));
 
     /* Type hint: either a keyword (int, string, mixed, etc) or a class/enum name
-     * TODO: recognise `?` at the beginning of the type and save a special flag on corresponding sArg
-     * TODO: later, when performing Arg autocasting - do not autocast null values if `?` was used with type
-     * TODO: this is last push to make full support for nullable types.
-     * TODO: Do not include `?` into signature.
+     *  recognise `?` at the beginning of the type and save a special flag on corresponding sArg
+     *  later, when performing Arg autocasting - do not autocast null values if `?` was used with type
+     *   this is last push to make full support for nullable types.
+     *  Do not include `?` into signature.
      */
-#if 1
-      /* Refactor this direct byte lookup */
-      if (pIn->sData.zString[0] == '?') {
-        pIn++;
-        if (pIn >= pEnd) {
-          /* No more arguments to process */
-          break;
-        }
-//        puts("nullable arg");
-        sArg.iFlags |= VM_FUNC_ARG_NULLABLE;
+    if (pIn->sData.zString[0] == '?') {
+      pIn++;
+      if (pIn >= pEnd) {
+        /* No more arguments to process */
+        break;
       }
+      sArg.iFlags |= VM_FUNC_ARG_NULLABLE;
+    }
 
-#endif
     if (pIn->nType & (PH7_TK_ID | PH7_TK_KEYWORD)) {
 
-      // Built in types: these are keywords
+      /* Built in types: these are keywords */
       if (pIn->nType & PH7_TK_KEYWORD) {
         nKey = (sxu32)(SX_PTR_TO_INT(pIn->pUserData));
 choose_memobj:
@@ -3723,7 +3758,7 @@ choose_memobj:
         } else {
           /* unknown typename, treat as mixed + warning*/
           PH7_GenCompileError(&(*pGen), E_WARNING, pGen->pIn->nLine,
-                              "Invalid argument type '%z',Automatic cast will not be performed",
+                              "Invalid argument type '%z', compiled as ':mixed'",
                               &pIn->sData);
         }
       } else {
@@ -3746,6 +3781,8 @@ choose_memobj:
              * if there were none)
              */
              nKey = pClass->nLine; 
+             if (!nKey)
+              nKey = PH7_TKWRD_MIXED;
               /* TODO: this is a hack and must be refactored, may be by adding an extra sxi32 to the ph7_class structure
                * TODO: trace pClass->nLine usage, expecially writes 
                */
@@ -3753,8 +3790,15 @@ choose_memobj:
              /* Try to choose memobj type based on this new information */
              goto choose_memobj;
           }
-        } else
-          printf("Warning, Typename %.*s is not yet known, assuming a class. If it is an ENUM, this will not gonna work\n", pName->nByte,pName->zString);
+        } else {
+              
+              PH7_GenCompileError(pGen, E_WARNING, pGen->pIn->nLine,
+                 "Typename '%z' is not yet known, assuming a class name.\n"
+                 "(unlike classes, enums must be declared (or included) in the same translation unit)\n"
+                 "\n"
+,               pName);
+              
+        }
         
         /* Ordinary class, not an enum */
         char *zDup;
@@ -3793,7 +3837,8 @@ choose_memobj:
     /* Copy argument name */
     zDup = SyMemBackendStrDup(&pGen->pVm->sAllocator, SyStringData(&pIn->sData), SyStringLength(&pIn->sData));
     if (zDup == 0) {
-      PH7_GenCompileError(&(*pGen), E_ERROR, pIn->nLine, "PH7 engine is running out of memory");
+      //PH7_GenCompileError(&(*pGen), E_ERROR, pIn->nLine, "PH7 engine is running out of memory");
+      PH7_GenCompileOOM(pGen);
       return SXERR_ABORT;
     }
     SyStringInitFromBuf(&sArg.sName, zDup, SyStringLength(&pIn->sData));
@@ -3831,25 +3876,26 @@ choose_memobj:
         pIn = pDefend;
       }
       if (pIn < pEnd && (pIn->nType & PH7_TK_COMMA) == 0) {
-        rc = PH7_GenCompileError(&(*pGen), E_ERROR, pIn->nLine, "Unexpected token '%z'", &pIn->sData);
+        rc = PH7_GenCompileError(&(*pGen), E_ERROR, pIn->nLine, "Collecting function arguments: Unexpected token '%z'", &pIn->sData);
         return rc;
       }
       pIn++; /* Jump the trailing comma */
 
     }
+
     /* Append argument signature */
     if (sArg.nType > 0) {
       if (SyStringLength(&sArg.sClass) > 0) {
-        /* Class name
-           TODO: This is wrong, since class name 
-            can be 'f', 'h', 'i' and so on interfering with sentinels below
-           Class must be encoded as 'oClassname;' sentinel only
-         */
-        
+        char c = 'o';
+        /* Class name */
+        SyBlobAppend(&sSig, &c, 1);
         SyBlobAppend(&sSig, SyStringData(&sArg.sClass), SyStringLength(&sArg.sClass));
+        c = ';';
+        SyBlobAppend(&sSig, &c, 1);
       } else {
-        int c;
-        c = 'n'; /* cc warning */
+        char c; //BUG5: Little/Big endian issues
+
+        c = 'm'; /* cc warning */
         /* Type leading character */
         /* TODO: overloading with callable type does not work as intended in all cases
          * It generates 'm' as its type signature which is 'mixed' or 'no type' so callable
@@ -3865,9 +3911,8 @@ choose_memobj:
           case MEMOBJ_BOOL:     c = 'b'; break; /* Bool */
           case MEMOBJ_REAL:     c = 'f'; break; /* Float */
           case MEMOBJ_STRING:   c = 's'; break; /* String */
-          //case MEMOBJ_OBJECT: c = 'o'; break; TODO: add a class name plus ';' so VmOverload() can resolve different classes
-        /* Strange type, May be a class or enum
-         */
+          
+        /* Strange type, leave 'mixed' */
           default:
             break;
         }
@@ -3875,16 +3920,14 @@ choose_memobj:
         SyBlobAppend(&sSig, (const void *)&c, sizeof(char));
       }
     } else {
-        //printf("m-");
-      /* No type is associated with this parameter which mean
+      /* PH7: No type is associated with this parameter which mean
        * that this function is not condidate for overloading. 
        */
-
-      /* BUG: function test(int $a, $b, int $c) --> signature will be lost on parsing $b
+      /*
       SyBlobRelease(&sSig); 
       */
 
-      /* mixed or no-type goes here */
+      /* PH8: No type is a 'mixed' type. mixed and no-types go here */
       SyBlobAppend(&sSig, "m", 1);
     }
     /* Save in the argument set */
@@ -3920,7 +3963,8 @@ static sxi32 GenStateCompileFuncBody(
 //  printf("GenStateCompileFuncBody() : pBlock == %p, iFlags=%08x\r\n",pBlock, pBlock->iFlags);
 
   if (rc != SXRET_OK) {
-    PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out-of-memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out-of-memory");
+    PH7_GenCompileOOM(pGen);
     /* Don't worry about freeing memory, everything will be released shortly */
     return SXERR_ABORT;
   }
@@ -4140,7 +4184,8 @@ static sxi32 GenStateCompileFunc(
             /* Save imported variable */
             SySetPut(&pFunc->aClosureEnv, (const void *)&sEnv);
           } else {
-            PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+            //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+            PH7_GenCompileOOM(pGen);
             return SXERR_ABORT;
           }
         }
@@ -4235,7 +4280,8 @@ OutOfMem:
   /* If the supplied memory subsystem is so sick that we are unable to allocate
    * a tiny chunk of memory, there is no much we can do here.
    */
-  PH7_GenCompileError(&(*pGen), E_ERROR, 1, "Fatal, PH7 engine is running out-of-memory");
+  //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "Fatal, PH7 engine is running out-of-memory");
+  PH7_GenCompileOOM(pGen);
   return SXERR_ABORT;
 }
 /*
@@ -4394,7 +4440,8 @@ loop:
 
   pCons = PH7_NewClassAttr(pGen->pVm, pName, nLine, iProtection, iFlags);
   if (pCons == 0) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
 
@@ -4453,7 +4500,8 @@ loop:
   }
   rc = PH7_ClassInstallAttr(pClass, pCons);
   if (rc != SXRET_OK) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_COMMA)) {
@@ -4539,7 +4587,8 @@ loop:
   /* Allocate a new class attribute */
   pAttr = PH7_NewClassAttr(pGen->pVm, pName, nLine, iProtection, iFlags);
   if (pAttr == 0) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   if (pGen->pIn->nType & PH7_TK_EQUAL /*'='*/) {
@@ -4564,7 +4613,8 @@ loop:
   /* All done,install the attribute */
   rc = PH7_ClassInstallAttr(pClass, pAttr);
   if (rc != SXRET_OK) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_COMMA /*','*/)) {
@@ -4673,7 +4723,8 @@ static sxi32 GenStateCompileClassMethod(
   /* Allocate a new class_method instance */
   pMeth = PH7_NewClassMethod(pGen->pVm, pClass, pName, nLine, iProtection, iFlags, iFuncFlags);
   if (pMeth == 0) {
-    PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   /* Jump the left parenthesis '(' */
@@ -4773,7 +4824,8 @@ err:
   /* All done,install the method */
   rc = PH7_ClassInstallMethod(pClass, pMeth);
   if (rc != SXRET_OK) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   return SXRET_OK;
@@ -4810,7 +4862,8 @@ static sxi32 PH7_CompileClassInterface(ph7_gen_state *pGen) {
   /* Obtain a raw class */
   pClass = PH7_NewRawClass(pGen->pVm, pName, nLine);
   if (pClass == 0) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   /* Mark as an interface */
@@ -4987,7 +5040,8 @@ static sxi32 PH7_CompileClassInterface(ph7_gen_state *pGen) {
     rc = PH7_ClassInterfaceInherit(pClass, pBase);
   }
   if (rc != SXRET_OK) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
 done:
@@ -5020,7 +5074,7 @@ static sxi32 GenStateCompileEnum(ph7_gen_state *pGen, sxi32 iFlags) {
   sxi32 nKwrd;
   sxi32 rc;
   sxi32 nAutoValue = 0;
-  sxu32 nKey = 0; // enum type (0: no type)
+  sxu32 nKey = PH7_TKWRD_MIXED; // enum type is :mixed by default
   /* Jump the 'enum' keyword */
   pGen->pIn++;
 
@@ -5090,7 +5144,8 @@ err:
   pClass = PH7_NewRawClass(pGen->pVm, pName, nLine);
 
   if (pClass == 0) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
 
@@ -5156,7 +5211,8 @@ err:
   rc = PH7_VmInstallClass(pGen->pVm, pClass);
 
   if (rc != SXRET_OK) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Can not install enum, out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Can not install enum, out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
 
@@ -5230,7 +5286,8 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
   /* Obtain a raw class */
   pClass = PH7_NewRawClass(pGen->pVm, pName, nLine);
   if (pClass == 0) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   /* implemented interfaces container */
@@ -5578,7 +5635,8 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
   }
   SySetRelease(&aInterfaces);
   if (rc != SXRET_OK) {
-    PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
 done:
@@ -5729,7 +5787,7 @@ static sxi32 PH7_CompileThrow(ph7_gen_state *pGen) {
  * an object containing the exception information.
  */
 static sxi32 PH7_CompileCatch(ph7_gen_state *pGen, ph7_exception *pException) {
-  sxu32 nLine = pGen->pIn->nLine;
+  //sxu32 nLine = pGen->pIn->nLine;
   ph7_exception_block sCatch;
   SySet *pInstrContainer;
   GenBlock *pCatch;
@@ -5749,7 +5807,7 @@ static sxi32 PH7_CompileCatch(ph7_gen_state *pGen, ph7_exception *pException) {
       pToken--;
     }
     rc = PH7_GenCompileError(pGen, E_ERROR, pToken->nLine,
-                             "Catch: Unexpected token '%z',excpecting class name", &pToken->sData);
+                             "Catch: Unexpected token '%z',expecting a class name", &pToken->sData);
     if (rc == SXERR_ABORT) {
       return SXERR_ABORT;
     }
@@ -5827,7 +5885,8 @@ static sxi32 PH7_CompileCatch(ph7_gen_state *pGen, ph7_exception *pException) {
   }
   return SXRET_OK;
 Mem:
-  PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+  //PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
+  PH7_GenCompileOOM(pGen);
   return SXERR_ABORT;
 }
 /*
@@ -5845,8 +5904,8 @@ static sxi32 PH7_CompileTry(ph7_gen_state *pGen) {
   /* Create the exception container */
   pException = (ph7_exception *)SyMemBackendAlloc(&pGen->pVm->sAllocator, sizeof(ph7_exception));
   if (pException == 0) {
-    PH7_GenCompileError(&(*pGen), E_ERROR,
-                        pGen->pIn->nLine, "Fatal, PH7 engine is running out of memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Fatal, PH7 engine is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   /* Zero the structure */
@@ -5912,7 +5971,7 @@ static sxi32 GenStateCompileSwitchBlock(ph7_gen_state *pGen, sxu32 iTokenDelim, 
   sxi32 rc = SXRET_OK;
   while (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & (PH7_TK_SEMI /*';'*/ | PH7_TK_COLON /*':'*/)) == 0) {
     /* Unexpected token */
-    rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unexpected token '%z'", &pGen->pIn->sData);
+    rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Switch: Unexpected token '%z'", &pGen->pIn->sData);
     if (rc == SXERR_ABORT) {
       return SXERR_ABORT;
     }
@@ -5933,7 +5992,7 @@ static sxi32 GenStateCompileSwitchBlock(ph7_gen_state *pGen, sxu32 iTokenDelim, 
       if (pGen->pIn->nType & PH7_TK_CCB /*'}' */) {
         if (iTokenDelim != PH7_TK_CCB) {
           /* Unexpected token */
-          rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unexpected token '%z'",
+          rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Switch: Unexpected token '%z'",
                                    &pGen->pIn->sData);
           if (rc == SXERR_ABORT) {
             return SXERR_ABORT;
@@ -5953,7 +6012,7 @@ static sxi32 GenStateCompileSwitchBlock(ph7_gen_state *pGen, sxu32 iTokenDelim, 
       if (nKwrd == PH7_TKWRD_ENDSWITCH /* endswitch; */) {
         if (iTokenDelim != PH7_TK_KEYWORD) {
           /* Unexpected token */
-          rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Unexpected token '%z'",
+          rc = PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Switch: Unexpected token '%z'",
                                    &pGen->pIn->sData);
           if (rc == SXERR_ABORT) {
             return SXERR_ABORT;
@@ -6126,7 +6185,8 @@ static sxi32 PH7_CompileSwitch(ph7_gen_state *pGen) {
   pSwitch = (ph7_switch *)SyMemBackendAlloc(&pGen->pVm->sAllocator, sizeof(ph7_switch));
   if (pSwitch == 0) {
     /* Abort compilation */
-    PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Fatal, PH7 is running out of memory");
+    //PH7_GenCompileError(&(*pGen), E_ERROR, pGen->pIn->nLine, "Fatal, PH7 is running out of memory");
+    PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
   /* Zero the structure */
@@ -6766,6 +6826,7 @@ static sxi32 GenStateCompileChunk(
   /* Return compilation status */
   return rc;
 }
+
 /*
  * Compile a Raw PHP chunk.
  * If something goes wrong while compiling the PHP chunk,this function
@@ -6789,6 +6850,12 @@ static sxi32 PH7_CompilePHP(
   /* Point to the head and tail of the token stream. */
   pGen->pIn = (SyToken *)SySetBasePtr(pTokenSet);
   pGen->pEnd = &pGen->pIn[SySetUsed(pTokenSet)];
+#if 0
+  for (pScript = pGen->pIn; pScript < pGen->pEnd; pScript++) {
+    printf("token: %08x\n",(unsigned int)pScript->nType);
+  }
+#endif
+
   if (is_expr) {
     rc = SXERR_EMPTY;
     if (pGen->pIn < pGen->pEnd) {
@@ -6799,6 +6866,7 @@ static sxi32 PH7_CompilePHP(
     PH7_VmEmitInstr(pGen->pVm, PH7_OP_DONE, (rc != SXERR_EMPTY ? 1 : 0), 0, 0, 0);
     return SXRET_OK;
   }
+
   if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_EQUAL)) {
     static const sxu32 nKeyID = PH7_TKWRD_ECHO;
     /*
@@ -6835,6 +6903,8 @@ static sxi32 PH7_CompilePHP(
   SySetReset(&pGen->aGoto);
   SySetReset(&pGen->aLabel);
   /* Compilation result */
+
+
   return rc;
 }
 /*
@@ -6943,6 +7013,7 @@ PH7_PRIVATE sxi32 PH7_InitCodeGenerator(
   /* Initial state */
   pGen->pVm = &(*pVm);
   pGen->xErr = xErr;
+  printf("Init codegen: %p\n",pGen->xErr);
   pGen->pErrData = pErrData;
   SySetInit(&pGen->aLabel, &pVm->sAllocator, sizeof(Label));
   SySetInit(&pGen->aGoto, &pVm->sAllocator, sizeof(JumpFixup));
@@ -6996,7 +7067,7 @@ PH7_PRIVATE sxi32 PH7_ResetCodeGenerator(
  */
 PH7_PRIVATE sxi32 PH7_GenCompileError(ph7_gen_state *pGen, sxi32 nErrType, sxu32 nLine, const char *zFormat, ...) {
   SyBlob *pWorker = &pGen->sErrBuf;
-  const char *zErr = "Error";
+  const char *zErr = "[E]";
   SyString *pFile;
   va_list ap;
   sxi32 rc;
@@ -7009,33 +7080,44 @@ PH7_PRIVATE sxi32 PH7_GenCompileError(ph7_gen_state *pGen, sxi32 nErrType, sxu32
     SyBlobAppend(pWorker, pFile->zString, pFile->nByte);
     SyBlobAppend(pWorker, (const void *)": ", sizeof(": ") - 1);
   }
-  if (nErrType == E_ERROR) {
+
+  /* Fatal errors. Keep collecting them */
+  if (nErrType == E_ERROR || nErrType == E_PARSE) {
     /* Increment the error counter */
     pGen->nErr++;
     if (pGen->nErr > PH7_ERR_LIMIT) {
       /* Error count limit reached */
-      if (pGen->xErr) {
-        SyBlobFormat(pWorker, "%u Error count limit reached,PH7 is aborting compilation\n", nLine);
+      
+        SyBlobFormat(pWorker, "%u Error count limit reached, aborting compilation\n", nLine);
+
         if (SyBlobLength(pWorker) > 0) {
           /* Consume the generated error message */
-          pGen->xErr(SyBlobData(pWorker), SyBlobLength(pWorker), pGen->pErrData);
+          if (pGen->xErr)
+            pGen->xErr(SyBlobData(pWorker), SyBlobLength(pWorker), pGen->pErrData);
+#if DEVEL
+          else
+            printf("Compile pass: %.*s\n", SyBlobLength(pWorker),SyBlobData(pWorker) );
+#endif
         }
-      }
+      
       /* Abort immediately */
       return SXERR_ABORT;
     }
   }
+
+#if 0
   if (pGen->xErr == 0) {
     /* No available error consumer,return immediately */
     return SXRET_OK;
   }
+#endif
+
   switch (nErrType) {
-    case E_WARNING: zErr = "Warning"; break;
-    case E_PARSE: zErr = "Parse error"; break;
-    case E_NOTICE: zErr = "Notice"; break;
-    case E_USER_ERROR: zErr = "User error"; break;
-    case E_USER_WARNING: zErr = "User warning"; break;
-    case E_USER_NOTICE: zErr = "User notice"; break;
+    case E_WARNING: zErr = "[W]"; break;
+    case E_NOTICE: zErr = "[I]"; break;
+    case E_USER_ERROR: zErr = "(E)"; break;
+    case E_USER_WARNING: zErr = "(W)"; break;
+    case E_USER_NOTICE: zErr = "(I)"; break;
     default:
       break;
   }
@@ -7047,11 +7129,15 @@ PH7_PRIVATE sxi32 PH7_GenCompileError(ph7_gen_state *pGen, sxi32 nErrType, sxu32
   va_end(ap);
   /* Append a new line */
   SyBlobAppend(pWorker, (const void *)"\n", sizeof(char));
+
   if (SyBlobLength(pWorker) > 0) {
     /* Consume the generated error message */
-    pGen->xErr(SyBlobData(pWorker), SyBlobLength(pWorker), pGen->pErrData);
+
+    if (pGen->xErr)
+      pGen->xErr(SyBlobData(pWorker), SyBlobLength(pWorker), pGen->pErrData);
+    else
+      printf("Compile pass: %.*s\n", SyBlobLength(pWorker),SyBlobData(pWorker) );
   }
+
   return rc;
 }
-
-
