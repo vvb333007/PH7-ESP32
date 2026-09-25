@@ -416,6 +416,7 @@ static sxi32 ExprVerifyNodes(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 
       iParen--;
     } else if (apNode[i]->pStart->nType & PH7_TK_OSB /*'['*/) {
       iSquare++;
+//      puts("++");
     } else if (apNode[i]->pStart->nType & PH7_TK_CSB /*']'*/) {
       if (iSquare <= 0) {
         rc = PH7_GenCompileError(&(*pGen), E_ERROR, apNode[i]->pStart->nLine, "Syntax error: Unexpected token ']'");
@@ -425,6 +426,7 @@ static sxi32 ExprVerifyNodes(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 
         return rc;
       }
       iSquare--;
+      //puts("--");
     } else if (apNode[i]->pStart->nType & PH7_TK_OCB /*'{'*/) {
       iBraces++;
       if (i > 0 && (apNode[i - 1]->xCode == PH7_CompileVariable || (apNode[i - 1]->pStart->nType & PH7_TK_CSB /*]*/))) {
@@ -484,14 +486,15 @@ static sxi32 ExprVerifyNodes(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 
       }
       iBraces--;
     } else if (apNode[i]->pStart->nType & PH7_TK_COLON) {
+      /* Not a ternary operator? */
       if (iQuesty <= 0) {
         rc = PH7_GenCompileError(&(*pGen), E_ERROR, apNode[i]->pStart->nLine, "Syntax error: Unexpected token ':'");
         if (rc != SXERR_ABORT) {
           rc = SXERR_SYNTAX;
         }
         return rc;
-      }
-      iQuesty--;
+      } else
+        iQuesty--;
     } else if (apNode[i]->pStart->nType & PH7_TK_OP) {
       const ph7_expr_op *pOp = (const ph7_expr_op *)apNode[i]->pOp;
       if (pOp->iOp == EXPR_OP_QUESTY) {

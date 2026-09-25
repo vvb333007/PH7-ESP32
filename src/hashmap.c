@@ -5488,6 +5488,7 @@ static const ph7_builtin_func aHashmapFunc[] = {
   { "array_pop", ph7_hashmap_pop },
   { "array_push", ph7_hashmap_push },
   { "array_shift", ph7_hashmap_shift },
+  /* array_unshift() is implemented in a stdlib as a native PHP function */
   { "array_product", ph7_hashmap_product },
   { "array_sum", ph7_hashmap_sum },
   { "array_keys", ph7_hashmap_keys },

@@ -2803,7 +2803,7 @@ PH7_PRIVATE void *PH7_StreamOpenHandle(ph7_vm *pVm, const ph7_io_stream *pStream
  */
 PH7_PRIVATE sxi32 PH7_StreamReadWholeFile(void *pHandle, const ph7_io_stream *pStream, SyBlob *pOut) {
   ph7_int64 nRead;
-  char zBuf[8192]; /* 8K */
+  char zBuf[1024]; /* 1K. We are targeting embedded devices, 8K just for the stack here is too much */ 
   int rc;
   /* Perform the requested operation */
   for (;;) {

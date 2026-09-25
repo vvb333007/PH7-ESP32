@@ -9,19 +9,8 @@
 #define _PH7_H_
 
 /*
- * Symisc PH7: An embeddable bytecode compiler and a virtual machine for the PHP(5) programming language.
- * Copyright (C) 2011-2012, Symisc Systems http://ph7.symisc.net/
- * Version 2.1.4
- * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
- * please contact Symisc Systems via:
- *       legal@symisc.net
- *       licensing@symisc.net
- *       contact@symisc.net
- * or visit:
- *      http://ph7.symisc.net/
- */
-/*
  * Copyright (C) 2011, 2012 Symisc Systems. All rights reserved.
+ * Copyright (C) 2026, Viacheslav Logunov <vvb333007@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,14 +43,20 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $SymiscID: ph7.h v2.1 UNIX|WIN32/64 2012-09-15 09:43 stable <chm@symisc.net> $ */
 
+/* Version 2.2.0
+ * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
+ * please contact Symisc Systems via:
+ *       legal@symisc.net
+ *       licensing@symisc.net
+ *       contact@symisc.net
+ * or visit:
+ *      http://ph7.symisc.net/
+ */
 
 #include <stdarg.h> /* needed for the definition of va_list */
 #include <stdio.h>
 #include <stdlib.h>
-
-
 
 
 /*
@@ -85,7 +80,8 @@
  * version number and Y is the minor version number and Z is the release
  * number.
  */
-#define PH7_VERSION "2.1.4"
+//#define PH7_VERSION "2.1.4"
+#define PH7_VERSION "2.2.0"
 /*
  * The PH7_VERSION_NUMBER C preprocessor macro resolves to an integer
  * with the value (X*1000000 + Y*1000 + Z) where X, Y, and Z are the same
@@ -99,7 +95,7 @@
  * generated Server MIME header as follows:
  *   Server: YourWebServer/x.x PH7/x.x.x \r\n
  */
-#define PH7_SIG "PH7/2.1.4"
+#define PH7_SIG "PH7/2.2.0"
 /*
  * PH7 identification in the Symisc source tree:
  * Each particular check-in of a particular software released
@@ -107,16 +103,7 @@
  * This macro hold the one associated with ph7.
  */
 #define PH7_IDENT "ph7:c193f4d8a6b90ee60f9afad11840f1010054fdf9"
-/*
- * Copyright notice.
- * If you have any questions about the licensing situation,please
- * visit http://ph7.symisc.net/licensing.html
- * or contact Symisc Systems via:
- *   legal@symisc.net
- *   licensing@symisc.net
- *   contact@symisc.net
- */
-#define PH7_COPYRIGHT "Copyright (C) Symisc Systems 2011-2012, http://ph7.symisc.net/"
+#define PH7_COPYRIGHT "Copyright (C) Symisc Systems 2011-2012, http://ph7.symisc.net, Viacheslav Logunov <vvb333007@gmail.com>"
 /* Make sure we can call this stuff from C++ */
 #ifdef __cplusplus
 extern "C" {
@@ -138,6 +125,7 @@ extern "C" {
  * values of some parameters. 
  * Every effort has been made to ensure that the various combinations of compilation 
  * options work harmoniously and produce a working library.
+ *
  *
  * PH7_ENABLE_THREADS
  *   This option controls whether or not code is included in PH7 to enable it to operate
@@ -397,7 +385,6 @@ typedef double ph7_real;
 #define PH7_VM_CONFIG_ARGV_ENTRY 19      /* ONE ARGUMENT: const char *zValue */
 #define PH7_VM_CONFIG_EXTRACT_OUTPUT 20  /* TWO ARGUMENTS: const void **ppOut,unsigned int *pOutputLen */
 #define PH7_VM_CONFIG_ERR_LOG_HANDLER 21 /* ONE ARGUMENT: void (*xErrLog)(const char *,int,const char *,const char *) */
-/* ESP32 additions */
 #define PH7_VM_CONFIG_TEMPDIR 22          /* ONE ARGUMENT: const char *zPath */
 /*
  * Global Library Configuration Commands.

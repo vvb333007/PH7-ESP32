@@ -45,6 +45,12 @@
 #ifndef SMALLEST_INT64
 #define SMALLEST_INT64 (((sxi64)-1) - LARGEST_INT64)
 #endif
+
+#ifndef MAX_LITERAL_SIZE
+#define MAX_LITERAL_SIZE 1024  /* Compiler needs this: max length (in bytes) for a string literal*/
+#endif
+
+
 /* Forward declaration of private structures */
 typedef struct ph7_class_instance ph7_class_instance;
 typedef struct ph7_foreach_info ph7_foreach_info;
@@ -1892,7 +1898,10 @@ PH7_PRIVATE sxi32 PH7_CompileList(ph7_gen_state *pGen, sxi32 iCompileFlag);
 PH7_PRIVATE sxi32 PH7_CompileAnnonFunc(ph7_gen_state *pGen, sxi32 iCompileFlag);
 PH7_PRIVATE sxi32 PH7_InitCodeGenerator(ph7_vm *pVm, ProcConsumer xErr, void *pErrData);
 PH7_PRIVATE sxi32 PH7_ResetCodeGenerator(ph7_vm *pVm, ProcConsumer xErr, void *pErrData);
+
+#define PH7_GenCompileOOM(_pGen) PH7_GenCompileError((pGen), E_ERROR, 1, "Fatal, engine is running out-of-memory")
 PH7_PRIVATE sxi32 PH7_GenCompileError(ph7_gen_state *pGen, sxi32 nErrType, sxu32 nLine, const char *zFormat, ...);
+
 PH7_PRIVATE sxi32 PH7_CompileScript(ph7_vm *pVm, SyString *pScript, sxi32 iFlags);
 /* constant.c function prototypes */
 PH7_PRIVATE void PH7_RegisterBuiltInConstant(ph7_vm *pVm);

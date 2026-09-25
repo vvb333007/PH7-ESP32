@@ -106,8 +106,10 @@ static sxi32 EngineConfig(ph7 *pEngine, sxi32 nOp, va_list ap) {
           break;
         }
         /* Install the error consumer */
+        
         pConf->xErr = xConsumer;
         pConf->pErrData = pUserData;
+        printf("PH7_CONFIG_ERR_OUTPUT %p\n",pConf->xErr);
         break;
       }
     case PH7_CONFIG_ERR_LOG:
@@ -549,6 +551,7 @@ int ph7_init(ph7 **ppEngine) {
 #endif
   /* Default configuration */
   SyBlobInit(&pEngine->xConf.sErrConsumer, &pEngine->sAllocator);
+
   /* Install a default compile-time error consumer routine */
   ph7_config(pEngine, PH7_CONFIG_ERR_OUTPUT, PH7_VmBlobConsumer, &pEngine->xConf.sErrConsumer);
   /* Built-in vfs */
