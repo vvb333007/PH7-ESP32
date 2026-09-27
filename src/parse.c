@@ -1388,7 +1388,7 @@ static sxi32 ExprMakeTree(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 nTo
         if (pNode->pOp->iOp == EXPR_OP_REF) {
           sxi32 iTmp;
           /* Reference operator [i.e: '&=' ]*/
-          if (ExprIsModifiableValue(apNode[iLeft], FALSE) == FALSE || (apNode[iLeft]->pOp && apNode[iLeft]->pOp->iVmOp == PH7_OP_MEMBER /*->,::*/)) {
+          if (ExprIsModifiableValue(apNode[iLeft], FALSE) == FALSE || (apNode[iLeft]->pOp && (apNode[iLeft]->pOp->iVmOp == PH7_OP_MEMBER || apNode[iLeft]->pOp->iVmOp == PH7_OP_MEMBERNS) /*->,::*/)) {
             /* Left operand must be a modifiable l-value */
             rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'&': Left operand must be a modifiable l-value");
             if (rc != SXERR_ABORT) {

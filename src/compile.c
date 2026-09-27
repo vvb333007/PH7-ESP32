@@ -6427,7 +6427,9 @@ static sxi32 GenStateEmitExprCode(
         if (pInstr->iOp == PH7_OP_LOADC) {
           /* Prevent constant expansion */
           pInstr->iP1 = 0;
-        } else if (pInstr->iOp == PH7_OP_MEMBER /* $a->b(1,2,3) */ || pInstr->iOp == PH7_OP_NEW) {
+        } else if (pInstr->iOp == PH7_OP_MEMBER /* $a->b(1,2,3) */ ||
+                   pInstr->iOp == PH7_OP_MEMBERNS /* $a?->b(1,2,3)*/ ||
+                   pInstr->iOp == PH7_OP_NEW) {
           /* Method call,flag that */
           pInstr->iP2 = 1;
         }
@@ -6475,7 +6477,7 @@ static sxi32 GenStateEmitExprCode(
         if (pInstr->iOp == PH7_OP_LOAD_LIST) {
           /* Hide the STORE instruction */
           iVmOp = 0;
-        } else if (pInstr->iOp == PH7_OP_MEMBER) {
+        } else if ((pInstr->iOp == PH7_OP_MEMBER || pInstr->iOp == PH7_OP_MEMBERNS)) {
           /* Perform a member store operation [i.e: $this->x = 50] */
           iP2 = 1;
         } else {
@@ -6518,13 +6520,13 @@ static sxi32 GenStateEmitExprCode(
       if (pInstr && pInstr->iOp == PH7_OP_CALL) {
         VmInstr *pPrev;
         pPrev = PH7_VmPeekNextInstr(pGen->pVm);
-        if (pPrev == 0 || pPrev->iOp != PH7_OP_MEMBER) {
+        if (pPrev == 0 || (pPrev->iOp != PH7_OP_MEMBER && pPrev->iOp != PH7_OP_MEMBERNS)) {
           /* Pop the call instruction */
           iP1 = pInstr->iP1;
           (void)PH7_VmPopInstr(pGen->pVm);
         }
       }
-    } else if (iVmOp == PH7_OP_MEMBER) {
+    } else if (iVmOp == PH7_OP_MEMBER || iVmOp == PH7_OP_MEMBERNS) {
       if (pNode->pOp->iOp == EXPR_OP_DC /* '::' */) {
         /* Static member access,remember that */
         iP1 = 1;

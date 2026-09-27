@@ -5054,6 +5054,7 @@ static sxi32 VmByteCodeExec(
                 pTos->nIdx = SXU32_HIGH;
               } else {
                 /* Attribute access */
+                puts("Attr access");
                 VmClassAttr *pObjAttr = 0;
                 SyHashEntry *pEntry;
                 /* Extract the target attribute */
