@@ -7,7 +7,7 @@
 | Destructuring aka short list syntax: [$a,$b,$c] = $x; is not supported. [in roadmap] | Full support|
 | `__call()` and `__callStatic()` do not return any value [in roadmap] | Full support|
 | Native UTF8 support for strings, ID's, constants , variables and function names (classes etc) | :-) |
-| `??` and `??=` operators are missing | Full support |
+| `??=` operator is missing | Full support |
 
 
 
