@@ -184,6 +184,10 @@ Do fallback only if there is only 1 candidate~~
 ###14. ~~`callable` type ~~
 
 
-###13. ?? operator ( ?? as a ternary OP, and ??= null coalesce assignment) , ?-> nullsafe operator  
+###13. ?? operator ( ?? as a ternary OP, and ??= null coalesce assignment)
+
+###14. ?-> nullsafe operator  
+
+~~Implement a nullsafe arrow operator, which loads NULL. Change the behaviour of -> to generate a VM error if operating on null~~
 
        
