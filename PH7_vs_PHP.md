@@ -8,6 +8,7 @@
 | `__call()` and `__callStatic()` do not return any value [in roadmap] | Full support|
 | Native UTF8 support for strings, ID's, constants , variables and function names (classes etc) | :-) |
 | `??`, `??=` and nullsafe `?->` operators are missing | Full support |
+| Nullsafe `?->` operator work “by default,” i.e. the `->` operator is effectively an implicit `?->` operator | Zend PHP distinguishes between the semantics of `->` and `?->` |
 
 
 | PH7                                                                                                                                                                  | PHP                                                                                                                                                 |
