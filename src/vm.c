@@ -1,16 +1,15 @@
-  /*
- * Symisc PH7: An embeddable bytecode compiler and a virtual machine for the PHP(5) programming language.
- * Copyright (C) 2011-2012, Symisc Systems http://ph7.symisc.net/
- * Copyright (C) 2026-, Viacheslav Logunov vvb333007@gmail.com
- * Version 2.1.4
- * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
- * please contact Symisc Systems via:
- *       legal@symisc.net
- *       licensing@symisc.net
- *       contact@symisc.net
- * or visit:
- *      http://ph7.symisc.net/
+/*
+ * PH7-ESP32 — embeddable PHP bytecode compiler & virtual machine,
+ * ported and maintained for ESP32/FreeRTOS, Linux and Windows(Cygwin).
+ *
+ * Copyright (C) 2011-2018 Symisc Systems <http://ph7.symisc.net/>
+ * Copyright (C) 2026-present Viacheslav Logunov <vvb333007@gmail.com>
+ *
+ * Licensed under the Symisc Public License (modified BSD with mandatory
+ * source disclosure, clause 3); commercial licensing available from
+ * Symisc Systems. Full terms: see LICENSE. Contacts: see CONTACTS.
  */
+
 #include <stdint.h>
 #include "ph7int.h"
 
@@ -2446,9 +2445,10 @@ static sxi32 VmByteCodeExec(
  * and return immediately.
  *
  * P1 = 1 : we do have return value on the stack
+ * TODO: use P2 it is naturally unsigned integer
  * P3 = 0 : Return typecasting was done by the prior CVT instruction.
  * P3 = x : Result is nullable, prior CVT was not emitted by PH7_CompileReturn()
- *          OP_DONE must check the top of the stack and convert that object to a type P2.
+ *          OP_DONE must check the top of the stack and convert that object to a type P3.
  */
       case PH7_OP_DONE:
         if (pInstr->iP1) {
@@ -2836,7 +2836,9 @@ static sxi32 VmByteCodeExec(
           /* Reserve a room */
           pTos++;
           if ((pObj = (ph7_value *)SySetAt(&pVm->aLitObj, pInstr->iP2)) != 0) {
+            
             if (pInstr->iP1 == 1 && SyBlobLength(&pObj->sBlob) <= 64) {
+            
               SyHashEntry *pEntry;
               /* Candidate for expansion via user defined callbacks */
               pEntry = SyHashGet(&pVm->hConstant, SyBlobData(&pObj->sBlob), SyBlobLength(&pObj->sBlob));
@@ -8883,9 +8885,19 @@ static int vm_builtin_get_defined_vars(ph7_context *pCtx, int nArg, ph7_value **
  *   String representation of the given variable type.
  */
 static int vm_builtin_gettype(ph7_context *pCtx, int nArg, ph7_value **apArg) {
-  const char *zType = "Empty";
-  if (nArg > 0) {
+  const char *zType = "mixed";
+  while (nArg > 0) {
+    /* For strings and arrays we check if they in theory be a callable.
+     * In particular, a string "die" is a "callable"
+    */
+    if (apArg[0]->iFlags & (MEMOBJ_HASHMAP | MEMOBJ_STRING)) {
+      if (PH7_VmIsCallable(pCtx->pVm, apArg[0], FALSE)) {
+        zType = "callable";
+        break;
+      }
+    }
     zType = PH7_MemObjTypeDump(apArg[0]);
+    break;
   }
   /* Return the variable type */
   ph7_result_string(pCtx, zType, -1 /*Compute length automatically*/);
