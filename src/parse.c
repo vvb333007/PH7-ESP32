@@ -164,6 +164,7 @@ static const ph7_expr_op aOpTable[] = {
   /* Postfix operators */
   /* Precedence 2(Highest),left-associative */
 
+  { { "?->", sizeof(char) * 3 }, EXPR_OP_ARROW, 2, EXPR_OP_ASSOC_LEFT, PH7_OP_MEMBERNS }, 
   { { "->", sizeof(char) * 2 }, EXPR_OP_ARROW, 2, EXPR_OP_ASSOC_LEFT, PH7_OP_MEMBER },
   { { "::", sizeof(char) * 2 }, EXPR_OP_DC, 2, EXPR_OP_ASSOC_LEFT, PH7_OP_MEMBER },
   { { "[", sizeof(char) }, EXPR_OP_SUBSCRIPT, 2, EXPR_OP_ASSOC_LEFT, PH7_OP_LOAD_IDX },
@@ -226,12 +227,18 @@ static const ph7_expr_op aOpTable[] = {
   { { "&&", sizeof(char) * 2 }, EXPR_OP_LAND, 15, EXPR_OP_ASSOC_LEFT, PH7_OP_LAND },
   /* Precedence 16,left-associative */
   { { "||", sizeof(char) * 2 }, EXPR_OP_LOR, 16, EXPR_OP_ASSOC_LEFT, PH7_OP_LOR },
+  /* Null coalesce operator 
+  * Technically it is a right-assoc but should work as a left assoc as well.
+  * the engine has these precedences hardcoded in many places so I didn't risk to change iPrecþ
+  * It must be prec 17 for ?? and 18 for ? and so on. But there are hardcode checks like iPrec == 18 or 
+  * if (iPrec == i) where i is in range from 7 to 17 or 19.. Adding '??' at prec 17 and shifting 
+  *  all the rest of the table, by adding +1 to precedence - whole internal compiler/parser logic
+  * will be broken. TODO: CITO: These hardcoded values must be refactored. 
+  * 
+  */
+  { { "??", sizeof("??") - 1 }, EXPR_OP_NULLC, 17, EXPR_OP_ASSOC_LEFT, PH7_OP_NULLC },
   /* Ternary operator */
   /* Precedence 17,left-associative */
-  /* EXPR1 ? EXPR2 : EXPR3
-   TODO: EXPR1 ?? EXPR2
-  */
-  { { "??", sizeof("??") - 1 }, EXPR_OP_NULLC, 19, EXPR_OP_ASSOC_LEFT, PH7_OP_NULLC },
   { { "?", sizeof(char) }, EXPR_OP_QUESTY, 17, EXPR_OP_ASSOC_LEFT, 0 },
   /* Combined binary operators */
   /* Precedence 18,right-associative */
@@ -256,6 +263,7 @@ static const ph7_expr_op aOpTable[] = {
   /* Precedence 22,left-associative [Lowest operator] */
   { { ",", sizeof(char) }, EXPR_OP_COMMA, 22, EXPR_OP_ASSOC_LEFT, 0 }, /* IMP-0139-COMMA: Symisc eXtension */
 };
+
 /* Function call operator need special handling */
 static const ph7_expr_op sFCallOp = { { "(", sizeof(char) }, EXPR_OP_FUNC_CALL, 2, EXPR_OP_ASSOC_LEFT, PH7_OP_CALL };
 /*
@@ -286,7 +294,7 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
     }
     if (rc == 0) {
 
-    //  printf("ExprExtractOperator() : Found: %.*s\r\n", aOpTable[n].sOp.nByte, aOpTable[n].sOp.zString);
+      //printf("ExprExtractOperator() : Found: %.*s\r\n", aOpTable[n].sOp.nByte, aOpTable[n].sOp.zString);
 
       if (aOpTable[n].sOp.nByte != sizeof(char) || 
           (aOpTable[n].iOp != EXPR_OP_UMINUS && aOpTable[n].iOp != EXPR_OP_UPLUS) || 
@@ -313,7 +321,7 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
     ++n; /* Next operator in the table */
   }
   /* No such operator */
-    //printf("ExprExtractOperator() : not found\r\n");
+  //printf("ExprExtractOperator() : not found\r\n");
   return 0;
 }
 /*
@@ -492,13 +500,6 @@ static sxi32 ExprVerifyNodes(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 
       const ph7_expr_op *pOp = (const ph7_expr_op *)apNode[i]->pOp;
       if (pOp->iOp == EXPR_OP_QUESTY) {
         iQuesty++;
-        if (i > 0 && (apNode[i-1]->pStart->nType & PH7_TK_OP)) {
-          const ph7_expr_op *pPrev = (const ph7_expr_op *)apNode[i - 1]->pOp;
-          if (pPrev->iOp == EXPR_OP_QUESTY)  {
-            iQuesty -= 2;
-            //puts("An ?? operator detected by the parser");
-          }
-        }
       } else if (i > 0 && (pOp->iOp == EXPR_OP_UMINUS || pOp->iOp == EXPR_OP_UPLUS)) {
         if (apNode[i - 1]->xCode == PH7_CompileVariable || apNode[i - 1]->xCode == PH7_CompileLiteral) {
           sxi32 iExprOp = EXPR_OP_SUB; /* Binary minus */
@@ -805,6 +806,7 @@ static sxi32 ExprExtractNode(ph7_gen_state *pGen, ph7_expr_node **ppNode) {
   } else {
     if ((pCur->nType & (PH7_TK_LPAREN | PH7_TK_RPAREN | PH7_TK_COMMA | PH7_TK_COLON | PH7_TK_CSB | PH7_TK_OCB | PH7_TK_CCB)) == 0) {
       /* Point to the code generator routine */
+      //printf(">>> %08x\n",(unsigned int)pCur->nType);
       pNode->xCode = PH7_GetNodeHandler(pCur->nType);
       if (pNode->xCode == 0) {
         rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "Syntax error: Unexpected token '%z'", &pNode->pStart->sData);

@@ -369,6 +369,24 @@ static sxi32 TokenizePHP(SyStream *pStream, SyToken *pToken, void *pUserData, vo
           pToken->nType = PH7_TK_COLON; /* Single colon */
         }
         break;
+      case '?':
+        if (pStream->zText < pStream->zEnd) {
+          if (pStream->zText[0] == '?') {
+            /* Current operator: '??' */
+            pStream->zText++;  
+          } else if (pStream->zText[0] == '-') {
+            pStream->zText++;
+            if (pStream->zText < pStream->zEnd) {
+              if (pStream->zText[0] == '>') {
+                /* Current operator: '?->' */
+               pStream->zText++;
+               //puts("nullsafe detected");
+              } else
+                pStream->zText--;  //TODO: Looks bad
+            }
+          } 
+        }
+      break;
 
       case ',': pToken->nType |= PH7_TK_COMMA; break; /* Comma is also an operator */
       case ';':
@@ -555,6 +573,7 @@ static sxi32 TokenizePHP(SyStream *pStream, SyToken *pToken, void *pUserData, vo
     if (pToken->nType & PH7_TK_OP) {
       const ph7_expr_op *pOp;
       /* Check if the extracted token is an operator */
+
       pOp = PH7_ExprExtractOperator(pStr, (SyToken *)SySetPeek(pStream->pSet));
       if (pOp == 0) {
         /* Not an operator */
