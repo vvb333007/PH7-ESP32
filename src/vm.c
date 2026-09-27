@@ -4974,8 +4974,10 @@ static sxi32 VmByteCodeExec(
         }
       /*
  * OP_MEMBER P1 P2
+ * OP_MEMBERNS P1 P2 - a nullsafe version of OP_MEMBER
  * Load class attribute/method on the stack.
  */
+      case PH7_OP_MEMBERNS:
       case PH7_OP_MEMBER:
         {
           ph7_class_instance *pThis;
@@ -5092,7 +5094,13 @@ static sxi32 VmByteCodeExec(
                 PH7_ClassInstanceUnref(pThis);
               }
             } else {
-              VmErrorFormat(&(*pVm), PH7_CTX_ERR, "'->': Expecting class instance as left operand,PH7 is loading NULL");
+              if (pInstr->iOp == PH7_OP_MEMBER) {
+                VmErrorFormat(&(*pVm), PH7_CTX_ERR, "'->': Attempt to dereference a null variable. Aborted.");
+                goto Abort;
+              }
+              //VmErrorFormat(&(*pVm), PH7_CTX_ERR, "'->': Expecting class instance as left operand,PH7 is loading NULL");
+              // TODO: should we push the name of an exception thrower on the stack here
+              // so subsequent OP_CALL will actually call a function, which does throw(new Exception())?
               VmPopOperand(&pTos, 1);
               PH7_MemObjRelease(pTos);
               pTos->nIdx = SXU32_HIGH; /* Assume we are loading a constant */
@@ -5215,6 +5223,7 @@ static sxi32 VmByteCodeExec(
               }
             } else {
               /* Pop operands */
+
               PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "Invalid class name,PH7 is loading NULL");
               if (!pInstr->p3) {
                 VmPopOperand(&pTos, 1);
