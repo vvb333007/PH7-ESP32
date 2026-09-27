@@ -1026,6 +1026,10 @@ static sxi32 VmEvalChunk(ph7_vm *pVm, ph7_context *pCtx, SyString *pChunk, int i
   "   return $this->file.' '.$this->line.' '.$this->code.' '.$this->message;" \
   "}" \
   "}" \
+  "function __nullderef() {" \
+  "  throw(new Exception(\"Attempt to dereference (->) a null variable\"));" \
+  "}" \
+  "function __nullsafe() {}" \
   "class ErrorException extends Exception { " \
   "protected $severity;" \
   "public function __construct(string $message = null," \
@@ -5094,16 +5098,30 @@ static sxi32 VmByteCodeExec(
                 PH7_ClassInstanceUnref(pThis);
               }
             } else {
+
               if (pInstr->iOp == PH7_OP_MEMBER) {
-                VmErrorFormat(&(*pVm), PH7_CTX_ERR, "'->': Attempt to dereference a null variable. Aborted.");
-                goto Abort;
+                /* Replace the method name with stdlib function call which throws an exception 
+                 * and continue execution like nothing happened. Subsequent OP_CALL will execute __nullderef()
+                */
+                PH7_MemObjRelease(pTos);
+                SyBlobAppend(&pTos->sBlob, "__nullderef", 11);
+                MemObjSetType(pTos, MEMOBJ_STRING);
+              } else {
+               /* ?->, a nullsafe opeartor 
+                * applied to a null variable - silently ignore this by loading null on the tos:
+                * this will case subsequent OP_CALL to fail
+               */
+#if 0
+                VmPopOperand(&pTos, 1);
+                PH7_MemObjRelease(pTos);
+                pTos->nIdx = SXU32_HIGH; /* Assume we are loading a constant */
+#else
+                PH7_MemObjRelease(pTos);
+                SyBlobAppend(&pTos->sBlob, "__nullsafe", 10);
+                MemObjSetType(pTos, MEMOBJ_STRING);
+#endif
               }
-              //VmErrorFormat(&(*pVm), PH7_CTX_ERR, "'->': Expecting class instance as left operand,PH7 is loading NULL");
-              // TODO: should we push the name of an exception thrower on the stack here
-              // so subsequent OP_CALL will actually call a function, which does throw(new Exception())?
-              VmPopOperand(&pTos, 1);
-              PH7_MemObjRelease(pTos);
-              pTos->nIdx = SXU32_HIGH; /* Assume we are loading a constant */
+              pTos->nIdx = SXU32_HIGH;
             }
           } else {
             /* Static member access using class name */
@@ -5448,7 +5466,7 @@ static sxi32 VmByteCodeExec(
                 PH7_ClassInstanceCallMagicMethod(&(*pVm), pThis->pClass, pThis, "__invoke", sizeof("__invoke") - 1, 0);
               } else {
                 /* Raise exception: Invalid function name */
-                VmErrorFormat(&(*pVm), PH7_CTX_WARNING, "Invalid function name,NULL will be returned");
+                VmErrorFormat(&(*pVm), PH7_CTX_WARNING, "Invalid function name ,NULL will be returned");
               }
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
