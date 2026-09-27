@@ -1029,7 +1029,7 @@ static sxi32 VmEvalChunk(ph7_vm *pVm, ph7_context *pCtx, SyString *pChunk, int i
   "function __nullderef() {" \
   "  throw(new Exception(\"Attempt to dereference (->) a null variable\"));" \
   "}" \
-  "function __nullsafe() {}" \
+  "function __nullsafe() { return null; }" \
   "class ErrorException extends Exception { " \
   "protected $severity;" \
   "public function __construct(string $message = null," \
