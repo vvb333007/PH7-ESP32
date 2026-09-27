@@ -1573,6 +1573,8 @@ enum ph7_vm_op {
   PH7_OP_NULLCE,   /* ??= */
   PH7_OP_MEMBERNS, /* ?-> */
 
+  PH7_OP_JNN,
+
 };
 /* -- END-OF INSTRUCTIONS -- */
 /*

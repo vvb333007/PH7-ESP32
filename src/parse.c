@@ -236,7 +236,7 @@ static const ph7_expr_op aOpTable[] = {
   * will be broken. TODO: CITO: These hardcoded values must be refactored. 
   * 
   */
-  { { "??", sizeof("??") - 1 }, EXPR_OP_NULLC, 17, EXPR_OP_ASSOC_LEFT, PH7_OP_NULLC },
+  { { "??", sizeof("??") - 1 }, EXPR_OP_NULLC, 16, EXPR_OP_ASSOC_LEFT, PH7_OP_NULLC },
   /* Ternary operator */
   /* Precedence 17,left-associative */
   { { "?", sizeof(char) }, EXPR_OP_QUESTY, 17, EXPR_OP_ASSOC_LEFT, 0 },
@@ -317,6 +317,7 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
     ++n; /* Next operator in the table */
   }
   /* No such operator */
+  puts("Not found");
   return 0;
 }
 /*
@@ -1259,7 +1260,7 @@ static sxi32 ExprMakeTree(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 nTo
         if (apNode[iLeft]->pOp == 0) {
           if (apNode[iLeft]->xCode != PH7_CompileVariable) {
             pToken = apNode[iLeft]->pStart;
-            rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': Unexpected token '%z'",
+            rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': 1Unexpected token '%z'",
                                      &pNode->pOp->sOp, &pToken->sData);
             if (rc != SXERR_ABORT) {
               rc = SXERR_SYNTAX;
@@ -1576,7 +1577,7 @@ static sxi32 ExprMakeTree(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 nTo
   for (iCur = 1; iCur < nToken; ++iCur) {
     if (apNode[iCur]) {
       if ((apNode[iCur]->pOp || apNode[iCur]->xCode) && apNode[0] != 0) {
-        rc = PH7_GenCompileError(pGen, E_ERROR, apNode[iCur]->pStart->nLine, "Unexpected token '%z'", &apNode[iCur]->pStart->sData);
+        rc = PH7_GenCompileError(pGen, E_ERROR, apNode[iCur]->pStart->nLine, "2Unexpected token '%z'", &apNode[iCur]->pStart->sData);
         if (rc != SXERR_ABORT) {
           rc = SXERR_SYNTAX;
         }

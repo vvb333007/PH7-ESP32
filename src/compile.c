@@ -6467,6 +6467,9 @@ static sxi32 GenStateEmitExprCode(
     } else if (iVmOp == PH7_OP_LOR) {
       /* Emit the true jump so we can short-circuit the logical or*/
       PH7_VmEmitInstr(pGen->pVm, PH7_OP_JNZ, 1 /* Keep the value on the stack */, 0, 0, &nJmpIdx);
+    } else if (iVmOp == PH7_OP_NULLC) {
+      /* Emit the true jump so we can short-circuit the null coalesce */
+      PH7_VmEmitInstr(pGen->pVm, PH7_OP_JNN, 1 /* Keep the value on the stack */, 0, 0, &nJmpIdx); //TODO: JNN instruction!
     } else if (pNode->pOp->iPrec == 19 /* Combined binary operators [i.e: =,'.=','+=',*=' ...] precedence */) {
       iFlags |= EXPR_FLAG_LOAD_IDX_STORE;
     }

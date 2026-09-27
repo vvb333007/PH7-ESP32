@@ -2616,6 +2616,28 @@ static sxi32 VmByteCodeExec(
           VmPopOperand(&pTos, 1);
         }
         break;
+
+
+      /*
+ * JNN: P1 P2 *
+ *
+ * Take the jump if the top value is not null.Pop the top most
+ * entry in the stack if P1 is zero.
+ */
+      case PH7_OP_JNN:
+#ifdef UNTRUST
+        if (pTos < pStack) {
+          goto Abort;
+        }
+#endif
+        if ((pTos->iFlags & MEMOBJ_NULL) == 0)
+          pc = pInstr->iP2 - 1;
+
+        if (!pInstr->iP1)
+          VmPopOperand(&pTos, 1);
+
+        break;
+
       /*
  * NOOP: * * *
  *
@@ -2623,6 +2645,7 @@ static sxi32 VmByteCodeExec(
  * destination.
  */
       case PH7_OP_NOOP:
+      case PH7_OP_NULLC: 
         break;
       /*
  * POP: P1 * *
@@ -6200,6 +6223,7 @@ static const char *VmInstrToString(sxi32 nOp) {
     case PH7_OP_JMP: zOp = "JMP"; break;
     case PH7_OP_JZ: zOp = "JZ"; break;
     case PH7_OP_JNZ: zOp = "JNZ"; break;
+    case PH7_OP_JNN: zOp = "JNN"; break;
     case PH7_OP_POP: zOp = "POP"; break;
     case PH7_OP_CAT: zOp = "CAT"; break;
     case PH7_OP_CVT_INT: zOp = "CVT.INT"; break;
@@ -6281,6 +6305,7 @@ static const char *VmInstrToString(sxi32 nOp) {
     case PH7_OP_FOREACH_STEP:
       zOp = "4EACH_STEP";
       break;
+    case PH7_OP_NULLC: zOp = "NOOP"; break;
     default:
       break;
   }
