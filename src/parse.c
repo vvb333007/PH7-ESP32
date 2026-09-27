@@ -1,23 +1,14 @@
-
 /*
- * ----------------------------------------------------------
- * File: parse.c
- * MD5: 56ca16eaf7ac65c2fd5a9a8b67345f21
- * ----------------------------------------------------------
+ * PH7-ESP32 — embeddable PHP bytecode compiler & virtual machine,
+ * ported and maintained for ESP32/FreeRTOS, Linux and Windows(Cygwin).
+ *
+ * Copyright (C) 2011-2018 Symisc Systems <http://ph7.symisc.net/>
+ * Copyright (C) 2026-present Viacheslav Logunov <vvb333007@gmail.com>
+ *
+ * Licensed under the Symisc Public License (modified BSD with mandatory
+ * source disclosure, clause 3); commercial licensing available from
+ * Symisc Systems. Full terms: see LICENSE. Contacts: see CONTACTS.
  */
-/*
- * Symisc PH7: An embeddable bytecode compiler and a virtual machine for the PHP(5) programming language.
- * Copyright (C) 2011-2012, Symisc Systems http://ph7.symisc.net/
- * Version 2.1.4
- * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
- * please contact Symisc Systems via:
- *       legal@symisc.net
- *       licensing@symisc.net
- *       contact@symisc.net
- * or visit:
- *      http://ph7.symisc.net/
- */
-/* $SymiscID: parse.c v3.7 FreeBSD 2011-12-20 22:46 stable <chm@symisc.net> $ */
 
 #include "ph7int.h"
 
@@ -143,7 +134,8 @@
  * assignment, is the assigned value. Notice that it is NOT 3, but the combined value of $a plus 3 (this is the value that's assigned into $a).
  * Any two-place operator can be used in this operator-assignment mode, for example '$a -= 5' (subtract 5 from the value of $a), '$b *= 7'
  * (multiply the value of $b by 7), etc.
- * There is one more expression that may seem odd if you haven't seen it in other languages, the ternary conditional operator:
+ * There is one more expression that may seem odd if you haven't seen it in other languages, the 
+  ternary conditional operator:
  * <?php
  * $first ? $second : $third
  * ?>
@@ -239,6 +231,7 @@ static const ph7_expr_op aOpTable[] = {
   /* EXPR1 ? EXPR2 : EXPR3
    TODO: EXPR1 ?? EXPR2
   */
+  { { "??", sizeof("??") - 1 }, EXPR_OP_NULLC, 19, EXPR_OP_ASSOC_LEFT, PH7_OP_NULLC },
   { { "?", sizeof(char) }, EXPR_OP_QUESTY, 17, EXPR_OP_ASSOC_LEFT, 0 },
   /* Combined binary operators */
   /* Precedence 18,right-associative */
@@ -320,7 +313,7 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
     ++n; /* Next operator in the table */
   }
   /* No such operator */
-    printf("ExprExtractOperator() : not found\r\n");
+    //printf("ExprExtractOperator() : not found\r\n");
   return 0;
 }
 /*
@@ -499,6 +492,13 @@ static sxi32 ExprVerifyNodes(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 
       const ph7_expr_op *pOp = (const ph7_expr_op *)apNode[i]->pOp;
       if (pOp->iOp == EXPR_OP_QUESTY) {
         iQuesty++;
+        if (i > 0 && (apNode[i-1]->pStart->nType & PH7_TK_OP)) {
+          const ph7_expr_op *pPrev = (const ph7_expr_op *)apNode[i - 1]->pOp;
+          if (pPrev->iOp == EXPR_OP_QUESTY)  {
+            iQuesty -= 2;
+            //puts("An ?? operator detected by the parser");
+          }
+        }
       } else if (i > 0 && (pOp->iOp == EXPR_OP_UMINUS || pOp->iOp == EXPR_OP_UPLUS)) {
         if (apNode[i - 1]->xCode == PH7_CompileVariable || apNode[i - 1]->xCode == PH7_CompileLiteral) {
           sxi32 iExprOp = EXPR_OP_SUB; /* Binary minus */
@@ -1436,6 +1436,7 @@ static sxi32 ExprMakeTree(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 nTo
     }
     pNode = apNode[iCur];
     if (pNode->pOp && pNode->pOp->iOp == EXPR_OP_QUESTY && pNode->pLeft == 0) {
+      //printf("questy %d\n",iLeft);
       sxi32 iNest = 1;
       if (iLeft < 0 || !NODE_ISTERM(iLeft)) {
         /* Missing condition */

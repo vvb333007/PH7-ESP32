@@ -1,23 +1,14 @@
-
 /*
- * ----------------------------------------------------------
- * File: api.c
- * MD5: ec37aefad456de49a24c8f73f45f8c84
- * ----------------------------------------------------------
+ * PH7-ESP32 — embeddable PHP bytecode compiler & virtual machine,
+ * ported and maintained for ESP32/FreeRTOS, Linux and Windows(Cygwin).
+ *
+ * Copyright (C) 2011-2018 Symisc Systems <http://ph7.symisc.net/>
+ * Copyright (C) 2026-present Viacheslav Logunov <vvb333007@gmail.com>
+ *
+ * Licensed under the Symisc Public License (modified BSD with mandatory
+ * source disclosure, clause 3); commercial licensing available from
+ * Symisc Systems. Full terms: see LICENSE. Contacts: see CONTACTS.
  */
-/*
- * Symisc PH7: An embeddable bytecode compiler and a virtual machine for the PHP(5) programming language.
- * Copyright (C) 2011-2012, Symisc Systems http://ph7.symisc.net/
- * Version 2.1.4
- * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
- * please contact Symisc Systems via:
- *       legal@symisc.net
- *       licensing@symisc.net
- *       contact@symisc.net
- * or visit:
- *      http://ph7.symisc.net/
- */
-/* $SymiscID: api.c v2.0 FreeBSD 2012-08-18 06:54 stable <chm@symisc.net> $ */
 
 #include "ph7int.h"
 

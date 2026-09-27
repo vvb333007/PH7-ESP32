@@ -1,3 +1,27 @@
+/* 
+ * This is the SLRE of 2025 (a fork from Aquefir) which was patched where possible against
+ * known bugs and then wrapped in a PCRE-like API.
+ * 
+ * This is NOT a PHP PCRE. This is very similar regexp engine
+ * which has some limitation, comparing to PCRE:
+ * In particular, "/regexp/i" is not a valid sytax: '/' and flags are not supported (flags are supported through API, not through regexp itself)
+ * Separators and flags are not required.
+ *
+ * Does it support SLRE or PCRE syntax? It support both: PCRE syntax is used in pl_ functions, SLRE syntax is used in slre_match()
+ * PL wrapper works by converting a given regexp into something that SLRE (a patched version!) can understand
+ *
+ * No lookarounds, no UTF8 (only byte matching, no ranges e.g. [à-ÿ])
+ *
+ * Copyright (C) 2004-2013 Sergey Lyubka.
+ * Copyright (C) 2013 Cesanta Software Limited.
+ * Copyright (C) 2025 Aquefir Consulting LLC.
+ * Copyright (C) 2026 Viacheslav Logunov (bug fixes)
+ * Released under GNU General Public License v2
+
+ *
+ * CODING STYLE IS KEPT SAME AS THE CODING STYLE OF THE SLRE LIBRARY!
+ */
+
 #pragma once
 
 #define PL_SLRE_PATCHED 1       /* do not change. SLRE library variant (patched or not) */

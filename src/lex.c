@@ -1,23 +1,14 @@
-
 /*
- * ----------------------------------------------------------
- * File: lex.c
- * MD5: c218c13068ed53acb1154762f9e6fd13
- * ----------------------------------------------------------
+ * PH7-ESP32 — embeddable PHP bytecode compiler & virtual machine,
+ * ported and maintained for ESP32/FreeRTOS, Linux and Windows(Cygwin).
+ *
+ * Copyright (C) 2011-2018 Symisc Systems <http://ph7.symisc.net/>
+ * Copyright (C) 2026-present Viacheslav Logunov <vvb333007@gmail.com>
+ *
+ * Licensed under the Symisc Public License (modified BSD with mandatory
+ * source disclosure, clause 3); commercial licensing available from
+ * Symisc Systems. Full terms: see LICENSE. Contacts: see CONTACTS.
  */
-/*
- * Symisc PH7: An embeddable bytecode compiler and a virtual machine for the PHP(5) programming language.
- * Copyright (C) 2011-2012, Symisc Systems http://ph7.symisc.net/
- * Version 2.1.4
- * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
- * please contact Symisc Systems via:
- *       legal@symisc.net
- *       licensing@symisc.net
- *       contact@symisc.net
- * or visit:
- *      http://ph7.symisc.net/
- */
-/* $SymiscID: lex.c v2.8 Ubuntu-linux 2012-07-13 01:21 stable <chm@symisc.net> $ */
 
 #include "ph7int.h"
 
@@ -378,6 +369,7 @@ static sxi32 TokenizePHP(SyStream *pStream, SyToken *pToken, void *pUserData, vo
           pToken->nType = PH7_TK_COLON; /* Single colon */
         }
         break;
+
       case ',': pToken->nType |= PH7_TK_COMMA; break; /* Comma is also an operator */
       case ';':
         pToken->nType = PH7_TK_SEMI;

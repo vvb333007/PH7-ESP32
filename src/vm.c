@@ -13,8 +13,6 @@
 #include <stdint.h>
 #include "ph7int.h"
 
-//#define DISASM
-
 /* Forward declaration */
 static const char *VmInstrToString(sxi32 nOp);
 PH7_PRIVATE int PH7_VmIsCallable(ph7_vm *pVm, ph7_value *pValue, int CallInvoke);

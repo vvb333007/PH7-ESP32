@@ -1,15 +1,13 @@
 /*
- * Symisc PH7: An embeddable bytecode compiler and a virtual machine for the PHP(5) programming language.
- * Copyright (C) 2011-2012, Symisc Systems http://ph7.symisc.net/
- * Copyright (C) 2026-, Viacheslav Logunov vvb333007@gmail.com
- * Version 2.1.4
- * For information on licensing,redistribution of this file,and for a DISCLAIMER OF ALL WARRANTIES
- * please contact Symisc Systems via:
- *       legal@symisc.net
- *       licensing@symisc.net
- *       contact@symisc.net
- * or visit:
- *      http://ph7.symisc.net/
+ * PH7-ESP32 — embeddable PHP bytecode compiler & virtual machine,
+ * ported and maintained for ESP32/FreeRTOS, Linux and Windows(Cygwin).
+ *
+ * Copyright (C) 2011-2018 Symisc Systems <http://ph7.symisc.net/>
+ * Copyright (C) 2026-present Viacheslav Logunov <vvb333007@gmail.com>
+ *
+ * Licensed under the Symisc Public License (modified BSD with mandatory
+ * source disclosure, clause 3); commercial licensing available from
+ * Symisc Systems. Full terms: see LICENSE. Contacts: see CONTACTS.
  */
 
 #pragma once
@@ -1570,6 +1568,11 @@ enum ph7_vm_op {
   PH7_OP_SWITCH,         /* Switch operation */
   PH7_OP_ERR_CTRL,       /* Error control */
   PH7_OP_CVT_CALLABLE,   /* Callable cast */
+
+  PH7_OP_NULLC,    /* ?? */
+  PH7_OP_NULLCE,   /* ??= */
+  PH7_OP_MEMBERNS, /* ?-> */
+
 };
 /* -- END-OF INSTRUCTIONS -- */
 /*
@@ -1631,9 +1634,9 @@ enum ph7_expr_id {
   EXPR_OP_SHR_ASSIGN, /* Combined operator: >>= */
   EXPR_OP_COMMA,       /* Comma expression */
 
-  EXPR_OP_QQ, /* ?? */
-  EXPR_OP_QQE, /* ??= */
-  EXPR_OP_NULLSAFE, /* ?-> */
+  EXPR_OP_NULLC,    /* ?? */
+  EXPR_OP_NULLCE,   /* ??= */
+  EXPR_OP_MEMBERNS, /* ?-> */
 };
 /*
  * Very high level tokens.

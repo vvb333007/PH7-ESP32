@@ -1,14 +1,21 @@
+/*
+ * PH7-ESP32 — embeddable PHP bytecode compiler & virtual machine,
+ * ported and maintained for ESP32/FreeRTOS, Linux and Windows(Cygwin).
+ *
+ * Copyright (C) 2011-2018 Symisc Systems <http://ph7.symisc.net/>
+ * Copyright (C) 2026-present Viacheslav Logunov <vvb333007@gmail.com>
+ *
+ * Licensed under the Symisc Public License (modified BSD with mandatory
+ * source disclosure, clause 3); commercial licensing available from
+ * Symisc Systems. Full terms: see LICENSE. Contacts: see CONTACTS.
+ */
+
 #ifndef PH7_DISABLE_BUILTIN_FUNC
 #ifndef PH7_DISABLE_DISK_IO
 
 
 /*
  * UNIX VFS implementation for the PH7 engine.
- * Authors:
- *    Symisc Systems,devel@symisc.net.
- *    Copyright (C) Symisc Systems,http://ph7.symisc.net
- * Status:
- *    Stable.
  */
 
 #include "ph7int.h"
