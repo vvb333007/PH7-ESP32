@@ -3853,7 +3853,7 @@ choose_memobj:
       sArg.iFlags |= VM_FUNC_ARG_BY_REF;
       pIn++;
     }
-//printf("0=%08x, 1=%08x\r\n",pIn[0].nType,pIn[1].nType);
+
     if  (pIn >= pEnd || 
         (pIn->nType & PH7_TK_DOLLAR) == 0 || 
         &pIn[1] >= pEnd || 
@@ -3946,7 +3946,7 @@ choose_memobj:
           default:
             break;
         }
-        //printf("%c-",c);
+
         SyBlobAppend(&sSig, (const void *)&c, sizeof(char));
       }
     } else {
@@ -3990,8 +3990,6 @@ static sxi32 GenStateCompileFuncBody(
                           pFunc,      /* pBlock.pUserData = pFunc; */
                           &pBlock);
 
-//  printf("GenStateCompileFuncBody() : pBlock == %p, iFlags=%08x\r\n",pBlock, pBlock->iFlags);
-
   if (rc != SXRET_OK) {
     //PH7_GenCompileError(&(*pGen), E_ERROR, 1, "PH7 engine is running out-of-memory");
     PH7_GenCompileOOM(pGen);
@@ -4004,14 +4002,11 @@ static sxi32 GenStateCompileFuncBody(
   PH7_VmSetByteCodeContainer(pGen->pVm, &pFunc->aByteCode);
   /* Compile the body */
 
-//  printf("PH7_CompileBlock() start\r\n");
   rc = PH7_CompileBlock(&(*pGen), 0);
   if (rc != SXRET_OK) {
     /* Don't worry about freeing memory, everything will be released shortly */
     return SXERR_ABORT;
   }
-
-//  printf("PH7_CompileBlock() end\r\n");
 
   /* Fix exception jumps now the destination is resolved */
   GenStateFixJumps(pGen->pCurrent, PH7_OP_THROW, PH7_VmInstrLength(pGen->pVm));
@@ -4326,8 +4321,6 @@ static sxi32 PH7_CompileFunction(ph7_gen_state *pGen) {
 
   nLine = pGen->pIn->nLine;
   pGen->pIn++; /* Jump the 'function' keyword */
-
-//  printf("PH7_CompileFunction\r\n");
 
   iFlags = 0;
   if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_AMPER)) {
@@ -6714,7 +6707,6 @@ static ProcLangConstruct GenStateGetStatementHandler(
 ) {
   sxu32 n = 0;
 
-//  printf("nKeyword=%08x\n",nKeywordID);
   for (;;) {
     if (n >= SX_ARRAYSIZE(aLangConstruct)) {
       break;
@@ -7127,7 +7119,7 @@ PH7_PRIVATE sxi32 PH7_GenCompileError(ph7_gen_state *pGen, sxi32 nErrType, sxu32
             pGen->xErr(SyBlobData(pWorker), SyBlobLength(pWorker), pGen->pErrData);
 #if DEVEL
           else
-            printf("Compile pass: %.*s\n", SyBlobLength(pWorker),SyBlobData(pWorker) );
+            printf("Stdlib: %.*s\n", SyBlobLength(pWorker),(const char *)SyBlobData(pWorker) );
 #endif
         }
       
@@ -7167,7 +7159,7 @@ PH7_PRIVATE sxi32 PH7_GenCompileError(ph7_gen_state *pGen, sxi32 nErrType, sxu32
     if (pGen->xErr)
       pGen->xErr(SyBlobData(pWorker), SyBlobLength(pWorker), pGen->pErrData);
     else
-      printf("Compile pass: %.*s\n", SyBlobLength(pWorker),SyBlobData(pWorker) );
+      printf("Stdlib: %.*s\n", SyBlobLength(pWorker),(const char *)SyBlobData(pWorker) );
   }
 
   return rc;

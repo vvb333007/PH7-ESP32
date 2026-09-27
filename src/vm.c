@@ -763,10 +763,9 @@ static ph7_vm_func *VmOverload(
       
       c = -1;
     }
-    if (c > 0) {
-      //printf("%c+",c);
+    if (c > 0)
       SyBlobAppend(&sSig, (const void *)&c, sizeof(char));
-    }
+    
   }
 
   SyStringInitFromBuf(&sArgSig, SyBlobData(&sSig), SyBlobLength(&sSig));
@@ -778,7 +777,6 @@ static ph7_vm_func *VmOverload(
 
     iCur = VmOverloadCompare(&sArgSig, &apSet[j]->sSignature);
     if (iCur > iMax) {
-      //printf("candidate iMax=%d, iCur=%d\n",iMax,iCur);
       iMax = iCur;
       iTarget = j;
     }
@@ -2251,6 +2249,23 @@ static sxi32 VmByteCodeDump(
 static int VmObConsumer(const void *pData, unsigned int nDataLen, void *pUserData);
 static sxi32 VmUncaughtException(ph7_vm *pVm, ph7_class_instance *pThis);
 static sxi32 VmThrowException(ph7_vm *pVm, ph7_class_instance *pThis);
+
+#if 0
+/* Used to inject calls in runtime. Mostly for exceptions
+ */
+static sxi32 VmCallInternal(ph7_vm *pVm, const char *zName) {
+
+  sxi32 rc;
+  ph7_value sFunc;
+
+  PH7_MemObjInit(pVm, &sFunc);
+  ph7_value_string(&sFunc, zName, -1);
+  rc = PH7_VmCallUserFunction(pVm, &sFunc, 0, NULL, NULL);
+  PH7_MemObjRelease(&sFunc);
+  return rc;
+}
+#endif
+
 /*
  * Consume a generated run-time error message by invoking the VM output
  * consumer callback.
@@ -2486,10 +2501,7 @@ static sxi32 VmByteCodeExec(
                 } else if (nType & PH7_TKWRD_ARRAY) {
                   PH7_MemObjToHashmap(pResult);
                 } else {
-                    //printf("No convert on type %d\r\n", nType);
-                  /* TODO: class name, iterable, must be done via type check / instanceof. Generate an error if types are not convertible
-                   * void & mixed types never reach here
-                   */
+                  /* No auto cast */
                 }
 
               }
@@ -2851,7 +2863,7 @@ static sxi32 VmByteCodeExec(
                 MemObjSetType(pTos, MEMOBJ_NULL);
                 SyBlobReset(&pTos->sBlob);
                 /* Invoke the callback and deal with the expanded value */
-                //puts("memobj expand");
+
                 pCons->xExpand(pTos, pCons->pUserData);
                 /* Mark as constant */
                 pTos->nIdx = SXU32_HIGH;
@@ -2860,7 +2872,7 @@ static sxi32 VmByteCodeExec(
             } else {
 
             }
-            //puts("memobj load");
+
             PH7_MemObjLoad(pObj, pTos);
           } else {
             /* Set a NULL value */
@@ -4987,6 +4999,11 @@ static sxi32 VmByteCodeExec(
           ph7_class_instance *pThis;
           ph7_value *pNos;
           SyString sName;
+
+          /* P2 == 0 --> Method
+           * P2 >0 --> Attribute
+           */
+
           if (!pInstr->iP1) {
             pNos = &pTos[-1];
 #ifdef UNTRUST
@@ -5031,8 +5048,7 @@ static sxi32 VmByteCodeExec(
                   /* Push real method name on the stack */
                   PH7_MemObjRelease(pTos);
                   SyBlobAppend(&pTos->sBlob, SyStringData(&pMeth->sVmName), SyStringLength(&pMeth->sVmName));
-                  // __ClassName@MethodName_RANDOMSTRING
-                  //printf("Real method name in VM is %.*s\n",SyStringLength(&pMeth->sVmName), SyStringData(&pMeth->sVmName));
+                  /* Real method name in VM is pMeth->sVmName: __ClassName@MethodName_RANDOMSTRING */
                   MemObjSetType(pTos, MEMOBJ_STRING);
                 }
                 pTos->nIdx = SXU32_HIGH;
@@ -5098,28 +5114,47 @@ static sxi32 VmByteCodeExec(
                 PH7_ClassInstanceUnref(pThis);
               }
             } else {
-
+/* Object is NULL.
+ * Depending on operator used - either throw an exception or make a hard stop or just skip it
+ * if it is nullsafe
+ *
+ */
               if (pInstr->iOp == PH7_OP_MEMBER) {
-                /* Replace the method name with stdlib function call which throws an exception 
-                 * and continue execution like nothing happened. Subsequent OP_CALL will execute __nullderef()
-                */
-                PH7_MemObjRelease(pTos);
-                SyBlobAppend(&pTos->sBlob, "__nullderef", 11);
-                MemObjSetType(pTos, MEMOBJ_STRING);
+
+                /* Attribute: dereferencing a null pointer $class = null; $class->attribute */
+                if (pInstr->iP2 == 0) {
+
+//                    if (SXERR_ABORT == VmCallInternal(pVm, "__nullderef"))
+                      if (SXERR_ABORT == VmThrowException(pVm, NULL))
+                        goto Abort;
+                    
+
+                } else {
+                  /* Replace the method name with stdlib function call which throws an exception 
+                   * and continue execution like nothing happened. Subsequent OP_CALL will execute __nullderef()
+                  */
+                  PH7_MemObjRelease(pTos);
+                  SyBlobAppend(&pTos->sBlob, "__nullderef", 11);
+                  MemObjSetType(pTos, MEMOBJ_STRING);
+                }
               } else {
-               /* ?->, a nullsafe opeartor 
-                * applied to a null variable - silently ignore this by loading null on the tos:
-                * this will case subsequent OP_CALL to fail
+               /* ?->, a nullsafe opeartor: either replace method call with a builtin noop (__nullsafe())
+                * or, if it was an attribute access - load NULL to the Tos
                */
-#if 0
-                VmPopOperand(&pTos, 1);
-                PH7_MemObjRelease(pTos);
-                pTos->nIdx = SXU32_HIGH; /* Assume we are loading a constant */
-#else
-                PH7_MemObjRelease(pTos);
-                SyBlobAppend(&pTos->sBlob, "__nullsafe", 10);
-                MemObjSetType(pTos, MEMOBJ_STRING);
-#endif
+
+                if (pInstr->iP2 == 0) {
+                  /* Attribute access for nullsafe is simple: just load null 
+                  */
+                  VmPopOperand(&pTos, 1);  /* Pop method name out of the stack*/
+                  PH7_MemObjRelease(pTos); /* Release Tos (make it null) */
+                  pTos->nIdx = SXU32_HIGH; /* Assume we are loading a constant */
+                } else {
+                /* Replace method name with a builtin noop call
+                */
+                  PH7_MemObjRelease(pTos);
+                  SyBlobAppend(&pTos->sBlob, "__nullsafe", 10);
+                  MemObjSetType(pTos, MEMOBJ_STRING);
+                }
               }
               pTos->nIdx = SXU32_HIGH;
             }
@@ -5466,7 +5501,7 @@ static sxi32 VmByteCodeExec(
                 PH7_ClassInstanceCallMagicMethod(&(*pVm), pThis->pClass, pThis, "__invoke", sizeof("__invoke") - 1, 0);
               } else {
                 /* Raise exception: Invalid function name */
-                VmErrorFormat(&(*pVm), PH7_CTX_WARNING, "Invalid function name ,NULL will be returned");
+                VmErrorFormat(&(*pVm), PH7_CTX_WARNING, "Function/method not callable, assume NULL");
               }
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
@@ -5702,13 +5737,12 @@ static sxi32 VmByteCodeExec(
                     int bConv = 1;
                     if ((aFormalArg[n].iFlags & VM_FUNC_ARG_NULLABLE) != 0) {
                       if ((pArg->iFlags & MEMOBJ_NULL) != 0) {
-                        //puts("null nullable, no type conversion");
+
                         bConv = 0;
                       }
                     }
                     if (bConv) {
-                      //puts("auto cast arg");
-                      // Input Arguments Type Casting
+                      /* auto cast arg */
                       ProcMemObjCast xCast = PH7_MemObjCastMethod(aFormalArg[n].nType);
                       /* Cast to the desired type */
                       xCast(pArg);
@@ -6012,8 +6046,6 @@ Exception:
 static sxi32 VmLocalExec(ph7_vm *pVm, SySet *pByteCode, ph7_value *pResult) {
   ph7_value *pStack;
   sxi32 rc;
-
-    //printf("VmLocalExec() %p\n",pByteCode);
 
   /* Allocate a new operand stack */
   pStack = VmNewOperandStack(&(*pVm), SySetUsed(pByteCode));
@@ -9796,7 +9828,7 @@ static sxi32 VmThrowException(
         /* No such class */
         continue;
       }
-      if (VmInstanceOf(pThis->pClass, pClass)) {
+      if (pThis == 0 || VmInstanceOf(pThis->pClass, pClass)) {
         /* Catch block found,break immeditaley */
         pCatch = &aCatch[j];
         break;
@@ -9836,7 +9868,7 @@ static sxi32 VmThrowException(
       /* Mark as catch frame */
       ph7_value *pObj = VmExtractMemObj(&(*pVm), &pCatch->sThis, FALSE, TRUE);
       pFrame->iFlags |= VM_FRAME_CATCH;
-      if (pObj) {
+      if (pObj && pThis) {
         /* Install the exception instance */
         pThis->iRef++; /* Increment reference count */
         pObj->x.pOther = pThis;

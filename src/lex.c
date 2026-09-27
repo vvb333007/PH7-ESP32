@@ -380,7 +380,7 @@ static sxi32 TokenizePHP(SyStream *pStream, SyToken *pToken, void *pUserData, vo
               if (pStream->zText[0] == '>') {
                 /* Current operator: '?->' */
                pStream->zText++;
-               //puts("nullsafe detected");
+
               } else
                 pStream->zText--;  //TODO: Looks bad
             }
@@ -787,7 +787,7 @@ static sxi32 LexExtractHeredoc(SyStream *pStream, SyToken *pToken) {
   sStr.nByte = (sxu32)((const char *)zIn - sStr.zString);
   /* Record token type and length */
   pToken->nType = bNowDoc ? PH7_TK_NOWDOC : PH7_TK_HEREDOC;
-  //puts("nType==heredoc");
+
   SyStringDupPtr(&pToken->sData, &sStr);
   /* Remove trailing white spaces */
   SyStringRightTrim(&pToken->sData);

@@ -280,8 +280,6 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
   sxi32 rc;
   /* Do a linear lookup on the operators table */
 
-  //printf("ExprExtractOperator() : %.*s\r\n", pStr->nByte, pStr->zString);
-
   for (;;) {
     if (n >= SX_ARRAYSIZE(aOpTable)) {
       break;
@@ -293,8 +291,6 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
       rc = SyStringCmp(pStr, &aOpTable[n].sOp, SyMemcmp);
     }
     if (rc == 0) {
-
-      //printf("ExprExtractOperator() : Found: %.*s\r\n", aOpTable[n].sOp.nByte, aOpTable[n].sOp.zString);
 
       if (aOpTable[n].sOp.nByte != sizeof(char) || 
           (aOpTable[n].iOp != EXPR_OP_UMINUS && aOpTable[n].iOp != EXPR_OP_UPLUS) || 
@@ -321,7 +317,6 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
     ++n; /* Next operator in the table */
   }
   /* No such operator */
-  //printf("ExprExtractOperator() : not found\r\n");
   return 0;
 }
 /*
@@ -417,7 +412,7 @@ static sxi32 ExprVerifyNodes(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 
       iParen--;
     } else if (apNode[i]->pStart->nType & PH7_TK_OSB /*'['*/) {
       iSquare++;
-//      puts("++");
+
     } else if (apNode[i]->pStart->nType & PH7_TK_CSB /*']'*/) {
       if (iSquare <= 0) {
         rc = PH7_GenCompileError(&(*pGen), E_ERROR, apNode[i]->pStart->nLine, "Syntax error: Unexpected token ']'");
@@ -427,7 +422,7 @@ static sxi32 ExprVerifyNodes(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 
         return rc;
       }
       iSquare--;
-      //puts("--");
+
     } else if (apNode[i]->pStart->nType & PH7_TK_OCB /*'{'*/) {
       iBraces++;
       if (i > 0 && (apNode[i - 1]->xCode == PH7_CompileVariable || (apNode[i - 1]->pStart->nType & PH7_TK_CSB /*]*/))) {
@@ -805,8 +800,8 @@ static sxi32 ExprExtractNode(ph7_gen_state *pGen, ph7_expr_node **ppNode) {
     pNode->xCode = PH7_CompileLiteral;
   } else {
     if ((pCur->nType & (PH7_TK_LPAREN | PH7_TK_RPAREN | PH7_TK_COMMA | PH7_TK_COLON | PH7_TK_CSB | PH7_TK_OCB | PH7_TK_CCB)) == 0) {
-      /* Point to the code generator routine */
-      //printf(">>> %08x\n",(unsigned int)pCur->nType);
+      /* Point to the code generator routine
+      */
       pNode->xCode = PH7_GetNodeHandler(pCur->nType);
       if (pNode->xCode == 0) {
         rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "Syntax error: Unexpected token '%z'", &pNode->pStart->sData);
@@ -1438,8 +1433,9 @@ static sxi32 ExprMakeTree(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 nTo
     }
     pNode = apNode[iCur];
     if (pNode->pOp && pNode->pOp->iOp == EXPR_OP_QUESTY && pNode->pLeft == 0) {
-      //printf("questy %d\n",iLeft);
+
       sxi32 iNest = 1;
+
       if (iLeft < 0 || !NODE_ISTERM(iLeft)) {
         /* Missing condition */
         rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': Syntax error", &pNode->pOp->sOp);
