@@ -386,6 +386,15 @@ typedef double ph7_real;
 #define PH7_VM_CONFIG_EXTRACT_OUTPUT 20  /* TWO ARGUMENTS: const void **ppOut,unsigned int *pOutputLen */
 #define PH7_VM_CONFIG_ERR_LOG_HANDLER 21 /* ONE ARGUMENT: void (*xErrLog)(const char *,int,const char *,const char *) */
 #define PH7_VM_CONFIG_TEMPDIR 22          /* ONE ARGUMENT: const char *zPath */
+#define PH7_VM_CONFIG_EXCMODE 23          /* ONE ARGUMENT: int: 0-Throw exceptions, 1-Throw error messages, 2- Be quiet */
+
+/* Argument to PH7_VM_CONFIG_EXCMODE
+ */
+#define PH7_VM_EXCMODE_QUIET   2 /* Ignore errors, do not display any messages */
+#define PH7_VM_EXCMODE_MESSAGE 1 /* Ignore errors but display messages */
+#define PH7_VM_EXCMODE_EXCEPT  0 /* Throw exceptions (default mode) */
+
+
 /*
  * Global Library Configuration Commands.
  *

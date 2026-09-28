@@ -1413,6 +1413,7 @@ struct ph7_vm {
   int nMaxDepth;                   /* Maximum allowed recusion depth */
   int nObDepth;                    /* OB depth */
   int nExceptDepth;                /* Exception depth */
+  int nExceptMode ;                /* Exception mode (0-throw exceptions, 1- throe error messages, 2- quiet) */
   int closure_cnt;                 /* Loaded closures counter */
   int json_rc;                     /* JSON return status [refer to json_encode()/json_decode()]*/
   sxu32 unique_id;                 /* Random number used to generate unique ID [refer to uniqid() for more info]*/

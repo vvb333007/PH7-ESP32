@@ -1,4 +1,4 @@
-/*
+/*                 
  * PH7-ESP32 — embeddable PHP bytecode compiler & virtual machine,
  * ported and maintained for ESP32/FreeRTOS, Linux and Windows(Cygwin).
  *
@@ -817,9 +817,8 @@ static sxi32 VmMountUserClass(
       /* Reserve a memory object for this constant/static attribute */
       pMemObj = PH7_ReserveMemObj(&(*pVm));
       if (pMemObj == 0) {
-        VmErrorFormat(&(*pVm), PH7_CTX_ERR,
-                      "Cannot reserve a memory object for class attribute '%z->%z' due to a memory failure",
-                      &pClass->sName, &pAttr->sName);
+        VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Cannot reserve a memory object for class attribute '%z->%z' due to a memory failure", &pClass->sName, &pAttr->sName);
+        /* TODO: exception */
         return SXERR_MEM;
       }
       if (SySetUsed(&pAttr->aByteCode) > 0) {
@@ -1895,6 +1894,13 @@ PH7_PRIVATE sxi32 PH7_VmConfigure(
 ) {
   sxi32 rc = SXRET_OK;
   switch (nOp) {
+    case PH7_VM_CONFIG_EXCMODE:
+      {
+        int nMode = va_arg(ap, int);
+        pVm->nExceptMode = nMode;
+        break;
+      }
+
     case PH7_VM_CONFIG_TEMPDIR:
       {
         const char *zPath = va_arg(ap, const char *);
@@ -2248,23 +2254,8 @@ static sxi32 VmByteCodeDump(
 /* Forward declaration */
 static int VmObConsumer(const void *pData, unsigned int nDataLen, void *pUserData);
 static sxi32 VmUncaughtException(ph7_vm *pVm, ph7_class_instance *pThis);
-static sxi32 VmThrowException(ph7_vm *pVm, ph7_class_instance *pThis);
+static sxi32 VmThrowException(ph7_vm *pVm, ph7_class_instance *pThis, SySet *aArg, const char *zMessage, ... );
 
-#if 0
-/* Used to inject calls in runtime. Mostly for exceptions
- */
-static sxi32 VmCallInternal(ph7_vm *pVm, const char *zName) {
-
-  sxi32 rc;
-  ph7_value sFunc;
-
-  PH7_MemObjInit(pVm, &sFunc);
-  ph7_value_string(&sFunc, zName, -1);
-  rc = PH7_VmCallUserFunction(pVm, &sFunc, 0, NULL, NULL);
-  PH7_MemObjRelease(&sFunc);
-  return rc;
-}
-#endif
 
 /*
  * Consume a generated run-time error message by invoking the VM output
@@ -2432,6 +2423,7 @@ static sxi32 VmByteCodeExec(
   VmInstr *pInstr;
   ph7_value *pTos;
   SySet aArg;
+
   sxi32 pc;
   sxi32 rc;
   /* Argument container */
@@ -2949,6 +2941,7 @@ static sxi32 VmByteCodeExec(
             } else {
               /* Fatal error */
               VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Fatal, PH7 engine is running out of memory while loading variable '%z'", &sName);
+              /* ?? TODO: exception */
               goto Abort;
             }
           }
@@ -2970,8 +2963,8 @@ static sxi32 VmByteCodeExec(
           /* Allocate a new hashmap instance */
           pMap = PH7_NewHashmap(&(*pVm), 0, 0);
           if (pMap == 0) {
-            VmErrorFormat(&(*pVm), PH7_CTX_ERR,
-                          "Fatal, PH7 engine is running out of memory while loading array at instruction #:%d", pc);
+            VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Fatal, PH7 engine is running out of memory while loading array at instruction #:%d", pc);
+            /* TODO: exception */
             goto Abort;
           }
           if (pInstr->iP1 > 0) {
@@ -3277,8 +3270,8 @@ static sxi32 VmByteCodeExec(
           /* Extract the desired variable and if not available dynamically create it */
           pObj = VmExtractMemObj(&(*pVm), &sName, pInstr->p3 ? FALSE : TRUE, TRUE);
           if (pObj == 0) {
-            VmErrorFormat(&(*pVm), PH7_CTX_ERR,
-                          "Fatal, PH7 engine is running out of memory while loading variable '%z'", &sName);
+            VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Fatal, PH7 engine is running out of memory while loading variable '%z'", &sName);
+            /* TODO: exception */
             goto Abort;
           }
           if (!pInstr->p3) {
@@ -3364,6 +3357,7 @@ static sxi32 VmByteCodeExec(
               rc = PH7_MemObjToHashmap(pObj);
               if (rc != SXRET_OK) {
                 VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Fatal, PH7 engine is running out of memory while creating a new array");
+                /* TODO: exception */
                 goto Abort;
               }
             }
@@ -3787,6 +3781,7 @@ static sxi32 VmByteCodeExec(
           if (b == 0) {
             r = 0;
             VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
+            /* TODO: ?? exception */
             /* goto Abort; */
           } else {
             r = a % b;
@@ -3829,6 +3824,7 @@ static sxi32 VmByteCodeExec(
           if (b == 0) {
             r = 0;
             VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
+            /* TODO: exception ?? */
             /* goto Abort; */
           } else {
             r = a % b;
@@ -3919,6 +3915,7 @@ static sxi32 VmByteCodeExec(
             /* Division by zero */
             r = 0;
             VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd/0", a);
+            /* TODO: exception ?? */
             /* goto Abort; */
           } else {
             r = a / b;
@@ -3930,6 +3927,7 @@ static sxi32 VmByteCodeExec(
           }
           if (pTos->nIdx == SXU32_HIGH) {
             PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "Cannot perform assignment on a constant class attribute");
+            /* TODO: exception */
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4044,6 +4042,7 @@ static sxi32 VmByteCodeExec(
           MemObjSetType(pNos, MEMOBJ_INT);
           if (pTos->nIdx == SXU32_HIGH) {
             PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "Cannot perform assignment on a constant class attribute");
+            /* TODO: exception */
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4142,6 +4141,7 @@ static sxi32 VmByteCodeExec(
           MemObjSetType(pNos, MEMOBJ_INT);
           if (pTos->nIdx == SXU32_HIGH) {
             PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "Cannot perform assignment on a constant class attribute");
+            /* TODO: exception */
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4214,6 +4214,7 @@ static sxi32 VmByteCodeExec(
           /* Perform the store operation */
           if (pTos->nIdx == SXU32_HIGH) {
             PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "Cannot perform assignment on a constant class attribute");
+            /* TODO: exception */
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pTos, pObj);
           }
@@ -4636,15 +4637,15 @@ static sxi32 VmByteCodeExec(
           nIdx = pTos->nIdx;
           if (nIdx == SXU32_HIGH) {
             if ((pTos->iFlags & (MEMOBJ_OBJ | MEMOBJ_HASHMAP | MEMOBJ_RES)) == 0) {
-              PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,
-                               "Reference operator require a variable not a constant as it's right operand");
+              PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"Reference operator require a variable not a constant as it's right operand");
+              /* TODO: exception */
             } else {
               ph7_value *pObj;
               /* Extract the desired variable and if not available dynamically create it */
               pObj = VmExtractMemObj(&(*pVm), &sName, FALSE, TRUE);
               if (pObj == 0) {
-                VmErrorFormat(&(*pVm), PH7_CTX_ERR,
-                              "Fatal, PH7 engine is running out of memory while loading variable '%z'", &sName);
+                VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Fatal, PH7 engine is running out of memory while loading variable '%z'", &sName);
+                /* TODO: exception */
                 goto Abort;
               }
               /* Perform the store operation */
@@ -4654,6 +4655,7 @@ static sxi32 VmByteCodeExec(
           } else if (sName.nByte > 0) {
             if ((pTos->iFlags & MEMOBJ_HASHMAP) && (pVm->pGlobal == (ph7_hashmap *)pTos->x.pOther)) {
               PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "$GLOBALS is a read-only array and therefore cannot be referenced");
+              /* TODO: exception */
             } else {
               VmFrame *pFrame = pVm->pFrame;
               while (pFrame->pParent && (pFrame->iFlags & VM_FRAME_EXCEPTION)) {
@@ -4664,6 +4666,7 @@ static sxi32 VmByteCodeExec(
               pEntry = SyHashGet(&pFrame->hVar, (const void *)sName.zString, sName.nByte);
               if (pEntry) {
                 VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Referenced variable name '%z' already exists", &sName);
+                /* TODO: ?? exception */
               } else {
                 rc = SyHashInsert(&pFrame->hVar, (const void *)sName.zString, sName.nByte, SX_INT_TO_PTR(nIdx));
                 if (pFrame->pParent == 0) {
@@ -4718,6 +4721,7 @@ static sxi32 VmByteCodeExec(
           rc = VmEnterFrame(&(*pVm), 0, 0, &pFrame);
           if (rc != SXRET_OK) {
             VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Fatal PH7 engine is runnig out of memory");
+          /* TODO: double exception , halt */
             goto Abort;
           }
           /* Mark the special frame */
@@ -4786,7 +4790,7 @@ static sxi32 VmByteCodeExec(
               }
             } else {
               /* Throw the exception */
-              rc = VmThrowException(&(*pVm), pThis);
+              rc = VmThrowException(&(*pVm), pThis, NULL, NULL);
               if (rc == SXERR_ABORT) {
                 /* Abort processing immediately */
                 goto Abort;
@@ -4849,6 +4853,7 @@ static sxi32 VmByteCodeExec(
             /* Jump out of the loop */
             if ((pTos->iFlags & MEMOBJ_NULL) == 0) {
               PH7_VmThrowError(&(*pVm), 0, PH7_CTX_WARNING, "Invalid argument supplied for the foreach statement,expecting array or class instance");
+              /* TODO: exception */
             }
             pc = pInstr->iP2 - 1;
           } else {
@@ -4858,6 +4863,7 @@ static sxi32 VmByteCodeExec(
               PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "PH7 is running out of memory while preparing the 'foreach' step");
               /* Jump out of the loop */
               pc = pInstr->iP2 - 1;
+              /* TODO: exception */
             } else {
               /* Zero the structure */
               SyZero(pStep, sizeof(ph7_foreach_step));
@@ -4883,9 +4889,11 @@ static sxi32 VmByteCodeExec(
             }
             if (SXRET_OK != SySetPut(&pInfo->aStep, (const void *)&pStep)) {
               PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "PH7 is running out of memory while preparing the 'foreach' step");
+
               SyMemBackendPoolFree(&pVm->sAllocator, pStep);
               /* Jump out of the loop */
               pc = pInstr->iP2 - 1;
+              /* TODO: exception */
             }
           }
           VmPopOperand(&pTos, 1);
@@ -5055,8 +5063,8 @@ static sxi32 VmByteCodeExec(
                      TODO: If it wasnt: display a warning message then
                      TODO: This whole TODO: statement goes to all magic method calls 
                   */
-                  VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class method '%z->%z',PH7 is loading NULL",
-                                &pClass->sName, &sName);
+                  VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class method '%z->%z',PH7 is loading NULL", &pClass->sName, &sName);
+                  /* TODO: exception */
                   /* Call the '__Call()' magic method if available 
                    * TODO: propagate return value and if it is not empty - push it on stack (remove method name tho)
                   */
@@ -5065,8 +5073,8 @@ static sxi32 VmByteCodeExec(
                      TODO: can we execute PopOperand before we call magic method? sName uses pTos, so we have to resolve that
                      TODO: inside the CallMagicMethod
                   */
-                  VmPopOperand(&pTos, 1);   // remove method name, move SP
-                  PH7_MemObjRelease(pTos);  // ??? causes followwing OP_CALL to fail.
+                  VmPopOperand(&pTos, 1);   // Remove method name, move SP
+                  PH7_MemObjRelease(pTos);  // Causes followwing OP_CALL to fail.
                 } else {
                   /* Push real method name on the stack */
                   PH7_MemObjRelease(pTos);
@@ -5095,10 +5103,11 @@ static sxi32 VmByteCodeExec(
                 if (pObjAttr == 0) {
                   /* TODO: First call the magic method and only then display error if there is no __get() implemented
                    * TODO: Check __toString implementation to see how return value is propagated there: magic methods can not return values right now */
+/* TODO: exception */
                   VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class attribute '%z->%z',PH7 is loading NULL",
                                 &pClass->sName, &sName);
                   /* Call the __get magic method if available */
-
+                  /* TODO: exception */
                   PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName);
 
                 }
@@ -5145,21 +5154,39 @@ static sxi32 VmByteCodeExec(
  */
               if (pInstr->iOp == PH7_OP_MEMBER) {
 
+                if (pTos->iFlags & MEMOBJ_STRING) {
+                  SyStringInitFromBuf(&sName, (const char *)SyBlobData(&pTos->sBlob), SyBlobLength(&pTos->sBlob));
+                } else {
+                  SyStringInitFromBuf(&sName, "<unknown>", sizeof("<unknown>")-1);
+                }
+
                 /* Attribute: dereferencing a null pointer $class = null; $class->attribute */
                 if (pInstr->iP2 == 0) {
 
-//                    if (SXERR_ABORT == VmCallInternal(pVm, "__nullderef"))
-                      if (SXERR_ABORT == VmThrowException(pVm, NULL))
-                        goto Abort;
+                  if (SXERR_ABORT == VmThrowException(pVm, NULL, &aArg, "A null dereference, '->%z' attribute access", &sName)) {
+                    goto Abort;
+                  }
                     
 
                 } else {
+#if 1
                   /* Replace the method name with stdlib function call which throws an exception 
                    * and continue execution like nothing happened. Subsequent OP_CALL will execute __nullderef()
+                   * TODO:This is ugly because we loose method name on this
                   */
                   PH7_MemObjRelease(pTos);
                   SyBlobAppend(&pTos->sBlob, "__nullderef", 11);
                   MemObjSetType(pTos, MEMOBJ_STRING);
+#else
+                  /* Not yer. Requires OP_CALL opcode logic update 
+                   * 
+                  */
+                  if (SXERR_ABORT == VmThrowException(pVm, NULL, &aArg, "A null dereference, '->%z()' method access", &sName)) {
+                    goto Abort;
+                  }
+                  PH7_MemObjRelease(pTos);
+#endif
+
                 }
               } else {
                /* ?->, a nullsafe opeartor: either replace method call with a builtin noop (__nullsafe())
@@ -5216,6 +5243,7 @@ static sxi32 VmByteCodeExec(
                 /* Undefined class */
                 VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Call to undefined class '%.*s',PH7 is loading NULL",
                               SyBlobLength(&pNos->sBlob), (const char *)SyBlobData(&pNos->sBlob));
+// TODO: throw exception here
                 if (!pInstr->p3) {
                   VmPopOperand(&pTos, 1);
                 }
@@ -5231,11 +5259,11 @@ static sxi32 VmByteCodeExec(
                   }
                   if (pMeth == 0 || (pMeth->iFlags & PH7_CLASS_ATTR_ABSTRACT)) {
                     if (pMeth) {
-                      VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Cannot call abstract method '%z:%z',PH7 is loading NULL",
-                                    &pClass->sName, &sName);
+                      VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Cannot call abstract method '%z:%z',PH7 is loading NULL", &pClass->sName, &sName);
+/* TODO: exception */
                     } else {
-                      VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class static method '%z::%z',PH7 is loading NULL",
-                                    &pClass->sName, &sName);
+                      VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class static method '%z::%z',PH7 is loading NULL", &pClass->sName, &sName);
+/* TODO: exception */
                       /* Call the '__CallStatic()' magic method if available */
                       PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, 0, "__callStatic", sizeof("__callStatic") - 1, &sName);
                     }
@@ -5260,8 +5288,8 @@ static sxi32 VmByteCodeExec(
                   }
                   if (pAttr == 0) {
                     /* No such attribute,load null */
-                    VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class attribute '%z::%z',PH7 is loading NULL",
-                                  &pClass->sName, &sName);
+                    VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class attribute '%z::%z',PH7 is loading NULL",                                  &pClass->sName, &sName);
+/* TODO: exception */
                     /* Call the __get magic method if available */
                     PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, 0, "__get", sizeof("__get") - 1, &sName);
                   }
@@ -5274,8 +5302,8 @@ static sxi32 VmByteCodeExec(
                   if (pAttr) {
                     if ((pAttr->iFlags & (PH7_CLASS_ATTR_STATIC | PH7_CLASS_ATTR_CONSTANT)) == 0) {
                       /* Access to a non static attribute */
-                      VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Access to a non-static class attribute '%z::%z',PH7 is loading NULL",
-                                    &pClass->sName, &pAttr->sName);
+                      VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Access to a non-static class attribute '%z::%z',PH7 is loading NULL",                                    &pClass->sName, &pAttr->sName);
+/* TODO: exception */
                     } else {
                       ph7_value *pValue;
                       /* Check if the access to the attribute is allowed */
@@ -5300,8 +5328,9 @@ static sxi32 VmByteCodeExec(
               }
             } else {
               /* Pop operands */
-
+              
               PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "Invalid class name,PH7 is loading NULL");
+              /* TODO: exception */
               if (!pInstr->p3) {
                 VmPopOperand(&pTos, 1);
               }
@@ -5330,8 +5359,8 @@ static sxi32 VmByteCodeExec(
           }
           if (pClass == 0) {
             /* No such class */
-            VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Class '%.*s' is not defined,PH7 is loading NULL",
-                          SyBlobLength(&pTos->sBlob), (const char *)SyBlobData(&pTos->sBlob));
+            VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Class '%.*s' is not defined,PH7 is loading NULL",                          SyBlobLength(&pTos->sBlob), (const char *)SyBlobData(&pTos->sBlob));
+/* TODO: exception */
             PH7_MemObjRelease(pTos);
             if (pInstr->iP1 > 0) {
               /* Pop given arguments */
@@ -5342,9 +5371,8 @@ static sxi32 VmByteCodeExec(
             /* Create a new class instance */
             pNew = PH7_NewClassInstance(&(*pVm), pClass);
             if (pNew == 0) {
-              VmErrorFormat(&(*pVm), PH7_CTX_ERR,
-                            "Cannot create new class '%z' instance due to a memory failure,PH7 is loading NULL",
-                            &pClass->sName);
+              VmErrorFormat(&(*pVm), PH7_CTX_ERR,                            "Cannot create new class '%z' instance due to a memory failure,PH7 is loading NULL",                            &pClass->sName);
+/* TODO: exception */
               PH7_MemObjRelease(pTos);
               if (pInstr->iP1 > 0) {
                 /* Pop given arguments */
@@ -5363,10 +5391,11 @@ static sxi32 VmByteCodeExec(
               /* Call the class constructor */
               SySetReset(&aArg);
               while (pArg < pTos) {
-                SySetPut(&aArg, (const void *)&pArg);
+                SySetPut(&aArg, (const void *)&pArg); 
                 pArg++;
               }
               if (pVm->bErrReport) {
+//XXX
                 ph7_vm_func_arg *pFuncArg;
                 sxu32 n;
                 n = SySetUsed(&aArg);
@@ -5377,6 +5406,7 @@ static sxi32 VmByteCodeExec(
                     if (SySetUsed(&pFuncArg->aByteCode) < 1) {
                       VmErrorFormat(&(*pVm), PH7_CTX_NOTICE, "Missing constructor argument %u($%z) for class '%z'",
                                     n + 1, &pFuncArg->sName, &pClass->sName);
+                    /* TODO: ?? exception */
                     }
                   }
                   n++;
@@ -5412,8 +5442,8 @@ static sxi32 VmByteCodeExec(
 #endif
           /* Make sure we are dealing with a class instance */
           if ((pTos->iFlags & MEMOBJ_OBJ) == 0) {
-            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,
-                             "Clone: Expecting a class instance as left operand,PH7 is loading NULL");
+            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"Clone: Expecting a class instance as left operand,PH7 is loading NULL");
+            /* TODO: exception */
             PH7_MemObjRelease(pTos);
             break;
           }
@@ -5423,8 +5453,8 @@ static sxi32 VmByteCodeExec(
           pClone = PH7_CloneClassInstance(pSrc);
           PH7_MemObjRelease(pTos);
           if (pClone == 0) {
-            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,
-                             "Clone: cannot make an object clone due to a memory failure,PH7 is loading NULL");
+            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"Clone: cannot make an object clone due to a memory failure,PH7 is loading NULL");
+            /* TODO: exception */
           } else {
             /* Load the cloned object */
             pTos->x.pOther = pClone;
@@ -5526,6 +5556,7 @@ static sxi32 VmByteCodeExec(
               } else {
                 /* Raise exception: Invalid function name */
                 VmErrorFormat(&(*pVm), PH7_CTX_WARNING, "Function/method not callable, assume NULL");
+                /* TODO: exception */
               }
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
@@ -5537,6 +5568,7 @@ static sxi32 VmByteCodeExec(
             break;
           }
           SyStringInitFromBuf(&sName, SyBlobData(&pTos->sBlob), SyBlobLength(&pTos->sBlob));
+try_again:
           /* Check for a compiled function first */
           pEntry = SyHashGet(&pVm->hFunction, (const void *)sName.zString, sName.nByte);
           if (pEntry) {
@@ -5623,6 +5655,7 @@ static sxi32 VmByteCodeExec(
               VmErrorFormat(&(*pVm), PH7_CTX_ERR,
                             "Recursion limit reached while invoking user function '%z',PH7 will set a NULL return value",
                             &pVmFunc->sName);
+/* TODO: exception */
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
                 VmPopOperand(&pTos, pInstr->iP1);
@@ -5641,6 +5674,7 @@ static sxi32 VmByteCodeExec(
                  * This is bad, better if we abort execution: this is logic error, not a runtime
                  */
                 VmErrorFormat(&(*pVm), PH7_CTX_ERR,"No matching function '%z()' for given argument list. Abort." ,&pTmp->sName);
+/* TODO: exception */
                 goto Abort;
               }
             }
@@ -5653,6 +5687,7 @@ static sxi32 VmByteCodeExec(
               VmErrorFormat(&(*pVm), PH7_CTX_ERR,
                             "PH7 is running out of memory while calling function '%z',NULL will be returned",
                             &pVmFunc->sName);
+/* TODO: exception */
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
                 VmPopOperand(&pTos, pInstr->iP1);
@@ -5724,6 +5759,7 @@ static sxi32 VmByteCodeExec(
 
                       /* This is a serious bug, better to abort execution */
                       VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Function '%z()': a 'callable' argument (%u) expects a valid, defined callable", &pVmFunc->sName, n + 1);
+/* TODO: exception */
                       goto Abort;
                     }
                   }
@@ -5743,6 +5779,7 @@ static sxi32 VmByteCodeExec(
                           VmErrorFormat(&(*pVm), PH7_CTX_WARNING,
                                         "Function '%z()':Argument %u must be an object of type '%z',PH7 is loading NULL instead",
                                         &pVmFunc->sName, n + 1, pName);
+/* TODO: exception */
                           PH7_MemObjRelease(pArg);
                         }
                       } else {
@@ -5752,6 +5789,7 @@ static sxi32 VmByteCodeExec(
                           VmErrorFormat(&(*pVm), PH7_CTX_ERR,
                                         "Function '%z()':Argument %u must be an object of type '%z',PH7 is loading NULL instead",
                                         &pVmFunc->sName, n + 1, pName);
+/* TODO: exception */
                           PH7_MemObjRelease(pArg);
                         }
                       }
@@ -5783,6 +5821,7 @@ static sxi32 VmByteCodeExec(
                                     "Function '%z',%d argument: Pass by reference,expecting a variable not a "
                                     "constant,PH7 is switching to pass by value",
                                     &pVmFunc->sName, n + 1);
+/* TODO: exception */
                     }
                     /* Switch to pass by value */
                     pObj = VmExtractMemObj(&(*pVm), &aFormalArg[n].sName, FALSE, TRUE);
@@ -5880,6 +5919,7 @@ static sxi32 VmByteCodeExec(
               /* Raise exception: Out of memory */
               VmErrorFormat(&(*pVm), PH7_CTX_ERR, "PH7 is running out of memory while calling function '%z',NULL will be returned",
                             &pVmFunc->sName);
+/* TODO: exception */
               if (pInstr->iP1 > 0) {
                 VmPopOperand(&pTos, pInstr->iP1);
               }
@@ -5913,6 +5953,7 @@ static sxi32 VmByteCodeExec(
                       VmErrorFormat(&(*pVm), PH7_CTX_NOTICE,
                                     "Function '%z',return by reference: Cannot reference local variable,PH7 is switching to return by value",
                                     &pVmFunc->sName);
+/* TODO: exception */
                     }
                     n = SXU32_HIGH;
                     break;
@@ -5923,6 +5964,7 @@ static sxi32 VmByteCodeExec(
                   VmErrorFormat(&(*pVm), PH7_CTX_NOTICE,
                                 "Function '%z',return by reference: Cannot reference constant expression,PH7 is switching to return by value",
                                 &pVmFunc->sName);
+/* TODO: exception */
                 }
               }
               pTos->nIdx = n;
@@ -5957,9 +5999,9 @@ static sxi32 VmByteCodeExec(
               goto Exception;
             }
           } else {
-/* Foreign Function Call
- *
- */
+
+            /* Not a compiled function. May be FFI call?
+             */
             ph7_user_func *pFunc;
             ph7_context sCtx;
             ph7_value sRet;
@@ -5967,7 +6009,8 @@ static sxi32 VmByteCodeExec(
             pEntry = SyHashGet(&pVm->hHostFunction, (const void *)sName.zString, sName.nByte);
             if (pEntry == 0) {
               /* Call to undefined function: not a compiled nor a foreign function */
-              VmErrorFormat(&(*pVm), PH7_CTX_WARNING, "Call to undefined function '%z',NULL will be returned", &sName);
+              if (SXERR_ABORT == VmThrowException(pVm, NULL, &aArg, "Undefined function '%z()' call", &sName))
+                goto Abort;
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
                 VmPopOperand(&pTos, pInstr->iP1);
@@ -7582,8 +7625,8 @@ PH7_PRIVATE sxi32 PH7_VmCallClassMethod(
   /* Create a new operand stack */
   aStack = VmNewOperandStack(&(*pVm), 2 /* Method name + Aux data */ + nArg);
   if (aStack == 0) {
-    PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,
-                     "PH7 is running out of memory while invoking class method");
+    PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"PH7 is running out of memory while invoking class method");
+    /* TODO: exception */
     return SXERR_MEM;
   }
   /* Fill the operand stack with the given arguments */
@@ -7706,8 +7749,8 @@ PH7_PRIVATE sxi32 PH7_VmCallUserFunction(
   /* Create a new operand stack */
   aStack = VmNewOperandStack(&(*pVm), 1 + nArg);
   if (aStack == 0) {
-    PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,
-                     "PH7 is running out of memory while invoking user callback");
+    PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "PH7 is running out of memory while invoking user callback");
+    /* TODO: exception */
     if (pResult) {
       /* Assume a null return value */
       PH7_MemObjRelease(pResult);
@@ -9825,19 +9868,105 @@ static sxi32 VmUncaughtException(
   return rc;
 }
 /*
- * Throw an user exception.
+ * Throw an user exception. if pThis is not NULL, then aArg and zMessage are ignored:
+ * this is how OP_THROW uses this function.
+ *
+ * VM can throw exceptions in runtime using this function with pThis == NULL.
+ * In this case a scratchpad area and a message must be provided. A scratchpad is used to construct a calling parameter
+ * for the Exception's constructor
+ *
+ * VM can be controlled via pVm->nExceptMode
  */
 static sxi32 VmThrowException(
-  ph7_vm *pVm,              /* Target VM */
-  ph7_class_instance *pThis /* Exception class instance [i.e: Exception $e] */
-) {
+  ph7_vm *pVm,               /* Target VM */
+  ph7_class_instance *pThis, /* Exception class instance [i.e: Exception $e] OR NULL*/
+  SySet *aArg,               /* if pThis == NULL:  A scratchpad area for constructor arg */
+  const char *zMessage,       /* if pThis == NULL: A custom message for the class Exception constructor */
+  ... ) {
+
   ph7_exception_block *pCatch; /* Catch block to execute */
   ph7_exception **apException;
   ph7_exception *pException;
+  va_list ap;
+
   /* Point to the stack of loaded exceptions */
   apException = (ph7_exception **)SySetBasePtr(&pVm->aException);
   pException = 0;
   pCatch = 0;
+
+  /* throw() calls this function with a class already created. But most of the other calls are when
+   * pThis is null, so we have to create a valid Exception instance and use it as pThis
+   *
+   */
+  if (pThis == NULL) {
+    ph7_class *pClass;
+
+    if (pVm->nExceptMode == PH7_VM_EXCMODE_QUIET)
+      return SXRET_OK;
+
+    if (pVm->nExceptMode == PH7_VM_EXCMODE_MESSAGE) {
+
+      
+      va_start(ap, zMessage);
+      VmThrowErrorAp(&(*pVm), 0, PH7_CTX_ERR, zMessage, ap);
+      va_end(ap);
+
+      return SXRET_OK;
+    }
+
+    if (pVm->nExceptMode != PH7_VM_EXCMODE_EXCEPT) {
+      /* Inconsistent state. */
+      return SXERR_ABORT;
+    }
+
+
+    /* Find class Exception descriptor
+    * this class is defined in PH7_BUILTIN_LIB macro in this file.
+    * Any problems associated with the class Exception (like no memory to instantiate the 
+    * class Exception or problems calling its constructor etc) results in VM stop
+    */
+    pClass = PH7_VmExtractClass(&(*pVm), "Exception", 9, TRUE /* Only loadable class but not 'interface' or 'abstract' class*/, 0);
+    if (pClass == NULL) {
+
+      /* This must not happen. class is defined in BUILTIN_LIB macro */
+      VmErrorFormat(pVm, PH7_CTX_ERR, "Class 'Exception' is not found in stdlib, abort.");
+      return SXERR_ABORT;
+
+    } else {
+      /* pThis = new Exception() */
+      pThis = PH7_NewClassInstance(&(*pVm), pClass);
+      if (pThis == NULL) {
+
+        VmErrorFormat(pVm, PH7_CTX_ERR, "Can not create a new class Exception instance, abort.");
+        return SXERR_ABORT;
+      } else {
+
+        /* We have instantiated class Exception; call its constructor (old style constructor) */
+        ph7_value sText;
+        ph7_value *apArg[1] = { &sText };
+        ph7_class_method *pCons;
+
+        PH7_MemObjInit(pVm, &sText);
+        MemObjSetType(&sText, MEMOBJ_STRING);
+
+        va_start(ap, zMessage);
+        SyBlobFormatAp(&sText.sBlob, zMessage, ap);
+        va_end(ap);
+
+        /* Call constructor to pass the user message so it can be extracted with a getMessage() later */
+        pCons = PH7_ClassExtractMethod(pClass, "__construct", sizeof("__construct") - 1);
+        if (pCons) {
+          SySetReset(aArg);
+          SySetPut(aArg, (const void *)&apArg[0]);
+          PH7_VmCallClassMethod(pVm, pThis, pCons, 0, SySetUsed(aArg), (ph7_value **)SySetBasePtr(aArg));
+        }
+        PH7_MemObjRelease(&sText);
+      }
+    }
+  }
+
+  /* pThis can be NULL at this point, it is ok */
+
   if (SySetUsed(&pVm->aException) > 0) {
     ph7_exception_block *aCatch;
     ph7_class *pClass;

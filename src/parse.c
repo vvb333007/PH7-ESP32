@@ -12,11 +12,35 @@
 
 #include "ph7int.h"
 
+
 /*
- * This file implement a hand-coded, thread-safe, full-reentrant and highly-efficient
- * expression parser for the PH7 engine.
+ * WARNING:
+ * iPrec values are used as internal parser/compiler 'category' IDs not just as precedence levels.
+ * Raw values are hardcoded in multiple places throughout the compiler.
+ *
+ * DO NOT REPLACE THESE RAW NUMBERS WITH FANCY MACROS - KEEP THIS INCONSITENCY VISIBLE
+ *
+ * Do NOT renumber existing precedence values when adding an operator.
+ * Inserting a new level and shifting all following iPrec values will break the compiler.
+ * since compiler uses iPrec to find out what operator group is processed (like: '19 - is *= and so on')
+ *
+ * For this reason operator '??' uses same precedence slot 16 which is used by operator '||'
+ * This is intentionally different from PHP precedence.
+ *
+ * PHP8 and PH8 runs following code with the same result:
+ *
+ * $d = 1;
+ * $b = $c = null;
+ * $a = $b || $c ?? $d;   // false
+ * $a = $b || ($c ?? $d;) // true
+ */
+
+
+/*
+ * This file implement a thread-safe, full-reentrant expression parser for the PH7 engine.
  * Besides from the one introudced by PHP (Over 60), the PH7 engine have introduced three new
  * operators. These are 'eq', 'ne' and the comma operator ','.
+ *
  * The eq and ne operators are borrowed from the Perl world. They are used for strict
  * string comparison. The reason why they have been implemented in the PH7 engine
  * and introduced as an extension to the PHP programming language is due to the confusion
