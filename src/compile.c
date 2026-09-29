@@ -4013,7 +4013,6 @@ static sxi32 GenStateCompileFuncBody(
   
   /* Emit explicit halt instruction at the end the function body
    * if function is marked as :never returning
-   * TODO: Emit throw(new Exception()) here instead of emitting OP_HALT here 
   */
   if (pFunc->iFlags & VM_FUNC_NEVER) {
     
