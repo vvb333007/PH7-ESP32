@@ -4,33 +4,27 @@ Text marked as ~~this~~ means that it is done.
 
 ## Milestones
 
-Architecture: one FreeRTOS task per VM.
-VMs are interruptible and can be executed step by step.
-VMs can be cloned (shared code, private data).
+VMs can be cloned (shared code, private data), required for fork().
 Refactor memory subsystem. Now it is a malloc() for everything
 PH7_VmCallUserFunction must be optimized (no mallocs).
+
 ---
 
 ### 1. Interrupt subsystem
 
 Register PHP functions as interrupt handlers and provide event-based dispatch.
-
-C code handles interrupts and notifies the PHP engine. The PHP engine calls the registered PHP interrupt handler.
+C code handles interrupts and notifies the PHP engine.
+The PHP engine calls the registered PHP interrupt handler ().
 
 PHP interrupts are soft interrupts, allowing arbitrary, potentially heavy code to be executed from the interrupt handler.
 
-Supported interrupt types:
-
-* GPIO interrupts
-* PCNT interrupts
-* TOUCH interrupts
-* Software Timer interrupts
+Supported interrupt types: GPIO interrupts, Software Timer interrupts
 
 ---
 
 ### 2. VM Yield subsystem
 
-* Ability to pause and resume any VM regardless of its current state
+* ~~Ability to pause and resume any VM regardless of its current state~~
 * Ability to execute a VM for a given number of opcodes
 
 ---
@@ -48,29 +42,48 @@ WiFi bindings, both native and hosted.
 ### 4. Arduino Core bindings and SLAC ("Standard Library of Arduino Classes")
 
 An analogue of the Arduino Core `.cpp` library, implemented in PHP wherever possible.
+Standard Arduino Core classes: HardwareSerial, SPI, Wire, FS, Print, String and so on
 
-Standard Arduino Core classes:
+### 5. Exceptions
 
-* `HardwareSerial`
-* `SPI`
-* `FS`
-* `Print`
-* `Server`
-* etc.
+  Rename `Exception` to `Throwable`, and add `Exception`, `Error`, `TypeError`, `ArgumentCountError`, `ArithmeticError`, `DivisionByZeroError`
+  Replace `instanceof(Exception)` in `throw` with `Throwable`
+  Go throuhg error messages table, and replace them with `VmThrowException` calls
+  Figure out `file`/`line` problem (`__FILE__`/`__LINE__` inside stdlib probably, report wrong location)
+  `debug_backtrace()` in the constructor, is it too expensive for ESP32?
 
-So far, `Print`, `Stream`, `Server`, and `Client` have been implemented.
+### 6. Types and overloading
+  Nullable types in stdlib signatures (`?string`, `?Throwable`) or null will not pass strict checks
+  "No matching function" message should print argument types, and the list of candidates
+  Constructor by class name - find places where it is'nt handled (`new`, `parent::`, `method_exists`)
+
+## 7. VM shutdown
+  Call `__destruct` for all live objects on VM exit, before function and class tables are freed
+  Decide what `OP_HALT_VM` does with destructors, and write it down
+  Objects with a cyclic references never reach zero refcount, need a list of all live objects
 
 ---
 
 ## Smaller tasks
 
-### 0. __invoke(), __call(), __callStatic()
+
+
+### 3. __invoke(), __call(), __callStatic(), __get()
 
 Currently do not return any values. That must be fixed ASAP;
+use `__toString()` as a template
 
 
+### 4. `function_exists()`
 
-### 1. UNIX-like `fork()` to make a full clone of a VM
+Implement `function_exists()`.
+
+###5. '' === null
+
+~~empty strings are === null which is wrong.~~
+
+
+### 6. UNIX-like `fork()` to make a full clone of a VM
 
 Start a new VM by cloning the current VM.
 
@@ -83,7 +96,7 @@ if ($pid == 0) {
     echo 'Child has been spawned, pid=' . $pid;
 }
 ```
-### 2. Background PHP services via FreeRTOS tasks
+### 7. Background PHP services via FreeRTOS tasks
 Start a service from P2HP:
 
 ```php
@@ -93,7 +106,7 @@ php_service_stop('Service Name');           // only once
 
 ---
 
-### 2. IPC instead of the FreeRTOS Task Notification API
+### 8. IPC instead of the FreeRTOS Task Notification API
 
 Allow VMs to communicate with each other.
 The main use case is communication with PHP services (standalone background PHP processes).
@@ -101,13 +114,13 @@ The main use case is communication with PHP services (standalone background PHP 
 Implement VM-to-VM IPC using FreeRTOS queues.
 Use FreeRTOS Task Notifications for lightweight VM wake/sleep synchronization.
 
-VM#1:
+VM1:
 
 ```php
 php_ipc_announce('My Fancy Name');
 ```
 
-VM#2:
+VM2:
 
 ```php
 $handle = php_ipc_bind(
@@ -126,24 +139,29 @@ php_ipc_sleep($handle, $mask); // sleep until woken up by another VM
 
 ---
 
-### 3. `mixed` type
+### 9. C++-style constructors
+
+Not always checked for existence. Should we patch a constructor lookup code?
+
+
+### 10. `mixed` type
 
 ~~Add mixed type~~
 
 ---
 
-### 4. `enum`
+### 11. `enum`
 
 ~~Add the `enum` keyword.~~
 
 
 ---
 
-### 5. `match` keyword
+### 12. `match` keyword
 
 ---
 
-### 6. Short array syntax
+### 13. Short array syntax
 
 Support:
 
@@ -155,40 +173,37 @@ $arr = [1,2,3];
 
 ---
 
-### 7. `function_exists()`
 
-Implement `function_exists()`.
-
-###8. ~~empty strings are === null which is wrong.~~
-
-
-###9. Function return arguments
+###14. Function return arguments
 
 ~~Support for function return types syntax (PHP7.x)~~
 
 
-###10. Overloading:
+###15. Overloading:
 
 ~~do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.~~
 
 
-###11. Overloading:
+###16. Overloading:
 
 ~~do not fallback to the last function in the list if there are no good candidates for overloading.
 Do fallback only if there is only 1 candidate~~
 
-###12. Nullable types:
+###17. Nullable types:
 
 ~~inject code into return statement which LOADC 0,0,0; TEQ ; JNZ over CVT instruction to skip conversion of null to the function type~~
 
-###14. ~~`callable` type ~~
+###18. ~~`callable` type ~~
 
 
-###13. ?? operator 
+###19. ?? operator 
 ( ~~?? as a null coalesce OP~~, and ??= null coalesce assignment)
 
-###14. ?-> nullsafe operator  
+###20. ?-> nullsafe operator  
 
 ~~Implement a nullsafe arrow operator, which loads NULL. Change the behaviour of -> to generate a VM error if operating on null~~
 
-       
+
+
+
+
