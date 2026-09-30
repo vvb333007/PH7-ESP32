@@ -419,7 +419,7 @@ PH7_PRIVATE sxi32 PH7_VmEmitInstr(
   }
 #if DISASM
   printf("  % 10s %d %u %p # PC=%u\n",
-          VmInstrToString(sInstr.iOp),
+         VmInstrToString(sInstr.iOp),
 
           sInstr.iP1,
           sInstr.iP2,
@@ -2267,7 +2267,7 @@ static sxi32 VmByteCodeDump(
 /* Forward declaration */
 static int VmObConsumer(const void *pData, unsigned int nDataLen, void *pUserData);
 static sxi32 VmUncaughtException(ph7_vm *pVm, ph7_class_instance *pThis);
-static sxi32 VmThrowException(ph7_vm *pVm, ph7_class_instance *pThis, const char *zType, VmInstr *aInstr, sxi32 *pc, const char *zMessage, ... );
+static sxi32 VmThrowException(ph7_vm *pVm, ph7_class_instance *pThis, const char *zType, const char *zMessage, ... );
 
 
 /*
@@ -2745,7 +2745,7 @@ static sxi32 VmByteCodeExec(
           PH7_VmThrowError(pVm, 0, PH7_CTX_ERR, "Can not convert value to a callable. Aborted.");
           goto Abort;
 #else
-          if (SXERR_ABORT == VmThrowException(pVm, NULL, "TypeError", aInstr, &pc, "Can not convert value to a callable. Aborted."))
+          if (SXERR_ABORT == VmThrowException(pVm, NULL, "TypeError", "Can not convert value to a callable. Aborted."))
             goto Abort;
 #endif
         }
@@ -3811,7 +3811,7 @@ static sxi32 VmByteCodeExec(
           if (b == 0) {
             r = 0;
             //VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
-            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError",aInstr, &pc, "Division by zero %qd%%0", a))
+            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError", "Division by zero %qd%%0", a))
               goto Abort;
 
             /* goto Abort; */
@@ -3856,7 +3856,7 @@ static sxi32 VmByteCodeExec(
           if (b == 0) {
             r = 0;
             //VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
-            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError",aInstr, &pc, "Division by zero %qd%%0", a))
+            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError", "Division by zero %qd%%0", a))
               goto Abort;
 
           } else {
@@ -3905,7 +3905,7 @@ static sxi32 VmByteCodeExec(
             /* Division by zero */
             r = 0;
 //            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "Division by zero");
-            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError",aInstr, &pc, "Division by zero %d/0", a))
+            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError", "Division by zero %d/0", a))
               goto Abort;
 
           } else {
@@ -3951,7 +3951,7 @@ static sxi32 VmByteCodeExec(
             /* Division by zero */
             r = 0;
 //            VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd/0", a);
-            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError",aInstr, &pc, "Division by zero %d/0", a))
+            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError", "Division by zero %d/0", a))
               goto Abort;
 //            ph7_vm_call_function(pVm,"__nullderef",0,NULL,NULL);
 
@@ -4766,6 +4766,7 @@ static sxi32 VmByteCodeExec(
           /* Mark the special frame */
           pFrame->iFlags |= VM_FRAME_EXCEPTION;
           pFrame->iExceptionJump = pInstr->iP2;
+
           /* Point to the frame that trigger the exception */
           pFrame = pFrame->pParent;
           while (pFrame->pParent && (pFrame->iFlags & VM_FRAME_EXCEPTION)) {
@@ -5202,7 +5203,7 @@ static sxi32 VmByteCodeExec(
                 /* Attribute: dereferencing a null pointer $class = null; $class->attribute */
                 if (pInstr->iP2 == 0) {
 
-                  if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error",aInstr, &pc, "A null dereference, '->%z' attribute access", &sName)) {
+                  if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "A null dereference, '->%z' attribute access", &sName)) {
                     goto Abort;
                   }
                     
@@ -5220,7 +5221,7 @@ static sxi32 VmByteCodeExec(
                   /* Not yer. Requires OP_CALL opcode logic update 
                    * 
                   */
-                  if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error",aInstr, &pc, "A null dereference, '->%z()' method access", &sName)) {
+                  if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "A null dereference, '->%z()' method access", &sName)) {
                     goto Abort;
                   }
                   PH7_MemObjRelease(pTos);
@@ -6039,7 +6040,7 @@ try_again:
             pEntry = SyHashGet(&pVm->hHostFunction, (const void *)sName.zString, sName.nByte);
             if (pEntry == 0) {
               /* Call to undefined function: not a compiled nor a foreign function */
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error",aInstr, &pc, "Undefined function '%z()' call", &sName))
+              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "Undefined function '%z()' call", &sName))
                 goto Abort;
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
@@ -9919,9 +9920,6 @@ static sxi32 VmThrowException(
   ph7_vm *pVm,               /* Target VM */
   ph7_class_instance *pThis, /* Exception class instance [i.e: Exception $e] OR NULL*/
   const char *zType,         /* if pThis == NULL:  exception class name (Throwable, Error, TypeError etc) */
-  VmInstr *aInstr,           /* Beginning of bytecode */
-  sxi32 *pc,                 /* Current PC */
-                             /* TODO: bytecode limit! Potential OOB read*/
   const char *zMessage,      /* if pThis == NULL: A custom message for the class Exception constructor */
   ... ) {
 
@@ -9962,6 +9960,16 @@ static sxi32 VmThrowException(
     }
 
     bIsInternal = 1;
+
+
+    VmFrame *pFrame = pVm->pFrame;
+    while (pFrame->pParent && (pFrame->iFlags & VM_FRAME_EXCEPTION)) {
+      /* Safely ignore the exception frame */
+      pFrame = pFrame->pParent;
+    }
+    /* Tell the upper layer that an exception was thrown */
+    pFrame->iFlags |= VM_FRAME_THROW;
+
 
 
     /* Find class Exception descriptor
@@ -10053,7 +10061,9 @@ static sxi32 VmThrowException(
       }
     }
     return rc;
+
   } else {
+
     VmFrame *pFrame = pVm->pFrame;
     sxi32 rc;
     while (pFrame->pParent && (pFrame->iFlags & VM_FRAME_EXCEPTION)) {
@@ -10081,22 +10091,6 @@ static sxi32 VmThrowException(
       /* Leave the frame */
       VmLeaveFrame(&(*pVm));
     }
-  }
-
-  if (bIsInternal) {
-    //printf("Looking for a suitable OP_DONE from PC=%d\n",pc);
-    sxi32 c = *pc;
-    for( ; ; ) {
-       /* TODO: CITO: check if we are still in bounds
-        * TODO: CITO: if there are no corresponding POP_EXCEPTIOn that means
-        *             our code generator is broken. In this case, scroll down to nearest OP_DONE
-       */
-      if (aInstr[c].iOp == PH7_OP_POP_EXCEPTION && aInstr[c].iP1 == 0)
-        break;
-      c++;
-    }
-    //printf("Found, %d insns away\n",c - *pc);
-    *pc = c - 1;
   }
 
   /* TICKET 1433-60: Do not release the 'pException' pointer since it may
