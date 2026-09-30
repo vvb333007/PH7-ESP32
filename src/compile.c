@@ -5773,6 +5773,7 @@ static sxi32 GenStateThrowNodeValidator(ph7_gen_state *pGen, ph7_expr_node *pRoo
  * throw: This is how you trigger an exception.
  * Each "throw" block must have at least one "catch" block associated with it.
  */
+
 static sxi32 PH7_CompileThrow(ph7_gen_state *pGen) {
   sxu32 nLine = pGen->pIn->nLine;
   GenBlock *pBlock;
@@ -5969,6 +5970,7 @@ static sxi32 PH7_CompileTry(ph7_gen_state *pGen) {
       return SXERR_ABORT;
     }
     return SXRET_OK;
+
   }
   /* Compile one or more catch blocks */
   for (;;) {
