@@ -1430,6 +1430,7 @@ struct ph7_vm {
   ph7_hashmap *pGlobal;            /* $GLOBALS hashmap */
   sxu32 nGlobalIdx;                /* $GLOBALS index */
   sxi32 iExitStatus;               /* Script exit status */
+  sxi32 iException;                /* VM internal exception happened */
   ph7_gen_state sCodeGen;          /* Code generator module */
   ph7_vm *pNext, *pPrev;           /* List of active VM's */
   sxu32 nMagic;                    /* Sanity check against misuse */
