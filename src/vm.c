@@ -10,6 +10,27 @@
  * Symisc Systems. Full terms: see LICENSE. Contacts: see CONTACTS.
  */
 
+
+#if 0
+    if (pVm->nExceptMode == PH7_VM_EXCMODE_QUIET)
+      return SXRET_OK;
+
+    if (pVm->nExceptMode == PH7_VM_EXCMODE_MESSAGE) {
+
+      
+      va_start(ap, zMessage);
+      VmThrowErrorAp(&(*pVm), 0, PH7_CTX_ERR, zMessage, ap);
+      va_end(ap);
+
+      return SXRET_OK;
+    }
+    if (pVm->nExceptMode != PH7_VM_EXCMODE_EXCEPT) {
+      /* Inconsistent state. */
+      return SXERR_ABORT;
+    }
+
+#endif
+
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
@@ -18,7 +39,23 @@
 /* Forward declaration */
 static const char *VmInstrToString(sxi32 nOp);
 PH7_PRIVATE int PH7_VmIsCallable(ph7_vm *pVm, ph7_value *pValue, int CallInvoke);
-PH7_PRIVATE sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nBytes);
+PH7_PRIVATE sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nBytes, const char *zFormat, ...);
+
+
+#define VM_EXCEPTION_GOTO(fname_, flen_, fmt_, ... ) \
+            { \
+              sxi32 ret_; \
+              VmFrame *pFrame_ = pVm->pFrame; \
+              if (PH7_EXCEPTION == (ret_ = PH7_VmThrow(pVm, fname_, flen_,fmt_,__VA_ARGS__ ))) { \
+                /* Exception handled: a catch() block has executed.. */ \
+                if (aInstr != pFrame_->pExcByteCode || pFrame_->iExceptionJump < 1) \
+                  goto Exception; /*..but current frame is not our jump destination*/ \
+                pc = pFrame_->iExceptionJump - 1; \
+                break; \
+              } \
+              goto Abort; /* Exception was unhandled: terminate */ \
+            }
+
 
 /*
  * The code in this file implements execution method of the PH7 Virtual Machine.
@@ -831,7 +868,7 @@ static sxi32 VmMountUserClass(
       if (pMemObj == 0) {
         VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Cannot reserve a memory object for class attribute '%z->%z' due to a memory failure", &pClass->sName, &pAttr->sName);
         /* Hard fault */
-        return SXERR_MEM;
+        return SXERR_MEM; // TODO: SXERR_ABORT?
       }
       if (SySetUsed(&pAttr->aByteCode) > 0) {
         /* Initialize attribute default value (any complex expression) */
@@ -1067,11 +1104,11 @@ static sxi32 VmEvalChunk(ph7_vm *pVm, ph7_context *pCtx, SyString *pChunk, int i
   "    parent::__construct($message,$code,$filename,$lineno);" \
   "  }" \
   "}" \
-  "function __nullderef() {" \
-  "  throw(new Error(\"Attempt to dereference (->) a null variable\"));" \
+  "function __nullderef($arg) {" \
+  "  throw(new Error('Null dereference (null->): '.$arg));" \
   "}" \
-  "function __divbyzero() {" \
-  "  throw(new DivisionByZeroError(\"Division by zero detected\"));" \
+  "function __divbyzero($arg) {" \
+  "  throw(new DivisionByZeroError('Division by zero: '.$arg));" \
   "}" \
   "function __nullsafe() { return null; }" \
   "interface Iterator {" \
@@ -2281,7 +2318,7 @@ static sxi32 VmByteCodeDump(
 /* Forward declaration */
 static int VmObConsumer(const void *pData, unsigned int nDataLen, void *pUserData);
 static sxi32 VmUncaughtException(ph7_vm *pVm, ph7_class_instance *pThis);
-static sxi32 VmThrowException(ph7_vm *pVm, ph7_class_instance *pThis, const char *zType, const char *zMessage, ... );
+static sxi32 VmThrowException(ph7_vm *pVm, ph7_class_instance *pThis);
 
 
 /*
@@ -2756,13 +2793,10 @@ static sxi32 VmByteCodeExec(
 #endif
         if ((pTos->iFlags & (MEMOBJ_STRING|MEMOBJ_HASHMAP)) == 0 ||
             (PH7_VmIsCallable(pVm, pTos, FALSE) == 0)) { 
-#if 0
+
           PH7_VmThrowError(pVm, 0, PH7_CTX_ERR, "Can not convert value to a callable. Aborted.");
           goto Abort;
-#else
-          if (SXERR_ABORT == VmThrowException(pVm, NULL, "TypeError", "Can not convert value to a callable. Aborted."))
-            goto Abort;
-#endif
+//TODO:exception
 
         }
         break;
@@ -3282,10 +3316,8 @@ static sxi32 VmByteCodeExec(
             nIdx = pTos->nIdx;
             VmPopOperand(&pTos, 1);
             if (nIdx == SXU32_HIGH) {
-              //PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'=': can not assign: expression on the left is a constant");
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'=': can not assign: expression on the left is a constant"))
-                goto Abort;
-
+              PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'=': can not assign: expression on the left is a constant");
+//TODO:exception
               pTos->nIdx = SXU32_HIGH;
             } else {
               /* Point to the desired memory object */
@@ -3644,10 +3676,8 @@ static sxi32 VmByteCodeExec(
           if (pInstr->iOp == PH7_OP_MUL_STORE) {
             ph7_value *pObj;
             if (pTos->nIdx == SXU32_HIGH) {
-   //           PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, " '*=' can not assign: expression on the left is a constant");
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'*=': can not assign: expression on the left is a constant"))
-                goto Abort;
-
+              PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, " '*=' can not assign: expression on the left is a constant");
+//TODO:exception
             } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
               PH7_MemObjStore(pNos, pObj);
             }
@@ -3694,11 +3724,8 @@ static sxi32 VmByteCodeExec(
           PH7_MemObjAdd(pTos, pNos, TRUE);
           /* Peform the store operation */
           if (nIdx == SXU32_HIGH) {
-//            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, " '+=': can not assign: expression on the left is a constant");
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'+=': can not assign: expression on the left is a constant"))
-                goto Abort;
-
-
+            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, " '+=': can not assign: expression on the left is a constant");
+//TODO:exception
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, nIdx)) != 0) {
             PH7_MemObjStore(pTos, pObj);
           }
@@ -3794,10 +3821,8 @@ static sxi32 VmByteCodeExec(
             MemObjSetType(pNos, MEMOBJ_INT);
           }
           if (pTos->nIdx == SXU32_HIGH) {
-//            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'-=': can not assign: expression on the left is a constant");
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'-=': can not assign: expression on the left is a constant"))
-                goto Abort;
-
+            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'-=': can not assign: expression on the left is a constant");
+//TODO:exception
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pNos, pObj);
           }
@@ -3835,12 +3860,11 @@ static sxi32 VmByteCodeExec(
           b = pTos->x.iVal;
           if (b == 0) {
             r = 0;
-            //VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
-//            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError", "Division by zero %qd%%0", a))
-//              goto Abort;
+//            VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
+            do 
+              VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d%%0) at PC=%08x (%u)\n",a,pc,pc)
+            while(0);
 
-            PH7_VmThrow(pVm,"__divbyzero",11 );
-            goto Done;
           } else {
             r = a % b;
           }
@@ -3881,12 +3905,10 @@ static sxi32 VmByteCodeExec(
           b = pNos->x.iVal;
           if (b == 0) {
             r = 0;
-            //VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
-//            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError", "Division by zero %qd%%0", a))
-//              goto Abort;
-            PH7_VmThrow(pVm,"__divbyzero",11 );
-            goto Done;
-
+//            VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
+            do 
+              VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d%%=0) at PC=%08x (%u)\n",a,pc,pc)
+            while(0);
           } else {
             r = a % b;
           }
@@ -3894,10 +3916,8 @@ static sxi32 VmByteCodeExec(
           pNos->x.iVal = r;
           MemObjSetType(pNos, MEMOBJ_INT);
           if (pTos->nIdx == SXU32_HIGH) {
-//            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'%=': can not assign: expression on the left is a constant");
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'%=': can not assign: expression on the left is a constant"))
-                goto Abort;
-
+            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'%=': can not assign: expression on the left is a constant");
+//TODO:exception
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pNos, pObj);
           }
@@ -3931,35 +3951,15 @@ static sxi32 VmByteCodeExec(
           /* Perform the requested operation */
           a = pNos->rVal;
           b = pTos->rVal;
-          if (b == 0) {
-            sxi32 ret;
+
+          if (b == 0) { // TODO: unlikely()
+            
             /* Division by zero */
             r = 0;
+            do 
+              VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d/0) at PC=%08x (%u)\n",a,pc,pc)
+            while(0);
 
-//            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError", "Division by zero %d/0", a))
-//              goto Abort;
-
-            VmFrame *pFrame = pVm->pFrame;
-
-            ret = PH7_VmThrow(pVm,"__divbyzero",11 );
-
-            if (SXERR_ABORT == ret) {
-              /* Exception was unhandled: terminate */
-              goto Abort;
-            }
-
-            if (PH7_EXCEPTION == ret) {
-              /* Exception was handled. skip the try{} block and continue execution 
-               *by propagating PH7_EXCEPTION up to the exception frame
-              */
-              if (aInstr != pFrame->pExcByteCode || pFrame->iExceptionJump < 1)
-                goto Exception;
-
-              pc = pFrame->iExceptionJump - 1;
-
-              break;
-            }
-    
           } else {
             r = a / b;
             /* Push the result */
@@ -3968,6 +3968,7 @@ static sxi32 VmByteCodeExec(
             /* Try to get an integer representation */
             PH7_MemObjTryInteger(pNos);
           }
+
           VmPopOperand(&pTos, 1);
           break;
         }
@@ -4002,12 +4003,7 @@ static sxi32 VmByteCodeExec(
           if (b == 0) {
             /* Division by zero */
             r = 0;
-//            VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd/0", a);
-//            if (SXERR_ABORT == VmThrowException(pVm, NULL, "DivisionByZeroError", "Division by zero %d/0", a))
-//              goto Abort;
-            PH7_VmThrow(pVm,"__divbyzero",11 );
-            goto Done;
-
+            VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d/=0) at PC=%08x (%u)\n",a,pc,pc)
 
           } else {
             r = a / b;
@@ -4018,10 +4014,8 @@ static sxi32 VmByteCodeExec(
             PH7_MemObjTryInteger(pNos);
           }
           if (pTos->nIdx == SXU32_HIGH) {
-//            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'/=': can not assign: expression on the left is a constant");
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'/=': can not assign: expression on the left is a constant"))
-                goto Abort;
-
+            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'/=': can not assign: expression on the left is a constant");
+//TODO:exception
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4135,10 +4129,8 @@ static sxi32 VmByteCodeExec(
           pNos->x.iVal = r;
           MemObjSetType(pNos, MEMOBJ_INT);
           if (pTos->nIdx == SXU32_HIGH) {
-//            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'|=', '^=' and '&=': can not assign: expression on the left is a constant");
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'|=', '^=' and '&=': can not assign: expression on the left is a constant"))
-                goto Abort;
-
+            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'|=', '^=' and '&=': can not assign: expression on the left is a constant");
+//TODO:exception
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4238,9 +4230,7 @@ static sxi32 VmByteCodeExec(
           if (pTos->nIdx == SXU32_HIGH) {
             PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'<<=' and '>>=' : can not assign: expression on the left is a constant");
 
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'<<=' and '>>=': can not assign: expression on the left is a constant"))
-                goto Abort;
-
+//TODO:exception
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4312,10 +4302,8 @@ static sxi32 VmByteCodeExec(
           }
           /* Perform the store operation */
           if (pTos->nIdx == SXU32_HIGH) {
-//            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'.=': can not assign: expression on the left is a constant");
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'.=': can not assign: expression on the left is a constant"))
-                goto Abort;
-
+            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "'.=': can not assign: expression on the left is a constant");
+//TODO:exception
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
             PH7_MemObjStore(pTos, pObj);
           }
@@ -4756,9 +4744,8 @@ static sxi32 VmByteCodeExec(
             }
           } else if (sName.nByte > 0) {
             if ((pTos->iFlags & MEMOBJ_HASHMAP) && (pVm->pGlobal == (ph7_hashmap *)pTos->x.pOther)) {
-              //PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "$GLOBALS is a read-only array and therefore cannot be referenced");
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "'$GLOBALS': a read-only array can not be referenced"))
-                goto Abort;
+              PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "$GLOBALS is a read-only array and therefore cannot be referenced");
+//TODO:exception
             } else {
               VmFrame *pFrame = pVm->pFrame;
               while (pFrame->pParent && (pFrame->iFlags & VM_FRAME_EXCEPTION)) {
@@ -4902,8 +4889,8 @@ static sxi32 VmByteCodeExec(
                 goto Abort;
               }
             } else {
-              /* Throw the exception. pThis != NULL => zType and zMessage are NULL */
-              rc = VmThrowException(&(*pVm), pThis, NULL, NULL, NULL, NULL);
+              /* Throw the exception. */
+              rc = VmThrowException(&(*pVm), pThis);
               if (rc == SXERR_ABORT) {
                 /* Abort processing immediately */
                 goto Abort;
@@ -5218,6 +5205,11 @@ static sxi32 VmByteCodeExec(
                                 &pClass->sName, &sName);
                   /* Call the __get magic method if available */
                   /* TODO: exception */
+                  /* TODO: add flags to pClass: HAS_GET, HAS_SET, HAS_CALL, HAS_CALLSTATIC, etc
+                   * which are inherited via 'extends' construct. These flags are used by CallMagicMethod
+                   * to skip method lookup when we know there are none.
+                   * TODO: propagate pResult from a magic call, put it on Tos
+                  */
                   PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName);
 
                 }
@@ -5270,33 +5262,13 @@ static sxi32 VmByteCodeExec(
                   SyStringInitFromBuf(&sName, "<unknown>", sizeof("<unknown>")-1);
                 }
 
-                /* Attribute: dereferencing a null pointer $class = null; $class->attribute */
-                if (pInstr->iP2 == 0) {
+                /* Dereferencing a null pointer $class = null; $class->attribute or ->method() */
+                do 
 
-                  if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "A null dereference, '->%z' attribute access", &sName)) {
-                    goto Abort;
-                  }
-                    
-
-                } else {
-#if 1
-                  /* Replace the method name with stdlib function call which throws an exception 
-                   * and continue execution like nothing happened. Subsequent OP_CALL will execute __nullderef()
-                   * TODO:This is ugly because we loose method name on this.
-                  */
-                  PH7_MemObjRelease(pTos);
-                  SyBlobAppend(&pTos->sBlob, "__nullderef", 11);
-                  MemObjSetType(pTos, MEMOBJ_STRING);
-#else
-                  if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "A null dereference, '->%z()' method access", &sName)) {
-                    goto Abort;
-                  }
-                  PH7_MemObjRelease(pTos);
-                  SyBlobAppend(&pTos->sBlob, "__nullsafe", 10);
-                  MemObjSetType(pTos, MEMOBJ_STRING);
-#endif
-
-                }
+                  VM_EXCEPTION_GOTO("__nullderef",11,
+                                    pInstr->iP2 == 0 ? " '->%z' class attribute access"
+                                                     : " '->%z()' class method call",&sName)
+                while(0);
               } else {
                /* ?->, a nullsafe opeartor: either replace method call with a builtin noop (__nullsafe())
                 * or, if it was an attribute access - load NULL to the Tos
@@ -5334,6 +5306,8 @@ static sxi32 VmByteCodeExec(
               /* Attribute name already computed */
               SyStringInitFromBuf(&sName, pInstr->p3, SyStrlen((const char *)pInstr->p3));
             }
+
+
             if (pNos->iFlags & (MEMOBJ_STRING | MEMOBJ_OBJ)) {
               ph7_class *pClass = 0;
               if (pNos->iFlags & MEMOBJ_OBJ) {
@@ -5509,7 +5483,7 @@ static sxi32 VmByteCodeExec(
                 pArg++;
               }
               if (pVm->bErrReport) {
-//XXX
+
                 ph7_vm_func_arg *pFuncArg;
                 sxu32 n;
                 n = SySetUsed(&aArg);
@@ -6130,8 +6104,9 @@ static sxi32 VmByteCodeExec(
             pEntry = SyHashGet(&pVm->hHostFunction, (const void *)sName.zString, sName.nByte);
             if (pEntry == 0) {
               /* Call to undefined function: not a compiled nor a foreign function */
-              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "Undefined function '%z()' call", &sName))
-                goto Abort;
+//              if (SXERR_ABORT == VmThrowException(pVm, NULL, "Error", "Undefined function '%z()' call", &sName))
+//                goto Abort;
+//TODO:exception
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
                 VmPopOperand(&pTos, pInstr->iP1);
@@ -7911,35 +7886,54 @@ PH7_PRIVATE sxi32 PH7_VmCallUserFunction(
 
 
 /*
- * Call a user defined or foreign function where the name of the function
- * is stored in the pFunc parameter and the given arguments are stored
- * in the apArg[] array.
- * Return SXRET_OK if the function was successfuly called.Any other
- * return value indicates failure.
+ * Throw an exception during bytecode execution. This obe is called from a huge switch(opcode)
+ * statement of VmByteCodeExec(). VmThrow creates a trampoline consisting of OP_CALL and DONE
+ * plus corresponding stdlib's function name like '__nullderef' or '__unknownfn' or similar.
+ *
+ * Execution of this trampoline creates an exception in context of a function call which is
+ * then handled by OP_CALL post-processing code (exception handling)
+ *
+ * Return SXRET_ABORT if the exception was not handled
+ * Return PH7_EXCEPTION if the exception was handled, and a corresponding 'catch' block eexecuted
  */
-PH7_PRIVATE sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nByte) {
-
-  ph7_value Func, Result;
+PH7_PRIVATE sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nByte, const char *zFormat, ...) {
+  va_list ap;
+  ph7_value Result;
   ph7_value *aStack;
   VmInstr aInstr[3] = { 0 };
-  int i;
 
-  /* Create a new operand stack */
-  aStack = VmNewOperandStack(&(*pVm), 2);
+
+  /* Create a new operand stack, need 2 but let it be four 
+      TODO: a local stack is enough, we do not need to malloc() a new operand stack
+*/
+  
+  aStack = VmNewOperandStack(&(*pVm), 4);
   if (aStack == 0) {
     PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR, "PH7 is running out of memory while invoking user callback");
     return SXERR_ABORT;
   }
 
-  MemObjSetType(&aStack[0], MEMOBJ_STRING);
-  SyBlobAppend(&aStack[0].sBlob, zName, nByte);
+
+  /* Format the given string and put it on the stack */
+  if (zFormat != NULL) {
+    MemObjSetType(&aStack[0], MEMOBJ_STRING);
+    va_start(ap, zFormat);
+    SyBlobFormatAp(&aStack[0].sBlob, zFormat, ap);
+    va_end(ap);
+  } else
+    MemObjSetType(&aStack[0], MEMOBJ_NULL);
   aStack[0].nIdx = SXU32_HIGH; /* Mark as constant */
+
+  /* Put the function name on stack. OMG all of these are mallocs. TODO: check what is the initial size of the blob. Check if we can make a fater lockless allocator for ph7_values and blobs*/
+  MemObjSetType(&aStack[1], MEMOBJ_STRING);
+  SyBlobAppend(&aStack[1].sBlob, zName, nByte);
+  aStack[1].nIdx = SXU32_HIGH; /* Mark as constant */
 
   /* Emit the CALL istruction */
   aInstr[0].iOp = PH7_OP_CALL;
-  aInstr[0].iP1 = 0; /* Total number of given arguments */
+  aInstr[0].iP1 = 1; /* Total number of given arguments */
   aInstr[0].iP2 = 0;
-  aInstr[0].p3 = 0;
+  aInstr[0].p3 = 0; 
 
   /* Emit the DONE instruction */
   aInstr[1].iOp = PH7_OP_DONE;
@@ -7947,11 +7941,15 @@ PH7_PRIVATE sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nByte) {
   aInstr[1].iP2 = 0;
   aInstr[1].p3 = 0;
 
-  sxi32 ret = VmByteCodeExec(&(*pVm), aInstr, aStack, 0, &Result, NULL, TRUE);
+  sxi32 ret = VmByteCodeExec(&(*pVm), aInstr, aStack, 1, &Result, NULL, TRUE);
 
 
   PH7_MemObjRelease(&aStack[0]);
+  PH7_MemObjRelease(&aStack[1]);
   SyMemBackendFree(&pVm->sAllocator, aStack);
+
+  assert((ret == SXERR_ABORT) || (ret == PH7_EXCEPTION));
+
 
   return ret;
 }
@@ -10061,116 +10059,18 @@ static sxi32 VmUncaughtException(
  */
 static sxi32 VmThrowException(
   ph7_vm *pVm,               /* Target VM */
-  ph7_class_instance *pThis, /* Exception class instance [i.e: Exception $e] OR NULL*/
-  const char *zType,         /* if pThis == NULL:  exception class name (Throwable, Error, TypeError etc) */
-  const char *zMessage,      /* if pThis == NULL: A custom message for the class Exception constructor */
-  ... ) {
+  ph7_class_instance *pThis /* Exception class instance [i.e: Throwable $e] OR NULL*/
+) {
 
   ph7_exception_block *pCatch; /* Catch block to execute */
   ph7_exception **apException;
   ph7_exception *pException;
-  va_list ap;
-  int bIsInternal = 0;
 
   /* Point to the stack of loaded exceptions */
   apException = (ph7_exception **)SySetBasePtr(&pVm->aException);
   pException = 0;
   pCatch = 0;
     
-  /* throw() calls this function with a class already created. But most of the other calls are when
-   * pThis is null, so we have to create a valid Exception instance and use it as pThis
-   *
-   */
-  if (pThis == NULL) {
-  
-    ph7_class *pClass;
-    VmFrame *pFrame;
-
-    if (pVm->nExceptMode == PH7_VM_EXCMODE_QUIET)
-      return SXRET_OK;
-
-    if (pVm->nExceptMode == PH7_VM_EXCMODE_MESSAGE) {
-
-      
-      va_start(ap, zMessage);
-      VmThrowErrorAp(&(*pVm), 0, PH7_CTX_ERR, zMessage, ap);
-      va_end(ap);
-
-      return SXRET_OK;
-    }
-    if (pVm->nExceptMode != PH7_VM_EXCMODE_EXCEPT) {
-      /* Inconsistent state. */
-      return SXERR_ABORT;
-    }
-
-    bIsInternal = 1;
-    pVm->iException = 1;
-
-    
-
-
-    //VmEnterFrame(&(*pVm), 0, 0, &pFrame);
-
-    pFrame = pVm->pFrame;
-    while (pFrame->pParent && (pFrame->iFlags & VM_FRAME_EXCEPTION)) {
-      /* Safely ignore the exception frame */
-      pFrame = pFrame->pParent;
-    }
-    /* Tell the upper layer that an exception was thrown */
-    pFrame->iFlags |= VM_FRAME_THROW;
-
-    
-#if 1
-    /* Find class Exception descriptor
-    * this class is defined in PH7_BUILTIN_LIB macro in this file.
-    * Any problems associated with the class Exception (like no memory to instantiate the 
-    * class Exception or problems calling its constructor etc) results in VM stop
-    */
-    if (zType == NULL)
-      zType = "Throwable";
-
-    pClass = PH7_VmExtractClass(&(*pVm), zType, strlen(zType), TRUE /* Only loadable class but not 'interface' or 'abstract' class*/, 0);
-    if (pClass == NULL) {
-
-      /* This must not happen. class is defined in BUILTIN_LIB macro */
-      VmErrorFormat(pVm, PH7_CTX_ERR, "Class '%s' is not found in stdlib, abort.");
-      return SXERR_ABORT;
-
-    } else {
-      /* pThis = new Exception() */
-      pThis = PH7_NewClassInstance(&(*pVm), pClass);
-      if (pThis == NULL) {
-
-        VmErrorFormat(pVm, PH7_CTX_ERR, "Can not create a new 'class %s' instance, abort.", zType);
-        return SXERR_ABORT;
-      } else {
-
-        /* We have instantiated class Throwable; call its constructor (old style constructor) */
-        ph7_value sText;
-        ph7_value *apArg[2] = { &sText, NULL };
-        ph7_class_method *pCons;
-
-        PH7_MemObjInit(pVm, &sText);
-        MemObjSetType(&sText, MEMOBJ_STRING);
-
-        va_start(ap, zMessage);
-        SyBlobFormatAp(&sText.sBlob, zMessage, ap);
-        va_end(ap);
-
-        /* Call constructor to pass the user message so it can be extracted with a getMessage() later */
-        pCons = PH7_ClassExtractMethod(pClass, "__construct", sizeof("__construct") - 1);
-        if (pCons) {
-          //SySetReset(aArg);
-          //SySetPut(aArg, (const void *)&apArg[0]);
-          PH7_VmCallClassMethod(pVm, pThis, pCons, 0, 1/*SySetUsed(aArg)*/, apArg /*(ph7_value **)SySetBasePtr(aArg)*/);
-        }
-        PH7_MemObjRelease(&sText);
-      }
-    }
-#endif
-  }
-
-  /* pThis can be NULL at this point, it is ok */
 
   if (SySetUsed(&pVm->aException) > 0) {
 //    puts("Have exceptions");
@@ -10187,12 +10087,12 @@ static sxi32 VmThrowException(
       /* Extract the target class */
       pClass = PH7_VmExtractClass(&(*pVm), pName->zString, pName->nByte, TRUE, 0);
 
-      if (pClass == 0) {
+      if (pClass == NULL) {
         /* No such class */
   
         continue;
       }
-      if (pThis == 0 || VmInstanceOf(pThis->pClass, pClass)) {
+      if (pThis == NULL || VmInstanceOf(pThis->pClass, pClass)) {
         /* Catch block found,break immeditaley */
         pCatch = &aCatch[j];
         break;
@@ -10203,7 +10103,7 @@ static sxi32 VmThrowException(
   }
 
   /* Execute the cached block if available */
-  if (pCatch == 0) {
+  if (pCatch == NULL) {
     sxi32 rc;
     //puts("catch block not found");  
     rc = VmUncaughtException(&(*pVm), pThis);
