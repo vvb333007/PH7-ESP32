@@ -11,25 +11,19 @@
  */
 
 
-#if 0
-    if (pVm->nExceptMode == PH7_VM_EXCMODE_QUIET)
-      return SXRET_OK;
+/*
+    if pVm->nExceptMode == PH7_VM_EXCMODE_QUIET : silently ignore VM exceptions (exception 
+    that are thrown with a 'throw' PHP language construct are not affected. those affected 
+    are - division by zero, undefined function call, null dereference and so on)
 
-    if (pVm->nExceptMode == PH7_VM_EXCMODE_MESSAGE) {
 
-      
-      va_start(ap, zMessage);
-      VmThrowErrorAp(&(*pVm), 0, PH7_CTX_ERR, zMessage, ap);
-      va_end(ap);
+    if (pVm->nExceptMode == PH7_VM_EXCMODE_MESSAGE) : send a message to the ErrorConsumer 
+    (if VM is configured to print errors) and then simply ignore VM exception. This is a default
+    PH7 behaviuor
 
-      return SXRET_OK;
-    }
-    if (pVm->nExceptMode != PH7_VM_EXCMODE_EXCEPT) {
-      /* Inconsistent state. */
-      return SXERR_ABORT;
-    }
-
-#endif
+    if (pVm->nExceptMode == PH7_VM_EXCMODE_EXCEPT) : throw an exception (class Error, class 
+    TypeError, class DivisionByZero etc)
+*/
 
 #include <assert.h>
 #include <stdint.h>
@@ -4886,6 +4880,7 @@ static sxi32 VmByteCodeExec(
               rc = VmUncaughtException(&(*pVm), pThis);
               if (rc == SXERR_ABORT) {
                 /* Abort processing immediately */
+          
                 goto Abort;
               }
             } else {
@@ -4893,14 +4888,16 @@ static sxi32 VmByteCodeExec(
               rc = VmThrowException(&(*pVm), pThis);
               if (rc == SXERR_ABORT) {
                 /* Abort processing immediately */
+                
                 goto Abort;
               }
             }
           } else {
             /* Expecting a class instance */
-            VmUncaughtException(&(*pVm), 0);
+            rc = VmUncaughtException(&(*pVm), 0);
             if (rc == SXERR_ABORT) {
               /* Abort processing immediately */
+              
               goto Abort;
             }
           }
@@ -6216,7 +6213,7 @@ static sxi32 VmLocalExec(ph7_vm *pVm, SySet *pByteCode, ph7_value *pResult) {
   /* Allocate a new operand stack */
   pStack = VmNewOperandStack(&(*pVm), SySetUsed(pByteCode));
   if (pStack == 0) {
-    return SXERR_MEM;
+    return SXERR_ABORT;
   }
   /* Execute the program */
   rc = VmByteCodeExec(&(*pVm), (VmInstr *)SySetBasePtr(pByteCode), pStack, -1, &(*pResult), 0, FALSE);
@@ -9992,8 +9989,10 @@ static sxi32 VmUncaughtException(
   ph7_value *apArg[2], sArg;
   //int nArg = 1;
   sxi32 rc;
+
   if (pVm->nExceptDepth > 15) { //TODO: no magic numbers
     /* Nesting limit reached */
+    /* TODO: SXERR_ABORT?*/
     return SXRET_OK;
   }
   /* Call any exception handler if available */
@@ -10017,6 +10016,7 @@ static sxi32 VmUncaughtException(
     rc = SXERR_ABORT;
 
   pVm->nExceptDepth--;
+
   if (rc != SXRET_OK) {
     SyString sName = { "Throwable", sizeof("Throwable") - 1 };
     SyString sFuncName = { "Global", sizeof("Global") - 1 };
@@ -10031,7 +10031,7 @@ static sxi32 VmUncaughtException(
     }
     if (pFrame->pParent) {
       if (pFrame->iFlags & VM_FRAME_CATCH) {
-        SyStringInitFromBuf(&sFuncName, "Catch_block", sizeof("Catch_block") - 1);
+        SyStringInitFromBuf(&sFuncName, "catch", sizeof("catch") - 1);
       } else {
         ph7_vm_func *pFunc = (ph7_vm_func *)pFrame->pUserData;
         if (pFunc) {
@@ -10048,14 +10048,8 @@ static sxi32 VmUncaughtException(
   return rc;
 }
 /*
- * Throw an user exception. if pThis is not NULL, then aArg and zMessage are ignored:
- * this is how OP_THROW uses this function.
- *
- * VM can throw exceptions in runtime using this function with pThis == NULL.
- * In this case a scratchpad area and a message must be provided. A scratchpad is used to construct a calling parameter
- * for the Exception's constructor
- *
- * VM can be controlled via pVm->nExceptMode
+ * Throw an exception. This is used internally when processing OP_THROW opcode
+ * This function can not be used to throw exception, despite its name. PH7_VmThrow() can.
  */
 static sxi32 VmThrowException(
   ph7_vm *pVm,               /* Target VM */
@@ -10065,6 +10059,10 @@ static sxi32 VmThrowException(
   ph7_exception_block *pCatch; /* Catch block to execute */
   ph7_exception **apException;
   ph7_exception *pException;
+
+  sxi32 rc = SXRET_OK;
+
+  
 
   /* Point to the stack of loaded exceptions */
   apException = (ph7_exception **)SySetBasePtr(&pVm->aException);
@@ -10107,6 +10105,10 @@ static sxi32 VmThrowException(
     sxi32 rc;
     //puts("catch block not found");  
     rc = VmUncaughtException(&(*pVm), pThis);
+
+    /* TODO: investigate when VmUncaughtException() can return SXRET_OK 
+       TODO: looks like copy\pasted code
+    */
     if (rc == SXRET_OK && pException) {
       VmFrame *pFrame = pVm->pFrame;
       while (pFrame->pParent && (pFrame->iFlags & VM_FRAME_EXCEPTION)) {
@@ -10118,12 +10120,13 @@ static sxi32 VmThrowException(
         pFrame->iFlags &= ~VM_FRAME_THROW;
       }
     }
+
     return rc;
 
   } else {
 //    puts("catch block found");
     VmFrame *pFrame = pVm->pFrame;
-    sxi32 rc;
+    
     while (pFrame->pParent && (pFrame->iFlags & VM_FRAME_EXCEPTION)) {
       /* Safely ignore the exception frame */
       pFrame = pFrame->pParent;
@@ -10146,10 +10149,15 @@ static sxi32 VmThrowException(
         MemObjSetType(pObj, MEMOBJ_OBJ);
       }
       /* Exceute the block */
-      VmLocalExec(&(*pVm), &pCatch->sByteCode, 0);
+
+      rc = VmLocalExec(&(*pVm), &pCatch->sByteCode, 0);
       /* Leave the frame */
       VmLeaveFrame(&(*pVm));
+
+      if (rc == SXERR_ABORT)
+        return rc;
     }
+  
   }
 
 
