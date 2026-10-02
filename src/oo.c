@@ -887,6 +887,7 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceDump(SyBlob *pOut, ph7_class_instance *pThis,
         SyBlobFormat(&(*pOut), "['%z'] =>", &pVmAttr->pAttr->sName);
         SyBlobAppend(&(*pOut), "\n", sizeof(char));
         rc = PH7_MemObjDump(&(*pOut), pValue, ShowType, nTab + 1, nDepth, 0);
+        SyBlobAppend(&(*pOut), "\n", sizeof(char));
         if (rc == SXERR_LIMIT) {
           break;
         }
@@ -939,6 +940,8 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceDump(SyBlob *pOut, ph7_class_instance *pThis,
  * which have the same behaviour as __toString() but for float and integer types
  * respectively.
  * Refer to the official documentation for more information.
+ * TODO: This must be refactored: we need proper return result propagation. we need arguments as well.
+ * TODO: __set() must be able to receive 2 arguments (name and value), not just 1 like it is now.
  */
 PH7_PRIVATE sxi32 PH7_ClassInstanceCallMagicMethod(
   ph7_vm *pVm,               /* VM that own all this stuff */
@@ -946,7 +949,7 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceCallMagicMethod(
   ph7_class_instance *pThis, /* Target object */
   const char *zMethod,       /* Magic method name [i.e: __toString()]*/
   sxu32 nByte,               /* zMethod length*/
-  const SyString *pAttrName  /* Attribute name */
+  const SyString *pAttrName  /* Attribute name, i.e. argument to the magic method */
 ) {
   ph7_value *apArg[2] = { 0, 0 };
   ph7_class_method *pMeth;
@@ -954,6 +957,7 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceCallMagicMethod(
   sxi32 rc;
   int nArg;
   /* Make sure the magic method is available */
+  /* TODO: precache all magic methods*/
   pMeth = PH7_ClassExtractMethod(&(*pClass), zMethod, nByte);
   if (pMeth == 0) {
     /* No such method,return immediately */

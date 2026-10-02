@@ -5602,6 +5602,7 @@ PH7_PRIVATE sxi32 PH7_HashmapDump(SyBlob *pOut, ph7_hashmap *pMap, int ShowType,
         isRef = 1;
       }
       rc = PH7_MemObjDump(&(*pOut), pObj, ShowType, nTab + 1, nDepth, isRef);
+      SyBlobAppend(&(*pOut), "\n", sizeof(char));
       if (rc == SXERR_LIMIT) {
         break;
       }
@@ -5614,6 +5615,7 @@ PH7_PRIVATE sxi32 PH7_HashmapDump(SyBlob *pOut, ph7_hashmap *pMap, int ShowType,
     SyBlobAppend(&(*pOut), " ", sizeof(char));
   }
   SyBlobAppend(&(*pOut), "}", sizeof(char));
+  
   return rc;
 }
 /*

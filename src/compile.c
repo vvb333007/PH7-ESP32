@@ -5738,8 +5738,12 @@ static sxi32 PH7_CompileEnum(ph7_gen_state *pGen) {
  *    will attempt to find the first matching catch block. If an exception is not caught, a PHP
  *    Fatal Error will be issued with an "Uncaught Exception ..." message, unless a handler has
  *    been defined with set_exception_handler().
- *    The thrown object must be an instance of the Exception class or a subclass of Exception.
- *    Trying to throw an object that is not will result in a PHP Fatal Error. 
+ *
+ *    The thrown object must be an instance of the Throwable class or a subclass of Throwable.
+ *    Note that unloke PHP8, where Throwable is an interface, in PH8 the Throwable is a class
+ *
+ *    Attempt to throw an exception using any class that is not derived from Throwable will 
+ *    result in a hard stop
  */
 /*
  * Expression tree validator callback associated with the 'throw' statement.

@@ -842,8 +842,9 @@ typedef void (*ProcConstant)(ph7_value *, void *);
 /*
  * Each registered constant [i.e: __TIME__, __DATE__, PHP_OS, INT_MAX, etc.] is stored
  * in an instance of the following structure.
- * Please refer to the official documentation for more information
- * on how to create/install foreign constants.
+ *
+ * TODO: add a field which can hold a computed value. This is required for a new type of consts (single exec consts)
+ * TODO: 
  */
 typedef struct ph7_constant ph7_constant;
 struct ph7_constant {
