@@ -1239,14 +1239,16 @@ PH7_PRIVATE sxi32 PH7_MemObjDump(
       } else {
         /* Append length first */
         if (ShowType) {
-          SyBlobFormat(&(*pOut), "%u '", SyBlobLength(&pObj->sBlob));
+          SyBlobFormat(&(*pOut), "%u,", SyBlobLength(&pObj->sBlob));
         }
+        SyBlobAppend(&(*pOut), "'", sizeof(char));
         if (SyBlobLength(pContents) > 0) {
           SyBlobAppend(&(*pOut), SyBlobData(pContents), SyBlobLength(pContents));
         }
-        if (ShowType) {
-          SyBlobAppend(&(*pOut), "'", sizeof(char));
-        }
+        SyBlobAppend(&(*pOut), "'", sizeof(char));
+//        if (ShowType) {
+//          SyBlobAppend(&(*pOut), "'", sizeof(char));
+//        }
       }
     }
     if (ShowType) {

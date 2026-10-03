@@ -5572,12 +5572,16 @@ PH7_PRIVATE sxi32 PH7_HashmapDump(SyBlob *pOut, ph7_hashmap *pMap, int ShowType,
   /* Point to the first inserted entry */
   pEntry = pMap->pFirst;
   rc = SXRET_OK;
+
   if (!ShowType) {
-    SyBlobAppend(&(*pOut), "Array(", sizeof("Array(") - 1);
+    //SyBlobAppend(&(*pOut), "Array(", sizeof("Array(") - 1);
+    SyBlobAppend(&(*pOut), "array(", sizeof("array(") - 1);
   }
   /* Total entries */
-  SyBlobFormat(&(*pOut), "%u) {", pMap->nEntry);
-  SyBlobAppend(&(*pOut), "\n", sizeof(char));
+  if (ShowType)  {
+    SyBlobFormat(&(*pOut), "%u) = {", pMap->nEntry);
+    SyBlobAppend(&(*pOut), "\n", sizeof(char));
+  }
   for (;;) {
     if (n >= pMap->nEntry) {
       break;
@@ -5587,22 +5591,23 @@ PH7_PRIVATE sxi32 PH7_HashmapDump(SyBlob *pOut, ph7_hashmap *pMap, int ShowType,
     }
     /* Dump key */
     if (pEntry->iType == HASHMAP_INT_NODE) {
-      SyBlobFormat(&(*pOut), "[%qd] =>", pEntry->xKey.iKey);
+      SyBlobFormat(&(*pOut), "%qd =>", pEntry->xKey.iKey);
     } else {
-      SyBlobFormat(&(*pOut), "[%.*s] =>",
+      SyBlobFormat(&(*pOut), "'%.*s' =>",
                    SyBlobLength(&pEntry->xKey.sKey), SyBlobData(&pEntry->xKey.sKey));
     }
-    SyBlobAppend(&(*pOut), "\n", sizeof(char));
+    //SyBlobAppend(&(*pOut), "\n", sizeof(char));
     /* Dump node value */
     pObj = HashmapExtractNodeValue(pEntry);
     isRef = 0;
     if (pObj) {
+
       if (pEntry->iFlags & HASHMAP_NODE_FOREIGN_OBJ) {
         /* Referenced object */
         isRef = 1;
       }
       rc = PH7_MemObjDump(&(*pOut), pObj, ShowType, nTab + 1, nDepth, isRef);
-      SyBlobAppend(&(*pOut), "\n", sizeof(char));
+      SyBlobAppend(&(*pOut), ",\n", ShowType ? sizeof(char)*2 : sizeof(char)*1);
       if (rc == SXERR_LIMIT) {
         break;
       }
@@ -5614,6 +5619,10 @@ PH7_PRIVATE sxi32 PH7_HashmapDump(SyBlob *pOut, ph7_hashmap *pMap, int ShowType,
   for (i = 0; i < nTab; i++) {
     SyBlobAppend(&(*pOut), " ", sizeof(char));
   }
+//  if (ShowType)  {
+//    SyBlobAppend(&(*pOut), ")", sizeof(char));
+//  }
+
   SyBlobAppend(&(*pOut), "}", sizeof(char));
   
   return rc;

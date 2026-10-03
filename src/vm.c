@@ -3823,7 +3823,7 @@ static sxi32 VmByteCodeExec(
           if (b == 0) {
             r = 0;
 //            VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
-            VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d%%0) at PC=%08x (%u)\n",a,pc,pc)
+            VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d%%0) at PC=%08x (%u)",a,pc,pc)
 
           } else {
             r = a % b;
@@ -3864,7 +3864,7 @@ static sxi32 VmByteCodeExec(
           if (b == 0) {
             r = 0;
 //          VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Division by zero %qd%%0", a);
-            VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d%%=0) at PC=%08x (%u)\n",a,pc,pc)
+            VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d%%=0) at PC=%08x (%u)",a,pc,pc)
           } else {
             r = a % b;
           }
@@ -3910,7 +3910,7 @@ static sxi32 VmByteCodeExec(
             
             /* Division by zero */
             r = 0;
-            VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d/0) at PC=%08x (%u)\n",a,pc,pc)
+            VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d/0) at PC=%08x (%u)",a,pc,pc)
 
           } else {
             r = a / b;
@@ -3953,7 +3953,7 @@ static sxi32 VmByteCodeExec(
           if (b == 0) {
             /* Division by zero */
             r = 0;
-            VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d/=0) at PC=%08x (%u)\n",a,pc,pc)
+            VM_EXCEPTION_GOTO("__divbyzero",11,"Division by zero (%d/=0) at PC=%08x (%u)",a,pc,pc)
 
           } else {
             r = a / b;
@@ -9986,8 +9986,11 @@ static sxi32 VmUncaughtException(
 
               ph7_value *pObj;
               if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pSlot->nIdx)) != NULL) {
-                PH7_MemObjDump(&Blob, pObj, 0, 1, 1, FALSE);
-                SyBlobAppend(&Blob, ",", sizeof(char));
+                PH7_MemObjDump(&Blob, pObj, 0, 0, 0, FALSE);
+
+                if ((j+1)<nArg) { /* DOnt print last ','*/
+                  SyBlobAppend(&Blob, ",", sizeof(char));
+                }
               }
             }
           }
