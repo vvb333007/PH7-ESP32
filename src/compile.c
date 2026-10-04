@@ -6094,6 +6094,10 @@ static sxi32 GenStateCompileCaseExpr(ph7_gen_state *pGen, ph7_case_expr *pExpr) 
   pGen->pEnd = pEnd;
   pInstrContainer = PH7_VmGetByteCodeContainer(pGen->pVm);
   PH7_VmSetByteCodeContainer(pGen->pVm, &pExpr->aByteCode);
+  /* TODO: make PH7_CompileExpr to be smart: if expression is a constant then record that
+   *       later, when a case statement will be executed, the result can be precached for a constant values
+   *       so next call will use that cached value;
+  */
   rc = PH7_CompileExpr(&(*pGen), 0, 0);
   /* Emit the done instruction */
   PH7_VmEmitInstr(pGen->pVm, PH7_OP_DONE, (rc != SXERR_EMPTY ? 1 : 0), 0, 0, 0);
@@ -6128,8 +6132,7 @@ static sxi32 GenStateCompileCaseExpr(ph7_gen_state *pGen, ph7_case_expr *pExpr) 
  *  is more complicated than a simple compare and/or is in a tight loop, a switch may be faster.
  *  The statement list for a case can also be empty, which simply passes control into the statement
  *  list for the next case. 
- *  The case expression may be any expression that evaluates to a simple type, that is, integer
- *  or floating-point numbers and strings.
+ *  The case expression may be any expression
  */
 static sxi32 PH7_CompileSwitch(ph7_gen_state *pGen) {
   GenBlock *pSwitchBlock;
