@@ -4780,8 +4780,9 @@ static sxi32 VmByteCodeExec(
           pFrame->iFlags |= VM_FRAME_EXCEPTION;
           pFrame->iExceptionJump = pInstr->iP2;
           pFrame->pExcByteCode = aInstr;
-
-          //fprintf(stderr, "pFrame: %p, JMP=%d, bytecode: %p\n",pFrame, pFrame->iExceptionJump, aInstr);
+#if FRAMELOG
+          fprintf(stderr, "INIT: pFrame: %p, JMP=%d, bytecode: %p\n",pFrame, pFrame->iExceptionJump, aInstr);
+#endif
 
           /* Point to the frame that trigger the exception */
           if (pFrame->pParent)
@@ -5458,12 +5459,15 @@ static sxi32 VmByteCodeExec(
               /* TODO: exception propagation from the class constructor is A MUST
                * Right now any exceptions thrown in a constructor are not handled properly
               */
-              PH7_VmCallClassMethod(&(*pVm), pNew, pCons, 0, (int)SySetUsed(&aArg), (ph7_value **)SySetBasePtr(&aArg));
+     
+              rc = PH7_VmCallClassMethod(&(*pVm), pNew, pCons, 0, (int)SySetUsed(&aArg), (ph7_value **)SySetBasePtr(&aArg));
+     
               /* TICKET 1433-52: Unsetting $this in the constructor body */
               if (pNew->iRef < 1) {
                 pNew->iRef = 1;
               }
             }
+
             if (pInstr->iP1 > 0) {
               /* Pop given arguments */
               VmPopOperand(&pTos, pInstr->iP1);
@@ -5471,7 +5475,29 @@ static sxi32 VmByteCodeExec(
             PH7_MemObjRelease(pTos);
             pTos->x.pOther = pNew;
             MemObjSetType(pTos, MEMOBJ_OBJ);
+
+
+#if 0
+           VmFrame *pFrame = pVm->pFrame->pParent;
+ 
+               {
+                puts("here!!!!!!!!!!!!!");
+                /* Exception was handled. */
+                if (pFrame->iExceptionJump > 0) {
+
+                fprintf(stderr, "OP_CALL induced JMP=%d, bytecode: %p\n",pFrame->iExceptionJump, pFrame->pExcByteCode);
+                  /* Pop the resutlt */
+                  VmPopOperand(&pTos, 1);
+                  /* Jump to this destination */
+          
+                  pc = pFrame->iExceptionJump - 1;
+                  assert(aInstr == pFrame->pExcByteCode);
+                  rc = PH7_OK;
+                }
+               }
+#endif
           }
+
           break;
         }
       /*
@@ -6039,7 +6065,7 @@ static sxi32 VmByteCodeExec(
               pFrame = pFrame->pParent;
 
               if (!is_callback && ((pFrame->pParent && (pFrame->iFlags & VM_FRAME_EXCEPTION)))) {
-                
+
                 /* Exception was handled. */
                 if (pFrame->iExceptionJump > 0) {
 
@@ -6165,6 +6191,16 @@ static sxi32 VmByteCodeExec(
         }
 
     }     /* Switch() */
+
+    VmFrame *pFrame = pVm->pFrame;
+    if (rc == PH7_EXCEPTION && pFrame->iExceptionJump > 0 && aInstr == pFrame->pExcByteCode) {
+#if FRAMELOG
+      fprintf(stderr, "Exception induced JMP=%d, bytecode: %p\n",pFrame->iExceptionJump, pFrame->pExcByteCode);
+#endif
+      pc = pFrame->iExceptionJump - 1;
+      rc = PH7_OK;
+    }
+
 
 NextInsn:
     pc++; /* Next instruction in the stream */
