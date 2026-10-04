@@ -1166,6 +1166,9 @@ static sxi32 VmEvalChunk(ph7_vm *pVm, ph7_context *pCtx, SyString *pChunk, int i
   "function __unknownfn($arg) {" \
   "  throw(new Error('Undefined function: '.$arg));" \
   "}" \
+  "function __unknownat($arg) {" \
+  "  throw(new Error('Class member: '.$arg));" \
+  "}" \
   "function __typeerror($arg) {" \
   "  throw(new TypeError('Type error: '.$arg));" \
   "}" \
@@ -5290,21 +5293,19 @@ static sxi32 VmByteCodeExec(
                   }
                   if (pMeth == 0 || (pMeth->iFlags & PH7_CLASS_ATTR_ABSTRACT)) {
                     if (pMeth) {
-//                      VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Cannot call abstract method '%z:%z',PH7 is loading NULL", &pClass->sName, &sName);
-                      VM_EXCEPTION_GOTO("__unknownfn", 11, "Can not invoke abstract method '%z:%z'. at [PC: %08x]\n", &pClass->sName,&sName, pc)
+//                    /* Abstract method is just a definition, no real code */
+                      VM_EXCEPTION_GOTO("__unknowncl", 11, "Can not invoke abstract method '%z:%z'. at [PC: %08x]\n", &pClass->sName,&sName, pc)
                     } else {
-                      //VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class static method '%z::%z',PH7 is loading NULL", &pClass->sName, &sName);
-                      
-                      /* TODO: CITO:  review and refactor CallMagicMethod: propagate return value back. */
+
+                      /* call __callStatic magic method. If method is not implemented - throw an exception */
                       if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, 0, "__callStatic", sizeof("__callStatic") - 1, &sName)) {
-                        VM_EXCEPTION_GOTO("__unknownfn", 11, "Undefined class static method '%z::%z(...)' call at [PC: %08x]\n", &pClass->sName,&sName, pc)
+                        VM_EXCEPTION_GOTO("__unknowncl", 11, "Undefined class static method '%z::%z(...)' call at [PC: %08x]\n", &pClass->sName,&sName, pc)
                       }
                     }
-                    /* Pop the method name from the stack */
-//                    if (!pInstr->p3) {
-//                      VmPopOperand(&pTos, 1);
-//                    }
-//                    PH7_MemObjRelease(pTos);
+
+                    /* We only can get here if user script has ignored exceptions via set_exception_handler() mechanism
+                     * Replace method name on the stack to a no-op function
+                     */
                     VM_REPLACE_FUNC_NAME("__nullsafe");
 
 
@@ -5329,7 +5330,7 @@ static sxi32 VmByteCodeExec(
                     /* Call the __get magic method if available */
 //                    PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, 0, "__get", sizeof("__get") - 1, &sName);
                     if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName)) {
-                      VM_EXCEPTION_GOTO("__unknownfn", 11, "Undefined class attribute '%z->%z(...)' access at [PC: %08x]\n", &pClass->sName,&sName, pc)
+                      VM_EXCEPTION_GOTO("__unknownat", 11, "Undefined class attribute '%z->%z(...)' access. [PC: %08x]\n", &pClass->sName,&sName, pc)
                     }
                   }
                   /* Pop the attribute name from the stack */
@@ -5341,8 +5342,7 @@ static sxi32 VmByteCodeExec(
                   if (pAttr) {
                     if ((pAttr->iFlags & (PH7_CLASS_ATTR_STATIC | PH7_CLASS_ATTR_CONSTANT)) == 0) {
                       /* Access to a non static attribute */
-                      VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Access to a non-static class attribute '%z::%z',PH7 is loading NULL",                                    &pClass->sName, &pAttr->sName);
-/* TODO: exception */
+                      VM_EXCEPTION_GOTO("__unknownat", 11, "Access to a non-static class attribute '%z::%z' [PC: %08x]", &pClass->sName, &pAttr->sName, pc);
                     } else {
                       ph7_value *pValue;
                       /* Check if the access to the attribute is allowed */
@@ -5450,16 +5450,14 @@ static sxi32 VmByteCodeExec(
                   if (pFuncArg) {
                     if (SySetUsed(&pFuncArg->aByteCode) < 1) {
                       VmErrorFormat(&(*pVm), PH7_CTX_NOTICE, "Missing constructor argument %u($%z) for class '%z'",                                    n + 1, &pFuncArg->sName, &pClass->sName);
-                    /* TODO: ?? exception */
                     }
                   }
                   n++;
                 }
               }
-              /* TODO: exception propagation from the class constructor is A MUST
-               * Right now any exceptions thrown in a constructor are not handled properly
+              /* Exception propagation from the class constructor
+               * rc == PH7_EXCEPTION --> Exception handled.
               */
-     
               rc = PH7_VmCallClassMethod(&(*pVm), pNew, pCons, 0, (int)SySetUsed(&aArg), (ph7_value **)SySetBasePtr(&aArg));
      
               /* TICKET 1433-52: Unsetting $this in the constructor body */
@@ -5475,27 +5473,6 @@ static sxi32 VmByteCodeExec(
             PH7_MemObjRelease(pTos);
             pTos->x.pOther = pNew;
             MemObjSetType(pTos, MEMOBJ_OBJ);
-
-
-#if 0
-           VmFrame *pFrame = pVm->pFrame->pParent;
- 
-               {
-                puts("here!!!!!!!!!!!!!");
-                /* Exception was handled. */
-                if (pFrame->iExceptionJump > 0) {
-
-                fprintf(stderr, "OP_CALL induced JMP=%d, bytecode: %p\n",pFrame->iExceptionJump, pFrame->pExcByteCode);
-                  /* Pop the resutlt */
-                  VmPopOperand(&pTos, 1);
-                  /* Jump to this destination */
-          
-                  pc = pFrame->iExceptionJump - 1;
-                  assert(aInstr == pFrame->pExcByteCode);
-                  rc = PH7_OK;
-                }
-               }
-#endif
           }
 
           break;
@@ -6192,6 +6169,13 @@ static sxi32 VmByteCodeExec(
 
     }     /* Switch() */
 
+    /* Common exception sink. OP_CALL uses its own sink for historical reasons. It is impossible to use one single
+     * sink because any attempt to do so breaks VM invariants here and there so I decided not to experiment with OP_CALL's sink anymore
+     * Check if we had a handled exception and we are currently in the exception frame (i.e. try() frame)
+     * If so - do the jump
+     *
+     * TODO: carefully verify the OP_CALL's exception handler, try to eliminate it completely
+     */
     VmFrame *pFrame = pVm->pFrame;
     if (rc == PH7_EXCEPTION && pFrame->iExceptionJump > 0 && aInstr == pFrame->pExcByteCode) {
 #if FRAMELOG
