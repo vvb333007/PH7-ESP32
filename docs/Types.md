@@ -1,4 +1,9 @@
-## The PH8 Type System
+## In short:
+
+In PH8, a declared type is not a restriction on a value, but a request for a particular representation. The VM always converts a value to the declared type when possible, both for function arguments and return values; mixed leaves the value untouched, while nullable types allow null to pass through unchanged. Type errors therefore occur not simply because a value originally had the “wrong” type, but when the resulting value cannot be meaningfully used as required.
+
+
+## Details:
 
 Just like PHP 8, PH8 allows you to specify argument types and return types for functions.
 
