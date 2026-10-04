@@ -52,7 +52,13 @@ static int check_repl(const char *pat, const char *subj, const char *tmpl, int l
   return ok;
 }
 
-#define CHECK(cond) do { if (!(cond)) { printf("FAIL line %d: %s\n", __LINE__, #cond); fails++; } } while (0)
+#define CHECK(cond) \
+  do { \
+    if (!(cond)) {\
+      printf("FAIL line %d: %s\n", __LINE__, #cond);\
+      fails++;\
+    }\
+  } while(0)
 
 int main(void) {
   int fails = 0;
