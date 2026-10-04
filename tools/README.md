@@ -6,6 +6,13 @@ Usage:
 
 
 
+Directory `tests` contains some internal php engine tests which I use to test my changes to the engine.
+These are not automation-ready tests!
 
-AI GENERATED: retest.c and refuzz.c are tests for regexp.c library;
+
+
+retest.c and refuzz.c are tests for regexp.c library, these are AI GENERATED. 
+
+These two files are not required to build the engine .
+
 These tests are for **development/debug only** , not for the production (whatever that means) testing
