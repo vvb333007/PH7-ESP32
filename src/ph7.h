@@ -314,6 +314,7 @@ extern "C" {
 /* beginning-of-error-codes */
 #define PH7_NOMEM SXERR_MEM       /* Out of memory */
 #define PH7_ABORT SXERR_ABORT     /* Foreign Function request operation abort/Another thread have released this instance */
+#define PH7_EXCEPTION (-255)      /* Exception happened */
 #define PH7_IO_ERR SXERR_IO       /* IO error */
 #define PH7_CORRUPT SXERR_CORRUPT /* Corrupt pointer/Unknown configuration option */
 #define PH7_LOOKED SXERR_LOCKED   /* Forbidden Operation */

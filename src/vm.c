@@ -203,8 +203,8 @@ struct VmShutdownCB {
   ph7_value aArg[10];  /* Callback arguments (10 maximum arguments) */
   int nArg;            /* Total number of given arguments */
 };
-/* Uncaught exception code value */
-#define PH7_EXCEPTION -255
+
+
 /*
  * Each parsed URI is recorded and stored in an instance of the following structure.
  * This structure and it's related routines are taken verbatim from the xHT project
@@ -1172,6 +1172,9 @@ static sxi32 VmEvalChunk(ph7_vm *pVm, ph7_context *pCtx, SyString *pChunk, int i
   "}" \
   "function __typeerror($arg) {" \
   "  throw(new TypeError('Type error: '.$arg));" \
+  "}" \
+  "function __ffi_throw($arg) {" \
+  "  throw(new Error('FFI Exception: '.$arg));" \
   "}" \
   "function __nullsafe() { return null; }" \
   "interface Iterator {" \
@@ -6139,6 +6142,7 @@ static sxi32 VmByteCodeExec(
             if (rc == PH7_ABORT) {
               goto Abort;
             }
+
             if (pInstr->iP1 > 0) {
               /* Pop function name and arguments */
               VmPopOperand(&pTos, pInstr->iP1);
@@ -6146,6 +6150,14 @@ static sxi32 VmByteCodeExec(
             /* Save foreign function return value */
             PH7_MemObjStore(&sRet, pTos);
             PH7_MemObjRelease(&sRet);
+
+            /* Foreign function throws an anonymous exception?
+             * Create a real throw Throwable() statement 
+             */
+            if ( rc == PH7_EXCEPTION ) {
+              rc = PH7_OK;
+              VM_EXCEPTION_GOTO("__ffi_throw",11," Exception in FFI function '%z()'. [PC: %08x]",&sName, pc)
+            }
           }
           break;
         }
@@ -10051,10 +10063,12 @@ static sxi32 VmUncaughtException(
   if ((pVm->aExceptionCB[1].iFlags & MEMOBJ_NULL) == 0) {
     rc = PH7_VmCallUserFunction(&(*pVm), &pVm->aExceptionCB[1], 1, apArg, 0);
     /* rc==PH7_OK when exception callback was executed without generating a new exception.
-    * In order to copy Zend PHP behavior we have to propagate PH7_EXCEPTION
+    * In order to copy Zend PHP behavior we have to abort execution.
+    *
     */
     if (rc == PH7_OK) {
-      rc = PH7_EXCEPTION;
+      // rc = PH7_EXCEPTION; //Propagate for the try/catch
+      rc = SXERR_ABORT; // Be like Zend: abort execution
     }
   }
   else

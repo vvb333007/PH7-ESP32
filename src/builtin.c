@@ -40,14 +40,18 @@ static char s_NaN[] = { 'N','a','N', 0 };
  * Return
  *  TRUE if var is a boolean. False otherwise.
  */
+//sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nBytes, const char *zFormat, ...);
+
 static int PH7_builtin_is_bool(ph7_context *pCtx, int nArg, ph7_value **apArg) {
   int res = 0; /* Assume false by default */
   if (nArg > 0) {
     res = ph7_value_is_bool(apArg[0]);
   }
+
   /* Query result */
   ph7_result_bool(pCtx, res);
   return PH7_OK;
+  //return PH7_EXCEPTION;
 }
 /*
  * bool is_float($var)
