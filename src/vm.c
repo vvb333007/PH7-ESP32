@@ -11,18 +11,32 @@
  */
 
 
-/*
-    if pVm->nExceptMode == PH7_VM_EXCMODE_QUIET : silently ignore VM exceptions (exception 
-    that are thrown with a 'throw' PHP language construct are not affected. those affected 
-    are - division by zero, undefined function call, null dereference and so on)
+/* BUG: if an anonymous function, defined in a class method uses 'use($this)' as a capture list
+        then $this receives one extra iRef and thus never dies , creating a leak
+<?php
+
+class Test {
 
 
-    if (pVm->nExceptMode == PH7_VM_EXCMODE_MESSAGE) : send a message to the ErrorConsumer 
-    (if VM is configured to print errors) and then simply ignore VM exception. This is a default
-    PH7 behaviuor
+    public function method(): callable {
+      return fn() use($this)  :static => $this;
+  }
 
-    if (pVm->nExceptMode == PH7_VM_EXCMODE_EXCEPT) : throw an exception (class Error, class 
-    TypeError, class DivisionByZero etc)
+  public function __destruct() {
+    echo 'Destructor called'.PHP_EOL;   // <--- never appears
+  }
+}
+
+function localfn() {
+  $b = new Test();
+  $c = $b->method();
+  
+}
+
+localfn();
+
+?>
+
 */
 
 #include <assert.h>
@@ -3340,7 +3354,11 @@ static sxi32 VmByteCodeExec(
               pValue = VmExtractMemObj(pVm, &sEnv.sName, FALSE, FALSE);
               if (pValue) {
                 /* Copy imported value */
+#if ADDREFLOG
+                fprintf(stderr,">>> exporting %.*s\n",sEnv.sName.nByte,sEnv.sName.zString );
+#endif
                 PH7_MemObjStore(pValue, &sEnv.sValue);
+                
               }
               /* Insert the imported variable */
               SySetPut(&pClosure->aClosureEnv, (const void *)&sEnv);
@@ -4984,6 +5002,9 @@ static sxi32 VmByteCodeExec(
                 pStep->iFlags |= PH7_4EACH_STEP_OBJECT;
                 pStep->xIter.pThis = pThis;
                 pThis->iRef++;
+#if ADDREFLOG
+                fprintf(stderr,"foreach1(%p) : %d --> %d\n",pThis,pThis->iRef-1,pThis->iRef);
+#endif
               }
             }
             if (SXRET_OK != SySetPut(&pInfo->aStep, (const void *)&pStep)) {
@@ -5211,6 +5232,9 @@ static sxi32 VmByteCodeExec(
          *     (new TestClass())->foo;
          */
                 pThis->iRef++;
+#if ADDREFLOG
+                fprintf(stderr,"defer_garbage(%p) : %d --> %d\n",pThis,pThis->iRef-1,pThis->iRef);
+#endif
                 PH7_MemObjRelease(pTos);
                 pTos->nIdx = SXU32_HIGH; /* Assume we are loading a constant */
                 if (pObjAttr) {
@@ -5302,6 +5326,9 @@ static sxi32 VmByteCodeExec(
                 pThis = (ph7_class_instance *)pNos->x.pOther;
                 pClass = pThis->pClass;
                 pThis->iRef++; /* Deffer garbage collection */
+#if ADDREFLOG
+                fprintf(stderr,"defer_garbage2(%p) : %d --> %d\n",pThis,pThis->iRef-1,pThis->iRef);
+#endif
               } else {
                 /* Try to extract the target class */
                 if (SyBlobLength(&pNos->sBlob) > 0) {
@@ -5498,6 +5525,9 @@ static sxi32 VmByteCodeExec(
      
               /* TICKET 1433-52: Unsetting $this in the constructor body */
               if (pNew->iRef < 1) {
+#if ADDREFLOG
+                fprintf(stderr,"unsetting_this_constr(%p) :%d\n",pNew,pNew->iRef);
+#endif
                 pNew->iRef = 1;
               }
             }
@@ -5621,7 +5651,9 @@ static sxi32 VmByteCodeExec(
               }
               PH7_MemObjInit(pVm, &sResult);
               /* May be a class instance and it's static method */
-              /* TODO: check return code propagation path */
+              /* TODO: check return code propagation path
+                */
+/* TODO: exception*/
               PH7_VmCallUserFunction(pVm, pTos, (int)SySetUsed(&aArg), (ph7_value **)SySetBasePtr(&aArg), &sResult);
               SySetReset(&aArg);
               /* Pop given arguments */
@@ -5687,6 +5719,9 @@ static sxi32 VmByteCodeExec(
                   /* Instance already loaded */
                   pThis = (ph7_class_instance *)pTarget->x.pOther;
                   pThis->iRef++;
+#if ADDREFLOG
+                  fprintf(stderr,"op_call1(%p) : %d --> %d\n",pThis,pThis->iRef-1,pThis->iRef);
+#endif
                   pSelf = pThis->pClass;
                 }
                 if (pSelf == 0) {
@@ -5710,6 +5745,9 @@ static sxi32 VmByteCodeExec(
                     pThis = pFrame->pThis;
                     if (pThis) {
                       pThis->iRef++;
+#if ADDREFLOG
+                      fprintf(stderr,"op_call2(%p) : %d --> %d\n",pThis,pThis->iRef-1,pThis->iRef);
+#endif
                     }
                   }
                 }
@@ -5746,7 +5784,7 @@ static sxi32 VmByteCodeExec(
             /* Check The recursion limit */
             if (pVm->nRecursionDepth > pVm->nMaxDepth) {
 
-              /* NOTE: we substract 3 from nRecursionDepth here because subsequent VM_EXCEPTION_GOTO requires
+              /* TODO: CITO: REFACTOR: NOTE: we substract 3 from nRecursionDepth here because subsequent VM_EXCEPTION_GOTO requires
                * at least 3 frames to execute. Otherwise attempt to throw() itself will cause an exception
                * This is a bad hack: whenever one changes the __genericfn() PHP code (e.g. add an extra call)
                * then number 2 also must be changed
@@ -6089,8 +6127,9 @@ static sxi32 VmByteCodeExec(
 
                 /* Exception was handled. */
                 if (pFrame->iExceptionJump > 0) {
-
-                //fprintf(stderr, "OP_CALL induced JMP=%d, bytecode: %p\n",pFrame->iExceptionJump, pFrame->pExcByteCode);
+#if EXCLOG
+                fprintf(stderr, "OP_CALL induced JMP=%d, bytecode: %p\n",pFrame->iExceptionJump, pFrame->pExcByteCode);
+#endif
                   /* Pop the resutlt */
                   VmPopOperand(&pTos, 1);
                   /* Jump to this destination */
@@ -6761,7 +6800,8 @@ static int vm_builtin_func_exists(ph7_context *pCtx, int nArg, ph7_value **apArg
   /* Assume the function is not defined */
   res = 0;
   /* Perform the lookup */
-  if (SyHashGet(&pVm->hFunction, (const void *)zName, (sxu32)nLen) != 0 || SyHashGet(&pVm->hHostFunction, (const void *)zName, (sxu32)nLen) != 0) {
+  if (SyHashGet(&pVm->hFunction, (const void *)zName, (sxu32)nLen) != 0 || 
+      SyHashGet(&pVm->hHostFunction, (const void *)zName, (sxu32)nLen) != 0) {
     /* Function is defined */
     res = 1;
   }
@@ -7818,6 +7858,9 @@ PH7_PRIVATE sxi32 PH7_VmCallClassMethod(
      * Push the class instance so that the '$this' variable will be available.
      */
     pThis->iRef++; /* Increment reference count */
+#if ADDREFLOG
+    fprintf(stderr,"CallClassMethod(%p) : %d --> %d\n",pThis,pThis->iRef-1,pThis->iRef);
+#endif
     aStack[i].x.pOther = pThis;
     aStack[i].iFlags = MEMOBJ_OBJ;
   }
@@ -10084,6 +10127,9 @@ static sxi32 VmUncaughtException(
     /* Load the exception instance */
     sArg.x.pOther = pThis;
     pThis->iRef++;
+#if ADDREFLOG
+    fprintf(stderr,"load_exc_inst(%p) : %d --> %d\n",pThis,pThis->iRef-1,pThis->iRef);
+#endif
     MemObjSetType(&sArg, MEMOBJ_OBJ);
   } else {
     //nArg = 0;
@@ -10276,6 +10322,9 @@ static sxi32 VmThrowException(
       if (pObj && pThis) {
         /* Install the exception instance */
         pThis->iRef++; /* Increment reference count */
+#if ADDREFLOG
+        fprintf(stderr,"inst_exc_inst(%p) : %d --> %d\n",pThis,pThis->iRef-1,pThis->iRef);
+#endif
         pObj->x.pOther = pThis;
         MemObjSetType(pObj, MEMOBJ_OBJ);
       }

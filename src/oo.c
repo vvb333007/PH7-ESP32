@@ -484,6 +484,7 @@ static ph7_class_instance *NewClassInstance(ph7_vm *pVm, ph7_class *pClass) {
   pThis->pVm = pVm;
   pThis->pClass = pClass;
   SyHashInit(&pThis->hAttr, &pVm->sAllocator, 0, 0);
+  fprintf(stderr,"pThis->iRef=%d , pThis=%p\n",pThis->iRef, pThis);
   return pThis;
 }
 /*
@@ -676,7 +677,9 @@ static void PH7_ClassInstanceRelease(ph7_class_instance *pThis) {
   pDestr = PH7_ClassExtractMethod(pClass, "__destruct", sizeof("__destruct") - 1);
   if (pDestr) {
     /* Invoke the destructor */
+    
     pThis->iRef = 2; /* Prevent garbage collection */
+    fprintf(stderr,"Before destructor, set fixed. pThis->iRef=%d , pThis=%p\n",pThis->iRef, pThis);
     PH7_VmCallClassMethod(pVm, pThis, pDestr, 0, 0, 0);
   }
   /* Release non-static attributes */
@@ -690,6 +693,7 @@ static void PH7_ClassInstanceRelease(ph7_class_instance *pThis) {
   }
   /* Release the whole structure */
   SyHashRelease(&pThis->hAttr);
+  fprintf(stderr,"memory released(%p)\n",pThis);
   SyMemBackendPoolFree(&pVm->sAllocator, pThis);
 }
 /*
@@ -697,9 +701,12 @@ static void PH7_ClassInstanceRelease(ph7_class_instance *pThis) {
  * If the reference count reaches zero,release the whole instance.
  */
 PH7_PRIVATE void PH7_ClassInstanceUnref(ph7_class_instance *pThis) {
+  fprintf(stderr,"unref(%p) : %d --> %d\n",pThis,pThis->iRef,pThis->iRef-1);
+
   pThis->iRef--;
   if (pThis->iRef < 1) {
     /* No more reference to this instance */
+    fprintf(stderr,"kill_class(%p)\n",pThis);
     PH7_ClassInstanceRelease(&(*pThis));
   }
 }

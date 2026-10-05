@@ -518,6 +518,8 @@ PH7_PRIVATE sxi32 PH7_MemObjToObject(ph7_value *pObj) {
       apArg[0] = pObj;
       PH7_VmCallClassMethod(pVm, pStd, pCons, 0, 1, apArg);
       if (pStd->iRef < 1) {
+        /* bad bad constructor unsetting $this */
+        fprintf(stderr,"iRef < 0 (%d) after __construct(), restoring to 1\n",pStd->iRef);
         pStd->iRef = 1;
       }
     }
@@ -825,7 +827,9 @@ PH7_PRIVATE sxi32 PH7_MemObjStore(ph7_value *pSrc, ph7_value *pDest) {
     ((ph7_hashmap *)pSrc->x.pOther)->iRef++;
   } else if (pSrc->iFlags & MEMOBJ_OBJ) {
     /* Increment reference count */
-    ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
+
+    int i = ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
+    fprintf(stderr,"iRef++ (%d) after MemObjStore()\n", i + 1);
   }
   if (pDest->iFlags & MEMOBJ_HASHMAP) {
     pMap = (ph7_hashmap *)pDest->x.pOther;
@@ -860,9 +864,11 @@ PH7_PRIVATE sxi32 PH7_MemObjLoad(ph7_value *pSrc, ph7_value *pDest) {
   if (pSrc->iFlags & MEMOBJ_HASHMAP) {
     /* Increment reference count */
     ((ph7_hashmap *)pSrc->x.pOther)->iRef++;
+    
   } else if (pSrc->iFlags & MEMOBJ_OBJ) {
     /* Increment reference count */
-    ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
+    int i = ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
+    fprintf(stderr,"iRef++ (%d) after MemObjLoad()\n",i + 1);
   }
   if (SyBlobLength(&pDest->sBlob) > 0) {
     SyBlobRelease(&pDest->sBlob);

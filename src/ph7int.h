@@ -1059,6 +1059,8 @@ struct ph7_gen_state {
   SyToken *pRawIn;    /* Current processed raw token */
   SyToken *pRawEnd;   /* Last raw token in the stream */
   SySet *pTokenSet;   /* Token containers */
+  sxu32 bInClass:1;   /* Compiling a 'class' statement */
+  sxu32 bReserved:31; /* Reserved/Unused */
 };
 /* Forward references */
 typedef struct ph7_vm_func_closure_env ph7_vm_func_closure_env;

@@ -4267,6 +4267,7 @@ again:
           bNullable = 1;
           goto again;
         }
+
 err:
         PH7_GenCompileError(pGen, E_ERROR, nLine, "A function return type or 'never' is expected after ':'");
         return SXERR_ABORT;
@@ -4283,8 +4284,20 @@ err:
         nKey = PH7_TKWRD_VOID | VM_FUNC_NEVER;
         //puts(":never is replaced with :void");
       }
+
       /* Check if nKey is one of a valid types: object, string, array, int, bool, callable
+       * handle special types: 'static'
+       * TODO: only do this if we are in the class scope!
       */
+      if (nKey == PH7_TKWRD_STATIC || nKey == PH7_TKWRD_PARENT || nKey == PH7_TKWRD_SELF) {
+          if (pGen->bInClass > 0)
+            nKey = PH7_TKWRD_OBJECT;
+          else {
+            PH7_GenCompileError(pGen, E_ERROR, nLine, "'static', 'parent' and 'self' can only be used inside class scope");
+            return SXERR_ABORT;
+          }
+      } 
+
       if ((nKey & VM_FUNC_RET_MASK) == 0)
         goto err;
 
@@ -5701,7 +5714,9 @@ done:
 static sxi32 PH7_CompileAbstractClass(ph7_gen_state *pGen) {
   sxi32 rc;
   pGen->pIn++; /* Jump the 'abstract' keyword */
+  pGen->bInClass++;
   rc = GenStateCompileClass(&(*pGen), PH7_CLASS_ABSTRACT);
+  pGen->bInClass--;
   return rc;
 }
 /*
@@ -5714,7 +5729,9 @@ static sxi32 PH7_CompileAbstractClass(ph7_gen_state *pGen) {
 static sxi32 PH7_CompileFinalClass(ph7_gen_state *pGen) {
   sxi32 rc;
   pGen->pIn++; /* Jump the 'final' keyword */
+  pGen->bInClass++;
   rc = GenStateCompileClass(&(*pGen), PH7_CLASS_FINAL);
+  pGen->bInClass--;
   return rc;
 }
 /*
@@ -5728,7 +5745,9 @@ static sxi32 PH7_CompileFinalClass(ph7_gen_state *pGen) {
  */
 static sxi32 PH7_CompileClass(ph7_gen_state *pGen) {
   sxi32 rc;
+  pGen->bInClass++;
   rc = GenStateCompileClass(&(*pGen), 0);
+  pGen->bInClass--;
   return rc;
 }
 
@@ -7109,6 +7128,7 @@ PH7_PRIVATE sxi32 PH7_ResetCodeGenerator(
   pGen->pRawIn = pGen->pRawEnd = 0;
   pGen->pIn = pGen->pEnd = 0;
   pGen->nErr = 0;
+  pGen->bInClass = 0;
   return SXRET_OK;
 }
 /*
