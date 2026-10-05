@@ -46,11 +46,12 @@ Standard Arduino Core classes: HardwareSerial, SPI, Wire, FS, Print, String and 
 
 ### 5. Exceptions
 
-  Rename `Exception` to `Throwable`, and add `Exception`, `Error`, `TypeError`, `ArgumentCountError`, `ArithmeticError`, `DivisionByZeroError`
-  Replace `instanceof(Exception)` in `throw` with `Throwable`
-  Go throuhg error messages table, and replace them with `VmThrowException` calls
-  Figure out `file`/`line` problem (`__FILE__`/`__LINE__` inside stdlib probably, report wrong location)
-  `debug_backtrace()` in the constructor, is it too expensive for ESP32?
+ ~~ Rename `Exception` to `Throwable`, and add `Exception`, `Error`, `TypeError`, `ArgumentCountError`, `ArithmeticError`, `DivisionByZeroError`~~
+~~  Replace `instanceof(Exception)` in `throw` with `Throwable`~~
+~~  Go throuhg error messages table, and replace them with `VmThrowException` calls~~
+Verify failure branches of VmByteCodeExec by provoking the exception
+Verify return code propagation of VmByteCodeExec, especially in VmLocalExec use
+Fix recursion depth limiter
 
 ### 6. Types and overloading
   Nullable types in stdlib signatures (`?string`, `?Throwable`) or null will not pass strict checks
@@ -58,7 +59,7 @@ Standard Arduino Core classes: HardwareSerial, SPI, Wire, FS, Print, String and 
   Constructor by class name - find places where it is'nt handled (`new`, `parent::`, `method_exists`)
 
 ## 7. VM shutdown
-  Call `__destruct` for all live objects on VM exit, before function and class tables are freed
+  Call `__destruct` for all live objects on VM exit (globals are not destructed right now on script DONE), before function and class tables are freed
   Decide what `OP_HALT_VM` does with destructors, and write it down
   Objects with a cyclic references never reach zero refcount, need a list of all live objects
 
@@ -66,21 +67,15 @@ Standard Arduino Core classes: HardwareSerial, SPI, Wire, FS, Print, String and 
 
 ## Smaller tasks
 
+### 1. '?:' Elvis operator support
+
+Implement `$a = $b ?: $c;`
 
 
 ### 3. __invoke(), __call(), __callStatic(), __get()
 
 Currently do not return any values. That must be fixed ASAP;
 use `__toString()` as a template
-
-
-### 4. `function_exists()`
-
-Implement `function_exists()`.
-
-###5. '' === null
-
-~~empty strings are === null which is wrong.~~
 
 
 ### 6. UNIX-like `fork()` to make a full clone of a VM
@@ -144,18 +139,6 @@ php_ipc_sleep($handle, $mask); // sleep until woken up by another VM
 Not always checked for existence. Should we patch a constructor lookup code?
 
 
-### 10. `mixed` type
-
-~~Add mixed type~~
-
----
-
-### 11. `enum`
-
-~~Add the `enum` keyword.~~
-
-
----
 
 ### 12. `match` keyword
 
@@ -173,33 +156,67 @@ $arr = [1,2,3];
 
 ---
 
+### 4. `function_exists()`
 
-###14. Function return arguments
+~~Implement `function_exists()`.~~
+
+###5. '' === null
+
+~~empty strings are === null which is wrong.~~
+
+
+
+### 18.  Arrow function
+
+~~Implement arrow functions with an explicit `use`:~~
+
+~~$a = fn(): int => .....;          --> ordinary arrow function (lambda), no variables captured from the outer scope!!!~~
+~~$a = fn() use($z) : int => .....; --> arrow function with capture (closure), variable $z is imported~~
+
+
+
+### 10.  `mixed` type
+
+~~Add mixed type~~
+
+---
+
+### 11.  `enum`
+
+~~Add the `enum` keyword.~~
+
+
+---
+
+
+###14.  Function return arguments
 
 ~~Support for function return types syntax (PHP7.x)~~
 
 
-###15. Overloading:
+###15.  Overloading:
 
 ~~do not let user to register a function with exactly same signature twice. Right now function is overwritten silently.~~
 
 
-###16. Overloading:
+###16.  Overloading:
 
 ~~do not fallback to the last function in the list if there are no good candidates for overloading.
 Do fallback only if there is only 1 candidate~~
 
-###17. Nullable types:
+###17.  Nullable types:
 
 ~~inject code into return statement which LOADC 0,0,0; TEQ ; JNZ over CVT instruction to skip conversion of null to the function type~~
 
-###18. ~~`callable` type ~~
+###18.   `callable` type
 
+~~Implement callable type~~
 
-###19. ?? operator 
+###19.  ?? operator 
+
 ( ~~?? as a null coalesce OP~~, and ??= null coalesce assignment)
 
-###20. ?-> nullsafe operator  
+###20.  ?-> nullsafe operator  
 
 ~~Implement a nullsafe arrow operator, which loads NULL. Change the behaviour of -> to generate a VM error if operating on null~~
 
