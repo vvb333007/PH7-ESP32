@@ -341,7 +341,7 @@ PH7_PRIVATE const ph7_expr_op *PH7_ExprExtractOperator(SyString *pStr, SyToken *
     ++n; /* Next operator in the table */
   }
   /* No such operator */
-  puts("Not found");
+  //puts("Not found");
   return 0;
 }
 /*
@@ -686,6 +686,13 @@ static sxi32 ExprAssembleAnnon(ph7_gen_state *pGen, SyToken **ppCur, SyToken *pE
     if (pIn < pEnd) {
       pIn++;
     }
+  } else if (pIn->nType & PH7_TK_ARRAY_OP) {
+    //TODO: arrow functions: if we see => instead of { then simply do PH7_CompileReturn here.
+    //
+    fprintf(stderr,"arrow function\n");
+    pIn++; /* Jump the leading arrow '=>' */
+    PH7_DelimitNestedTokens(pIn, pEnd, PH7_TK_OCB /*'{'*/, PH7_TK_SEMI /*';'*/, &pIn);
+
   } else {
     /* Syntax error */
     rc = PH7_GenCompileError(&(*pGen), E_ERROR, nLine, "Syntax error while declaring annonymous function,missing '{'");
@@ -808,6 +815,7 @@ static sxi32 ExprExtractNode(ph7_gen_state *pGen, ph7_expr_node **ppNode) {
           SyMemBackendPoolFree(&pGen->pVm->sAllocator, pNode);
           return rc;
         }
+        //puts("Gonna compile it with PH7_CompileAnnonFunc");
         pNode->xCode = PH7_CompileAnnonFunc;
       }
     } else if (PH7_IsLangConstruct(nKeyword, FALSE) == TRUE && &pCur[1] < pGen->pEnd) {
@@ -1495,11 +1503,14 @@ static sxi32 ExprMakeTree(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 nTo
         /* Link the node to the tree */
         pNode->pLeft = apNode[iCur + 1];
       } else {
+/* TODO: support for Elvis ( EXPR ?: EXPR) operator */        
         rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': Missing 'then' expression", &pNode->pOp->sOp);
+
         if (rc != SXERR_ABORT) {
           rc = SXERR_SYNTAX;
         }
         return rc;
+
       }
       apNode[iCur + 1] = 0;
       if (iRight + 1 < nToken) {

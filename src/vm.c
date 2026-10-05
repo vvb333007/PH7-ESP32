@@ -1176,6 +1176,9 @@ static sxi32 VmEvalChunk(ph7_vm *pVm, ph7_context *pCtx, SyString *pChunk, int i
   "function __ffi_throw($arg) {" \
   "  throw(new Error('FFI Exception: '.$arg));" \
   "}" \
+  "function __genericfn($arg) {" \
+  "  throw(new Error($arg));" \
+  "}" \
   "function __nullsafe() { return null; }" \
   "interface Iterator {" \
   "public function current():string;" \
@@ -1620,8 +1623,13 @@ PH7_PRIVATE sxi32 PH7_VmMakeReady(
   }
   /* Mark the VM ready for byte-code execution */
   pVm->nMagic = PH7_VM_RUN;
+
+  /* In case of restarted VM we want out call depth limit to be reset */
+  pVm->nRecursionDepth = 0;
+
   /* Release the code generator now we have compiled our program */
   PH7_ResetCodeGenerator(pVm, 0, 0);
+
   /* Emit the DONE instruction */
   rc = PH7_VmEmitInstr(&(*pVm), PH7_OP_DONE, 0, 0, 0, 0);
   if (rc != SXRET_OK) {
@@ -2569,6 +2577,13 @@ static sxi32 VmByteCodeExec(
     /* Fetch the instruction to execute */
     pInstr = &aInstr[pc];
     rc = SXRET_OK;
+
+    /* TODO: check nRecursionDepth here 
+     * TODO: If the depth is 5 calls away from the limit we throw the exception. If we hit the limit then just goto Abort.
+     * TODO: increment nesting depth. Must be decremented on exit from this function
+     */
+
+
     /*
  * What follows here is a massive switch statement where each case implements a
  * separate instruction in the virtual machine.  If we follow the usual
@@ -3363,6 +3378,9 @@ static sxi32 VmByteCodeExec(
               pObj = (ph7_value *)SySetAt(&pVm->aMemObj, nIdx);
               if (pObj) {
                 /* Perform the store operation */
+                /* TODO: for typed properties check if types are covertible, covert right operand to the typeof(left)
+                 * and then store. Otherwise member attribute may change its type in _STORE operations
+                */
                 PH7_MemObjStore(pTos, pObj);
               }
             }
@@ -5507,8 +5525,8 @@ static sxi32 VmByteCodeExec(
 
           /* Make sure we are dealing with a class instance */
           if ((pTos->iFlags & MEMOBJ_OBJ) == 0) {
-            PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"Clone: Expecting a class instance as left operand,PH7 is loading NULL");
-            /* TODO: exception */
+            //PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"Clone: Expecting a class instance as operand");
+            VM_EXCEPTION_GOTO("__unknownat",11,"'clone': expecting a class instance as right operand [PC: %08x]", pc)
             PH7_MemObjRelease(pTos);
             break;
           }
@@ -5625,7 +5643,7 @@ static sxi32 VmByteCodeExec(
                   PH7_MemObjRelease(&sResult);
                 */
                 if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pThis->pClass, pThis, "__invoke", sizeof("__invoke") - 1, NULL)) {
-                  VM_EXCEPTION_GOTO("__unknownfn", 11, "'__invoke()' magic method is not implemented by class '%z'. at [PC: %08x]\n", &pThis->pClass->sName, pc)
+                  VM_EXCEPTION_GOTO("__unknownat", 11, "'__invoke()' magic method is not implemented by class '%z'. at [PC: %08x]\n", &pThis->pClass->sName, pc)
                 }
 
               } else {
@@ -5724,10 +5742,18 @@ static sxi32 VmByteCodeExec(
                 }
               }
             }
+
             /* Check The recursion limit */
             if (pVm->nRecursionDepth > pVm->nMaxDepth) {
-              VmErrorFormat(&(*pVm), PH7_CTX_ERR,"Recursion limit reached while invoking user function '%z',PH7 will set a NULL return value",                            &pVmFunc->sName);
-/* TODO: exception */
+
+              /* NOTE: we substract 3 from nRecursionDepth here because subsequent VM_EXCEPTION_GOTO requires
+               * at least 3 frames to execute. Otherwise attempt to throw() itself will cause an exception
+               * This is a bad hack: whenever one changes the __genericfn() PHP code (e.g. add an extra call)
+               * then number 2 also must be changed
+               */
+              pVm->nRecursionDepth -= 3;
+              VM_EXCEPTION_GOTO("__genericfn", 11, "Call nesting limit reached while invoking user function '%z'. [PC: %08x]",&pVmFunc->sName, pc);
+
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
                 VmPopOperand(&pTos, pInstr->iP1);
@@ -5736,6 +5762,7 @@ static sxi32 VmByteCodeExec(
               PH7_MemObjRelease(pTos);
               break;
             }
+
             if (pVmFunc->pNextName) {
               /* Function is candidate for overloading,select the appropriate function to call */
               ph7_vm_func *pTmp = pVmFunc;
@@ -5745,8 +5772,8 @@ static sxi32 VmByteCodeExec(
                 /* More than one function is defined but nothing matches. 
                  * This is bad, better if we abort execution: this is logic error, not a runtime
                  */
-                VmErrorFormat(&(*pVm), PH7_CTX_ERR,"No matching function '%z()' for given argument list. Abort." ,&pTmp->sName);
-/* TODO: exception */
+                VM_EXCEPTION_GOTO("__unknownfn", 11, "No matching function '%z()' for given argument list [PC: %08x]\n", &pTmp->sName, pc)
+                /* Normally control flow does not reach goto below */
                 goto Abort;
               }
             }
@@ -5828,16 +5855,11 @@ static sxi32 VmByteCodeExec(
                     if (((pArg->iFlags & (MEMOBJ_STRING | MEMOBJ_HASHMAP)) == 0) ||
                         /* TODO: this call is heavy. Do we really need it? */
                         (PH7_VmIsCallable(pVm, pArg, FALSE) == 0)) { 
-
-                      // TODO: BUG:
-                      // Exceptions are not handled if thrown from here. This is a BUG:
-                      // What happens is that after a catch() block call unwinds with PH7_EXCEPTION but does not
-                      // perform a jump to pFram->iExceptionJump for unknown reason.
-                      //
-                      // Instead we put a null in the argument so subsequent use of this callable will throw an exception which can be caught and handled
-
-                      //PH7_MemObjRelease(pArg);
-                      //VmErrorFormat(&(*pVm), PH7_CTX_WARNING,"'%z()': argument %u must be callable. Converted to 'null' [PC: %08x]", &pVmFunc->sName, n + 1, pc);
+                      /*
+                      * Not a callable? Since PH8 provides a type guarantee at function in/out
+                      * we convert the value to a built-in callable which throws exception when
+                      * called. This is where PH8 differs from Zend
+                      */
                       PH7_MemObjRelease(pArg);
                       SyBlobAppend(&pArg->sBlob, "__badcallable", sizeof("__badcallable") - 1);\
                       MemObjSetType(pArg, MEMOBJ_STRING); \
@@ -6222,8 +6244,19 @@ NextInsn:
 //    fprintf(stderr,"Next PC is %d in bytecode %p\n",pc,aInstr);
   }       /* For(;;) */
 Done:
+  
+  /* TODO: refactor
+   * If there was an exception related to a recursion depth (actually call nesting depth) then
+   * this counter may go to a negative value. We fix it up here now;
+   *
+   */
+  if (pVm->nRecursionDepth < 0)
+    pVm->nRecursionDepth = 0;
+
+  
   SySetRelease(&aArg);
   return SXRET_OK;
+
 Abort:
 #if DEVEL
   puts("Aborted");

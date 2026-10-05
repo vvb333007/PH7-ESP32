@@ -101,6 +101,7 @@ struct LangConstruct {
 #define EXPR_FLAG_COMMA_STATEMENT 0x004 /* Treat comma expression as a single statement (used by class attributes) */
 /* Forward declaration */
 static sxi32 PH7_CompileExpr(ph7_gen_state *pGen, sxi32 iFlags, sxi32 (*xTreeValidator)(ph7_gen_state *, ph7_expr_node *));
+static sxi32 PH7_CompileReturn(ph7_gen_state *pGen);
 /*
  * Local utility routines used in the code generation phase.
  */
@@ -1314,7 +1315,7 @@ PH7_PRIVATE sxi32 PH7_CompileAnnonFunc(ph7_gen_state *pGen, sxi32 iCompileFlag) 
   sxu32 nIdx;
   sxu32 nLen;
   sxi32 rc;
-
+//puts("Here1");
   pGen->pIn++; /* Jump the 'function' keyword */
   if (pGen->pIn->nType & (PH7_TK_ID | PH7_TK_KEYWORD)) {
     pGen->pIn++;
@@ -1336,7 +1337,9 @@ PH7_PRIVATE sxi32 PH7_CompileAnnonFunc(ph7_gen_state *pGen, sxi32 iCompileFlag) 
   SyStringInitFromBuf(&sName, zName, nLen);
   PH7_MemObjInitFromString(pGen->pVm, pObj, &sName);
   /* Compile the lambda body */
+
   rc = GenStateCompileFunc(&(*pGen), &sName, 0, TRUE, &pAnnonFunc);
+//puts("Here2");
   if (rc == SXERR_ABORT) {
     return SXERR_ABORT;
   }
@@ -2157,8 +2160,19 @@ static sxi32 PH7_CompileBlock(
   sxi32 nKeywordEnd    /* EOF-keyword [i.e: endif;endfor;...]. 0 (zero) otherwise */
 ) {
   sxi32 rc;
-  /* TODO: check for an '=' sign (arrow function) */
-  if (pGen->pIn->nType & PH7_TK_OCB /* '{' */) {
+  
+  if (pGen->pIn->nType & PH7_TK_ARRAY_OP /* '=>' */) {
+    //puts("Array Op!");
+
+    rc = GenStateEnterBlock(&(*pGen), GEN_BLOCK_STD, PH7_VmInstrLength(pGen->pVm), 0, 0);
+    if (rc != SXRET_OK) {
+      return SXERR_ABORT;
+    }
+    //pGen->pIn++;
+    rc = PH7_CompileReturn(pGen);
+    GenStateLeaveBlock(&(*pGen), 0);
+  } else if (pGen->pIn->nType & PH7_TK_OCB /* '{' */) {
+
     sxu32 nLine = pGen->pIn->nLine;
     rc = GenStateEnterBlock(&(*pGen), GEN_BLOCK_STD, PH7_VmInstrLength(pGen->pVm), 0, 0);
     if (rc != SXRET_OK) {
@@ -4001,8 +4015,9 @@ static sxi32 GenStateCompileFuncBody(
   pInstrContainer = PH7_VmGetByteCodeContainer(pGen->pVm);
   PH7_VmSetByteCodeContainer(pGen->pVm, &pFunc->aByteCode);
   /* Compile the body */
-
+  //TODO: arrow function must be compiled as a single return statement
   rc = PH7_CompileBlock(&(*pGen), 0);
+
   if (rc != SXRET_OK) {
     /* Don't worry about freeing memory, everything will be released shortly */
     return SXERR_ABORT;
@@ -4284,7 +4299,9 @@ err:
 
 
   /* Compile the body */
+//puts("Here3");
   rc = GenStateCompileFuncBody(&(*pGen), pFunc);
+//puts("Here4");
   if (rc == SXERR_ABORT) {
     return SXERR_ABORT;
   }
@@ -6377,7 +6394,8 @@ static sxi32 GenStateEmitExprCode(
     if (pNode->pLeft) {
       /* Phase#3: Compile the 'then' expression  */
       rc = GenStateEmitExprCode(&(*pGen), pNode->pLeft, iFlags);
-      if (rc != SXRET_OK) {
+      /* TODO: Can this be empty? */
+      if (rc != SXRET_OK ) {
         return rc;
       }
     }
@@ -6691,6 +6709,9 @@ static const LangConstruct aLangConstruct[] = {
   { PH7_TKWRD_FOR, PH7_CompileFor },             /* for statement */
   { PH7_TKWRD_WHILE, PH7_CompileWhile },         /* while statement */
   { PH7_TKWRD_FOREACH, PH7_CompileForeach },     /* foreach statement */
+#ifdef PH7_TKWRD_FN
+  { PH7_TKWRD_FN, PH7_CompileFn },               /* arrow function statement */
+#endif
   { PH7_TKWRD_FUNCTION, PH7_CompileFunction },   /* function statement */
   { PH7_TKWRD_CONTINUE, PH7_CompileContinue },   /* continue statement */
   { PH7_TKWRD_BREAK, PH7_CompileBreak },         /* break statement */

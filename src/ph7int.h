@@ -1744,7 +1744,8 @@ enum ph7_expr_id {
 #define PH7_TKWRD_ENUM 57            /* enum */
 #define PH7_TKWRD_NEVER 58           /* 'never' function return type */
 
-// Keywords [59..63] are available for use for language extensions
+
+// Keywords [60..63] are available for use for language extensions
 // Keywords [65..127] are available for use for language extensions
 
 /* Constants which MUST BE A POWER OF TWO  */
