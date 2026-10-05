@@ -829,7 +829,9 @@ PH7_PRIVATE sxi32 PH7_MemObjStore(ph7_value *pSrc, ph7_value *pDest) {
     /* Increment reference count */
 
     int i = ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
+#if ADDREFLOG
     fprintf(stderr,"iRef++ (%d) after MemObjStore()\n", i + 1);
+#endif
   }
   if (pDest->iFlags & MEMOBJ_HASHMAP) {
     pMap = (ph7_hashmap *)pDest->x.pOther;
@@ -868,7 +870,9 @@ PH7_PRIVATE sxi32 PH7_MemObjLoad(ph7_value *pSrc, ph7_value *pDest) {
   } else if (pSrc->iFlags & MEMOBJ_OBJ) {
     /* Increment reference count */
     int i = ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
+#if ADDREFLOG
     fprintf(stderr,"iRef++ (%d) after MemObjLoad()\n",i + 1);
+#endif
   }
   if (SyBlobLength(&pDest->sBlob) > 0) {
     SyBlobRelease(&pDest->sBlob);
