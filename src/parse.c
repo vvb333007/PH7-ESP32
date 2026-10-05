@@ -185,6 +185,8 @@ static const ph7_expr_op aOpTable[] = {
   /* Precedence 1: non-associative */
   { { "new", sizeof("new") - 1 }, EXPR_OP_NEW, 1, EXPR_OP_NON_ASSOC, PH7_OP_NEW },
   { { "clone", sizeof("clone") - 1 }, EXPR_OP_CLONE, 1, EXPR_OP_NON_ASSOC, PH7_OP_CLONE },
+//  { { "", sizeof("clone") - 1 }, EXPR_OP_CLONE, 1, EXPR_OP_NON_ASSOC, PH7_OP_CLONE },
+//  { { "clone", sizeof("clone") - 1 }, EXPR_OP_CLONE, 1, EXPR_OP_NON_ASSOC, PH7_OP_CLONE },
   /* Postfix operators */
   /* Precedence 2(Highest),left-associative */
 

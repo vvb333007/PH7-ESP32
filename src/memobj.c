@@ -519,7 +519,9 @@ PH7_PRIVATE sxi32 PH7_MemObjToObject(ph7_value *pObj) {
       PH7_VmCallClassMethod(pVm, pStd, pCons, 0, 1, apArg);
       if (pStd->iRef < 1) {
         /* bad bad constructor unsetting $this */
+#if ADDREFLOG
         fprintf(stderr,"iRef < 0 (%d) after __construct(), restoring to 1\n",pStd->iRef);
+#endif
         pStd->iRef = 1;
       }
     }

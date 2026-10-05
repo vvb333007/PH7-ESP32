@@ -831,6 +831,11 @@ static ph7_vm_func *VmOverload(
     /* Point to the next entry */
     pLink = pLink->pNextName;
   }
+#ifdef DEVEL
+  if (pLink->pNextName != NULL) {
+    fprintf(stderr,"Too many candidates!\n");
+  }
+#endif
   if (i < 1) {
     /* No candidates,return the head of the list */
     //return pList; // Head of the list is an UB
@@ -896,7 +901,7 @@ static ph7_vm_func *VmOverload(
   }
   SyBlobRelease(&sSig);
   /* Appropriate function for the current call context */
-  /* TODO: iMax >= 0 !? */
+
   return (iMax >= 0 && iTarget >= 0) ? apSet[iTarget] : NULL;
 }
 /* Forward declaration */
@@ -1506,7 +1511,8 @@ PH7_PRIVATE sxi32 PH7_VmInit(
   PH7_MemObjInit(&(*pVm), &pVm->sAssertCallback);
   /* Set a default recursion limit */
 
-  pVm->nMaxDepth = 32;
+
+  pVm->nMaxDepth = VM_MAX_NESTING_DEPTH;
   //pVm->bErrReport = 1;
 
   /* Default assertion flags */
@@ -1585,6 +1591,7 @@ PH7_PRIVATE sxi32 PH7_VmBlobConsumer(
   rc = SyBlobAppend((SyBlob *)pUserData, pOut, nLen);
   return rc;
 }
+
 #define VM_STACK_GUARD 16
 /* TODO: this is a hotpath. Refactor.
  * Allocate a new operand stack so that we can start executing
@@ -1617,6 +1624,24 @@ static ph7_value *VmNewOperandStack(
   /* Ready for bytecode execution */
   return pStack;
 }
+
+/* Release all objects that are still on the operand stack
+ */
+static void VmPurgeOperandStack(ph7_value *pFrameStack, sxi32 nCount) {
+
+  for (sxi32 i = 0; i < nCount; i++) {
+    ph7_value *pStackEntry = &pFrameStack[i];
+#if LOGCLEANUP
+    if ((pStackEntry->iFlags & MEMOBJ_NULL) == 0)
+      fprintf(stderr,"%p: Release value (%s) on the OPSTACK\n", pStackEntry,PH7_MemObjTypeDump(pStackEntry));
+#endif
+    PH7_MEMOBJRELEASE(pStackEntry);
+  }
+
+}
+
+
+
 /* Forward declaration */
 static sxi32 VmRegisterSpecialFunction(ph7_vm *pVm);
 static int VmInstanceOf(ph7_class *pThis, ph7_class *pClass);
@@ -2586,16 +2611,35 @@ static sxi32 VmByteCodeExec(
     pTos = &pStack[nTos];
   }
   pc = 0;
+  pInstr = &aInstr[0];
+
+  /* Check nRecursionDepth here 
+   * Once call depth reaches critical value (<16 calls left) am exception is thrown. 
+   * This is because exception throwing mechanism needs to recurse as well and 15 frames seems reasonable value.
+   * When there are less than 15 frames left to the limit - exception can not be thrown.
+   * Once we reach hardlimit - script execution is aborted
+   */
+
+  pVm->nRecursionDepth++;
+
+  /* Soft limit guarantees at least VM_THROW_RESERVE_NESTING frames to perform PH7_VmThrow */
+  if (pVm->nRecursionDepth == (pVm->nMaxDepth - VM_THROW_RESERVE_NESTING)) {
+
+    VM_EXCEPTION_GOTO("__genericfn", 11, "Call nesting soft limit reached. [PC: %08x]", pc);
+
+  } else if (pVm->nRecursionDepth > (pVm->nMaxDepth)) {
+
+    PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"Call nesting limit reached. Aborted.");  
+
+    goto Abort;
+  }
+
   /* Execute as much as we can */
   for (;;) {
     /* Fetch the instruction to execute */
     pInstr = &aInstr[pc];
     rc = SXRET_OK;
 
-    /* TODO: check nRecursionDepth here 
-     * TODO: If the depth is 5 calls away from the limit we throw the exception. If we hit the limit then just goto Abort.
-     * TODO: increment nesting depth. Must be decremented on exit from this function
-     */
 
 
     /*
@@ -5178,14 +5222,15 @@ static sxi32 VmByteCodeExec(
                   pMeth = PH7_ClassExtractMethod(pClass, sName.zString, sName.nByte);
                 }
                 if (pMeth == 0) {
-                  /* TODO: Try to call magic and throw an exception if magic is not implemented by the class
-                     TODO: Propagate error from ClassInstanceCallMagicMethod() so we can check if __call() was actually called.
+                  /* Try to call magic and throw an exception if magic is not implemented by the class
+                     Propagate error from ClassInstanceCallMagicMethod() so we can check if __call() was actually called.
+                     TODO: we need all args to the __call and to the __callStatic , not just only name
                   */
-                  //VmErrorFormat(&(*pVm), PH7_CTX_ERR,  "Undefined class method '%z->%z',PH7 is loading NULL", &pClass->sName, &sName);
+
                   if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__call", sizeof("__call") - 1, &sName)) {
                     VM_EXCEPTION_GOTO("__unknownfn", 11, "Undefined class method '%z->%z(...)' call at [PC: %08x]\n", &pClass->sName,&sName, pc)
                   }
-                  /* Exception was handled but there is still OP_CALL waiting for function name */
+                  /* Unreachable but just in case */
                   VM_REPLACE_FUNC_NAME("__nullsafe");
 
                 } else {
@@ -5220,7 +5265,7 @@ static sxi32 VmByteCodeExec(
                   /* TODO: add flags to pClass: HAS_GET, HAS_SET, HAS_CALL, HAS_CALLSTATIC, etc
                    * which are inherited via 'extends' construct. These flags are used by CallMagicMethod
                    * to skip method lookup when we know there are none.
-                   * TODO: propagate pResult from a magic call, 
+                   * 
                   */
                   if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName)) {
                      VM_EXCEPTION_GOTO("__unknownfn", 11, "Undefined class attribute '%z->%z(...)' access at [PC: %08x]\n", &pClass->sName,&sName, pc)
@@ -5651,10 +5696,9 @@ static sxi32 VmByteCodeExec(
               }
               PH7_MemObjInit(pVm, &sResult);
               /* May be a class instance and it's static method */
-              /* TODO: check return code propagation path
-                */
-/* TODO: exception*/
+              /* TODO: check return code propagation path  */
               PH7_VmCallUserFunction(pVm, pTos, (int)SySetUsed(&aArg), (ph7_value **)SySetBasePtr(&aArg), &sResult);
+              /* TODO: propagate exception, if any */
               SySetReset(&aArg);
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
@@ -5668,11 +5712,9 @@ static sxi32 VmByteCodeExec(
                */
               if (pTos->iFlags & MEMOBJ_OBJ) {
                 ph7_class_instance *pThis = (ph7_class_instance *)pTos->x.pOther;
-                /* TODO: Call the magic method '__invoke' if available 
-                   TODO: propagate return  value and copy it to the stack
-                   TODO: Raise an exception if __invoke() is not available
-                  PH7_MemObjStore(&sResult, pTos);
-                  PH7_MemObjRelease(&sResult);
+                /* Call the magic method '__invoke' if available 
+                   Raise an exception if __invoke() is not available
+                   TODO: propagate return value and copy it to the stack
                 */
                 if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pThis->pClass, pThis, "__invoke", sizeof("__invoke") - 1, NULL)) {
                   VM_EXCEPTION_GOTO("__unknownat", 11, "'__invoke()' magic method is not implemented by class '%z'. at [PC: %08x]\n", &pThis->pClass->sName, pc)
@@ -5781,26 +5823,6 @@ static sxi32 VmByteCodeExec(
               }
             }
 
-            /* Check The recursion limit */
-            if (pVm->nRecursionDepth > pVm->nMaxDepth) {
-
-              /* TODO: CITO: REFACTOR: NOTE: we substract 3 from nRecursionDepth here because subsequent VM_EXCEPTION_GOTO requires
-               * at least 3 frames to execute. Otherwise attempt to throw() itself will cause an exception
-               * This is a bad hack: whenever one changes the __genericfn() PHP code (e.g. add an extra call)
-               * then number 2 also must be changed
-               */
-              pVm->nRecursionDepth -= 3;
-              VM_EXCEPTION_GOTO("__genericfn", 11, "Call nesting limit reached while invoking user function '%z'. [PC: %08x]",&pVmFunc->sName, pc);
-
-              /* Pop given arguments */
-              if (pInstr->iP1 > 0) {
-                VmPopOperand(&pTos, pInstr->iP1);
-              }
-              /* Assume a null return value so that the program continue it's execution normally */
-              PH7_MemObjRelease(pTos);
-              break;
-            }
-
             if (pVmFunc->pNextName) {
               /* Function is candidate for overloading,select the appropriate function to call */
               ph7_vm_func *pTmp = pVmFunc;
@@ -5817,18 +5839,18 @@ static sxi32 VmByteCodeExec(
             }
             /* Extract the formal argument set */
             aFormalArg = (ph7_vm_func_arg *)SySetBasePtr(&pVmFunc->aArgs);
-            /* Create a new VM frame  */
+           
+
+             /* Create a new VM frame  */
             rc = VmEnterFrame(&(*pVm), pVmFunc, pThis, &pFrame);
             if (rc != SXRET_OK) {
-              /* Raise exception: Out of memory */
-//              VmErrorFormat(&(*pVm), PH7_CTX_ERR,"PH7 is running out of memory while calling function '%z',NULL will be returned",                            &pVmFunc->sName);
-              
               /* Pop given arguments */
               if (pInstr->iP1 > 0) {
                 VmPopOperand(&pTos, pInstr->iP1);
               }
               /* Assume a null return value */
               PH7_MemObjRelease(pTos);
+              /* Raise exception: Out of memory */
               VM_OOM_GOTO("Can not call a function ( out of memory )");
               break;
             }
@@ -5875,9 +5897,13 @@ static sxi32 VmByteCodeExec(
                 if ((pArg->iFlags & MEMOBJ_NULL) && SySetUsed(&aFormalArg[n].aByteCode) > 0) {
                   /* NULL values are redirected to default arguments */
                   /* TODO: this is wrong. If user has passed the value then default args must not be applied*/
+
                   rc = VmLocalExec(&(*pVm), &aFormalArg[n].aByteCode, pArg);
-                  if (rc == PH7_ABORT) {
-                    goto Abort;
+
+
+                  // We are in a new frame, but do not bother leaving - we are aborting
+                  if (rc == PH7_ABORT || rc == PH7_EXCEPTION) {
+                    VM_FATAL_GOTO("Unrecoverable: an exception in a default arg value (arg %d), in function %z\n", n, &pVmFunc->sName);
                   }
                 }
                 /* Make sure the given arguments are of the correct type.
@@ -6078,15 +6104,12 @@ static sxi32 VmByteCodeExec(
               /* Push class name */
               SySetPut(&pVm->aSelf, (const void *)&pSelf);
             }
-            /* Increment nesting level */
-            pVm->nRecursionDepth++;
             /* Execute function body */
-#if FUNCNAMELOG
+#if FRAMELOG
             fprintf(stderr, "Func body exec: %.*s\n",pVmFunc->sName.nByte, pVmFunc->sName.zString);
 #endif
+            /* Use pFrameStack as operand stack but put the result on pTos */
             rc = VmByteCodeExec(&(*pVm), (VmInstr *)SySetBasePtr(&pVmFunc->aByteCode), pFrameStack, -1, pTos, &n, FALSE);
-            /* Decrement nesting level */
-            pVm->nRecursionDepth--;
             if (pSelf) {
               /* Pop class name */
               (void)SySetPop(&pVm->aSelf);
@@ -6113,8 +6136,10 @@ static sxi32 VmByteCodeExec(
                   VM_FATAL_GOTO("in function '%z': returning a reference to a constant expression is not permitted", &pVmFunc->sName);
                 }
               }
+
               pTos->nIdx = n;
             }
+xcpt:
             /* Cleanup the mess left behind */
             if (rc != PH7_ABORT && ((pFrame->iFlags & VM_FRAME_THROW) || rc == PH7_EXCEPTION || pVm->iException)) {
               
@@ -6127,7 +6152,7 @@ static sxi32 VmByteCodeExec(
 
                 /* Exception was handled. */
                 if (pFrame->iExceptionJump > 0) {
-#if EXCLOG
+#if FRAMELOG
                 fprintf(stderr, "OP_CALL induced JMP=%d, bytecode: %p\n",pFrame->iExceptionJump, pFrame->pExcByteCode);
 #endif
                   /* Pop the resutlt */
@@ -6151,11 +6176,10 @@ static sxi32 VmByteCodeExec(
               }
             }
 
-
-            /* Reset VM-Exception flag */
-//            pVm->iException = 0;
             /* Free the operand stack */
+            VmPurgeOperandStack(pFrameStack, SySetUsed(&pVmFunc->aByteCode));
             SyMemBackendFree(&pVm->sAllocator, pFrameStack);
+
             /* Leave the frame */
             VmLeaveFrame(&(*pVm));
             if (rc == PH7_ABORT) {
@@ -6280,7 +6304,7 @@ static sxi32 VmByteCodeExec(
 
 NextInsn:
     pc++; /* Next instruction in the stream */
-//    fprintf(stderr,"Next PC is %d in bytecode %p\n",pc,aInstr);
+
   }       /* For(;;) */
 Done:
   
@@ -6289,11 +6313,13 @@ Done:
    * this counter may go to a negative value. We fix it up here now;
    *
    */
-  if (pVm->nRecursionDepth < 0)
-    pVm->nRecursionDepth = 0;
-
+  
   
   SySetRelease(&aArg);
+#if LOGCLEANUP
+  fprintf(stderr,"%p: OP_DONE: %u elements on the OPSTACK\n",pStack,(unsigned int)(((uintptr_t)pStack - (uintptr_t)pTos)/sizeof(*pTos)));
+#endif
+  pVm->nRecursionDepth--;
   return SXRET_OK;
 
 Abort:
@@ -6305,6 +6331,7 @@ Abort:
     PH7_MemObjRelease(pTos);
     pTos--;
   }
+  pVm->nRecursionDepth--;
   return PH7_ABORT;
 Exception:
 #if DEVEL
@@ -6315,6 +6342,7 @@ Exception:
     PH7_MemObjRelease(pTos);
     pTos--;
   }
+  pVm->nRecursionDepth--;
   return PH7_EXCEPTION;
 }
 /*
@@ -6333,6 +6361,7 @@ static sxi32 VmLocalExec(ph7_vm *pVm, SySet *pByteCode, ph7_value *pResult) {
   }
   /* Execute the program */
   rc = VmByteCodeExec(&(*pVm), (VmInstr *)SySetBasePtr(pByteCode), pStack, -1, &(*pResult), 0, FALSE);
+  VmPurgeOperandStack(pStack, SySetUsed(pByteCode));
   /* Free the operand stack */
   SyMemBackendFree(&pVm->sAllocator, pStack);
   /* Execution result */

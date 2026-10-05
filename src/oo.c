@@ -484,7 +484,9 @@ static ph7_class_instance *NewClassInstance(ph7_vm *pVm, ph7_class *pClass) {
   pThis->pVm = pVm;
   pThis->pClass = pClass;
   SyHashInit(&pThis->hAttr, &pVm->sAllocator, 0, 0);
+#if ADDREFLOG
   fprintf(stderr,"pThis->iRef=%d , pThis=%p\n",pThis->iRef, pThis);
+#endif
   return pThis;
 }
 /*
@@ -679,7 +681,9 @@ static void PH7_ClassInstanceRelease(ph7_class_instance *pThis) {
     /* Invoke the destructor */
     
     pThis->iRef = 2; /* Prevent garbage collection */
+#if ADDREFLOG
     fprintf(stderr,"Before destructor, set fixed. pThis->iRef=%d , pThis=%p\n",pThis->iRef, pThis);
+#endif
     PH7_VmCallClassMethod(pVm, pThis, pDestr, 0, 0, 0);
   }
   /* Release non-static attributes */
@@ -693,7 +697,9 @@ static void PH7_ClassInstanceRelease(ph7_class_instance *pThis) {
   }
   /* Release the whole structure */
   SyHashRelease(&pThis->hAttr);
+#if ADDREFLOG
   fprintf(stderr,"memory released(%p)\n",pThis);
+#endif
   SyMemBackendPoolFree(&pVm->sAllocator, pThis);
 }
 /*

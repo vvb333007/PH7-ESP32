@@ -1413,6 +1413,10 @@ struct ph7_vm {
   void *pStderr;                   /* STDERR IO stream */
   int bErrReport;                  /* TRUE to report all runtime Error/Warning/Notice */
   int nRecursionDepth;             /* Current recursion depth */
+
+#define VM_THROW_RESERVE_NESTING 15 /* Required vod VM_EXCEPTION_GOTO to be able to throw()*/
+#define VM_MAX_NESTING_DEPTH     (32 + VM_THROW_RESERVE_NESTING) /* Max nesting depth of VmByteCodeExec() */
+
   int nMaxDepth;                   /* Maximum allowed recusion depth */
   int nObDepth;                    /* OB depth */
   int nExceptDepth;                /* Exception depth */
@@ -1818,6 +1822,17 @@ PH7_PRIVATE sxi32 PH7_MemObjStringAppend(ph7_value *pObj, const char *zData, sxu
 /* Not used in the current release of the PH7 engine */
 PH7_PRIVATE sxi32 PH7_MemObjStringFormat(ph7_value *pObj,const char *zFormat,va_list ap);
 #endif
+
+/* Avoid call if there is a null (99% of the cases)
+ *
+ */
+#define PH7_MEMOBJRELEASE(pObj_) \
+  do { \
+    if (((pObj_)->iFlags & MEMOBJ_NULL) == 0) { \
+      PH7_MemObjRelease(pObj_); \
+    } \
+  } while( 0 )
+
 PH7_PRIVATE sxi32 PH7_MemObjStore(ph7_value *pSrc, ph7_value *pDest);
 PH7_PRIVATE sxi32 PH7_MemObjLoad(ph7_value *pSrc, ph7_value *pDest);
 PH7_PRIVATE sxi32 PH7_MemObjRelease(ph7_value *pObj);
@@ -2161,3 +2176,6 @@ int uname(struct utsname *out);
 #endif /* #ifdef ESP32 */
 
 _Static_assert((VM_FUNC_RET_MASK & 0xffffff00) == VM_FUNC_RET_MASK);
+_Static_assert(VM_MAX_NESTING_DEPTH > VM_THROW_RESERVE_NESTING);
+
+
