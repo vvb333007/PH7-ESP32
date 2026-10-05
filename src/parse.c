@@ -687,9 +687,8 @@ static sxi32 ExprAssembleAnnon(ph7_gen_state *pGen, SyToken **ppCur, SyToken *pE
       pIn++;
     }
   } else if (pIn->nType & PH7_TK_ARRAY_OP) {
-    //TODO: arrow functions: if we see => instead of { then simply do PH7_CompileReturn here.
-    //
-    fprintf(stderr,"arrow function\n");
+    /* arrow functions: if we see => instead of { */
+
     pIn++; /* Jump the leading arrow '=>' */
     PH7_DelimitNestedTokens(pIn, pEnd, PH7_TK_OCB /*'{'*/, PH7_TK_SEMI /*';'*/, &pIn);
 

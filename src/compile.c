@@ -2146,8 +2146,6 @@ Consume:
  */
 
 /*
-TODO: Work around special case: 'fn( ARGLIST ) [use (ARGLIST)] [:TYPE|never] => EXPR;'
-
 Arrow functions support explicit variable capture using use(). 
 Unlike standard PHP arrow functions, PH7 does not implicitly capture variables from the enclosing scope.
 This is intended. It keeps closure creation lightweight and predictable, and this is dictated by 
@@ -2180,7 +2178,7 @@ static sxi32 PH7_CompileBlock(
     }
     pGen->pIn++;
     /* Normal function bodies: Compile until we hit the closing braces '}' */
-    /* TODO: Arrow Functions: Compile until we hit ';' */
+
     for (;;) {
       if (pGen->pIn >= pGen->pEnd) {
         rc = GenStateNextChunk(&(*pGen));
@@ -4015,7 +4013,7 @@ static sxi32 GenStateCompileFuncBody(
   pInstrContainer = PH7_VmGetByteCodeContainer(pGen->pVm);
   PH7_VmSetByteCodeContainer(pGen->pVm, &pFunc->aByteCode);
   /* Compile the body */
-  //TODO: arrow function must be compiled as a single return statement
+
   rc = PH7_CompileBlock(&(*pGen), 0);
 
   if (rc != SXRET_OK) {
@@ -6709,9 +6707,6 @@ static const LangConstruct aLangConstruct[] = {
   { PH7_TKWRD_FOR, PH7_CompileFor },             /* for statement */
   { PH7_TKWRD_WHILE, PH7_CompileWhile },         /* while statement */
   { PH7_TKWRD_FOREACH, PH7_CompileForeach },     /* foreach statement */
-#ifdef PH7_TKWRD_FN
-  { PH7_TKWRD_FN, PH7_CompileFn },               /* arrow function statement */
-#endif
   { PH7_TKWRD_FUNCTION, PH7_CompileFunction },   /* function statement */
   { PH7_TKWRD_CONTINUE, PH7_CompileContinue },   /* continue statement */
   { PH7_TKWRD_BREAK, PH7_CompileBreak },         /* break statement */
