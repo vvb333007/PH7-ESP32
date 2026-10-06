@@ -1252,11 +1252,13 @@ struct ph7_class_attr {
   sxu32 nLine;       /* Line number on which this attribute was defined */
 };
 /* Attribute configuration */
-#define PH7_CLASS_ATTR_STATIC 0x001   /* Static attribute */
-#define PH7_CLASS_ATTR_CONSTANT 0x002 /* Constant attribute OR enum value */
-#define PH7_CLASS_ATTR_ABSTRACT 0x004 /* Abstract method */
-#define PH7_CLASS_ATTR_FINAL 0x008    /* Final method */
-#define PH7_CLASS_ATTR_ENUM 0x0016 /* Used by GenStateCompileEnum() to hind the compiler (..CompileConst) to not require = RVALUE */
+#define PH7_CLASS_ATTR_STATIC    0x001 /* Static attribute */
+#define PH7_CLASS_ATTR_CONSTANT  0x002 /* Constant attribute OR enum value */
+#define PH7_CLASS_ATTR_ABSTRACT  0x004 /* Abstract method */
+#define PH7_CLASS_ATTR_FINAL     0x008 /* Final method */
+#define PH7_CLASS_ATTR_ENUM      0x010 /* Used by GenStateCompileEnum() to hint the compiler (..CompileConst) to not require = RVALUE */
+#define PH7_CLASS_ATTR_FIXEDTYPE 0x020 /* Fixed type attribute (assignment will do typecast) */
+#define PH7_CLASS_ATTR_NULLABLE  0x040 /* Fixed type nullable attribute (assignment will do typecast) */
 /* 
  * Each class method is parsed out and stored in an instance of the following
  * structure.
