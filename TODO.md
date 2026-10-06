@@ -46,12 +46,17 @@ Standard Arduino Core classes: HardwareSerial, SPI, Wire, FS, Print, String and 
 
 ### 5. Exceptions
 
- ~~ Rename `Exception` to `Throwable`, and add `Exception`, `Error`, `TypeError`, `ArgumentCountError`, `ArithmeticError`, `DivisionByZeroError`~~
-~~  Replace `instanceof(Exception)` in `throw` with `Throwable`~~
-~~  Go throuhg error messages table, and replace them with `VmThrowException` calls~~
+~~Rename `Exception` to `Throwable`, and add `Exception`, `Error`, `TypeError`, `ArgumentCountError`, `ArithmeticError`, `DivisionByZeroError`~~
+
+~~Replace `instanceof(Exception)` in `throw` with `Throwable`~~
+
+~~Go throuhg error messages table, and replace them with `VmThrowException` calls~~
+
 Verify failure branches of VmByteCodeExec by provoking the exception
+
 Verify return code propagation of VmByteCodeExec, especially in VmLocalExec use
-Fix recursion depth limiter
+
+~~Fix recursion depth limiter~~
 
 ### 6. Types and overloading
   Nullable types in stdlib signatures (`?string`, `?Throwable`) or null will not pass strict checks
@@ -60,7 +65,7 @@ Fix recursion depth limiter
 
 ## 7. VM shutdown
   Call `__destruct` for all live objects on VM exit (globals are not destructed right now on script DONE), before function and class tables are freed
-  Decide what `OP_HALT_VM` does with destructors, and write it down
+  Decide what `OP_HALT` does with destructors, and write it down
   Objects with a cyclic references never reach zero refcount, need a list of all live objects
 
 ---
