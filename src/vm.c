@@ -2413,12 +2413,13 @@ static sxi32 VmByteCodeDump(
       break;
     }
     /* Format and call the consumer callback */
-    rc = SyProcFormat(xConsumer, pUserData, "  % 10s %d %u %p # PC=%u\n",
+    rc = SyProcFormat(xConsumer, pUserData, "  % 10s %d %u %qx # PC=%u\n",
                       VmInstrToString(pInstr->iOp), 
                       pInstr->iP1,
                       pInstr->iP2,
-                      pInstr->p3,
+                      (uintptr_t)pInstr->p3,
                       n);
+
     if (rc != SXRET_OK) {
       /* Consumer routine request an operation abort */
       return rc;
@@ -3442,7 +3443,23 @@ static sxi32 VmByteCodeExec(
                 /* Perform the store operation */
                 /* TODO: for typed properties check if types are covertible, covert right operand to the typeof(left)
                  * and then store. Otherwise member attribute may change its type in _STORE operations
-                */
+                 */
+                    if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+                      if ((pObj->iFlags & MEMOBJ_NULLABLE) && (pTos->iFlags & MEMOBJ_NULL)) {
+                        // null to nullable -- no conversion
+                        // TODO: this not gonna work as wtoring NULL will change the object type
+                        //       so subsequent stores will all be discarded
+                      } else if ((pObj->iFlags & MEMOBJ_ALL) == (pTos->iFlags & MEMOBJ_ALL)) {
+                        // same types -- no conversion
+                      } else {
+                        // Types are different: prefer the type of the class attribute 
+                        //
+                        //fprintf(stderr, "Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pTos), PH7_MemObjTypeDump(pObj));
+                        ProcMemObjCast xCast = PH7_MemObjCastMethod(pObj->iFlags);
+                        xCast(pTos);
+                      }
+                    }
+
                 PH7_MemObjStore(pTos, pObj);
               }
             }
@@ -3459,6 +3476,7 @@ static sxi32 VmByteCodeExec(
           STACK_UNDERFLOW_GOTO(pTos);
 
           } else {
+            /* A string on the stack is the variable name (e.g. $k--> 'k')*/
             SyStringInitFromBuf(&sName, pInstr->p3, SyStrlen((const char *)pInstr->p3));
           }
           /* Extract the desired variable and if not available dynamically create it */
@@ -3473,6 +3491,9 @@ static sxi32 VmByteCodeExec(
             PH7_MemObjRelease(&pTos[1]);
           }
           /* Perform the store operation */
+/*
+
+ */
           PH7_MemObjStore(pTos, pObj);
           break;
         }
@@ -5197,8 +5218,8 @@ static sxi32 VmByteCodeExec(
           ph7_value *pNos;
           SyString sName;
 
-          /* P2 == 0 --> Method
-           * P2 >0 --> Attribute
+          /* P2 == 0 --> Attribute
+           * P2 >0 --> Method
            */
 
           if (!pInstr->iP1) {
@@ -5214,6 +5235,7 @@ static sxi32 VmByteCodeExec(
               pClass = pThis->pClass;
               /* Extract attribute name first */
               SyStringInitFromBuf(&sName, (const char *)SyBlobData(&pTos->sBlob), SyBlobLength(&pTos->sBlob));
+
               if (pInstr->iP2) {
                 /* Method call */
                 ph7_class_method *pMeth = 0;
@@ -5252,8 +5274,11 @@ static sxi32 VmByteCodeExec(
                   if (pEntry) {
                     /* Point to the attribute value */
                     pObjAttr = (VmClassAttr *)pEntry->pUserData;
+
+
                   }
                 }
+
 
                 /* Pop the attribute name */
                 VmPopOperand(&pTos, 1);
@@ -5283,16 +5308,28 @@ static sxi32 VmByteCodeExec(
                 PH7_MemObjRelease(pTos);
                 pTos->nIdx = SXU32_HIGH; /* Assume we are loading a constant */
                 if (pObjAttr) {
+
                   ph7_value *pValue = 0; /* cc warning */
                   /* Check attribute access */
                   if (VmClassMemberAccess(&(*pVm), pClass, &pObjAttr->pAttr->sName, pObjAttr->pAttr->iProtection, TRUE)) {
+
                     /* Load attribute */
                     pValue = (ph7_value *)SySetAt(&pVm->aMemObj, pObjAttr->nIdx);
                     if (pValue) {
+
+                      /* Perform a type cast? if class attribute was declared with a type hint
+                       * then we mark our MemObj as TYPE-LOCKED
+                      */
+                      if (pObjAttr->pAttr->iFlags & PH7_CLASS_ATTR_FIXEDTYPE) {
+                        //fprintf(stderr,"Fixed type conversion %d on %s attr\n",pObjAttr->pAttr->iFlags, pObjAttr->pAttr->iFlags & PH7_CLASS_ATTR_STATIC ? "static" : "dynamic");
+                        pValue->iFlags |= MEMOBJ_FIXEDTYPE;
+                      }
+
+                      
                       if (pThis->iRef < 2) {
                         /* Perform a store operation,rather than a load operation since
-                 * the class instance '$this' will be deleted shortly.
-                 */
+                         * the class instance '$this' will be deleted shortly.
+                         */
                         PH7_MemObjStore(pValue, pTos);
                       } else {
                         /* Simple load */
@@ -5349,6 +5386,7 @@ static sxi32 VmByteCodeExec(
               pTos->nIdx = SXU32_HIGH;
             }
           } else {
+
             /* Static member access using class name */
             pNos = pTos;
             pThis = 0;
@@ -6139,7 +6177,7 @@ static sxi32 VmByteCodeExec(
 
               pTos->nIdx = n;
             }
-xcpt:
+
             /* Cleanup the mess left behind */
             if (rc != PH7_ABORT && ((pFrame->iFlags & VM_FRAME_THROW) || rc == PH7_EXCEPTION || pVm->iException)) {
               
