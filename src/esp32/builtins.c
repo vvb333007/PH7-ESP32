@@ -45,11 +45,14 @@
  */
 #define IMPLEMENT_N_N(name, T0, T1, ...)                    \
   Impl(name, pCtx, nArg, apArg) {                           \
+    pCtx = pCtx; \
     if (nArg >= 2 &&                                        \
         ph7_value_is_numeric(apArg[0]) &&                   \
         ph7_value_is_numeric(apArg[1])) {                   \
       T0 a0 = (T0)ph7_value_to(T0, apArg[0]);               \
       T1 a1 = (T1)ph7_value_to(T1, apArg[1]);               \
+      a0 = a0; \
+      a1 = a1; \
       __VA_ARGS__;                                          \
     } else {                                                \
       ph7_context_throw_error(pCtx, PH7_CTX_WARNING,        \
@@ -63,8 +66,10 @@
 */
 #define IMPLEMENT_N(name, T0, ...)                          \
   Impl(name, pCtx, nArg, apArg) {                           \
+    pCtx = pCtx; \
     if (nArg >= 1 && ph7_value_is_numeric(apArg[0])) {      \
       T0 a0 = (T0)ph7_value_to(T0, apArg[0]);               \
+      a0 = a0; \
       __VA_ARGS__;                                          \
     } else {                                                \
       ph7_context_throw_error(pCtx, PH7_CTX_WARNING,        \
@@ -78,6 +83,7 @@
 */
 #define IMPLEMENT(name, ...)                                \
   Impl(name, pCtx, nArg, apArg) {                           \
+    pCtx = pCtx; \
     (void)nArg; (void)apArg;                                \
     __VA_ARGS__;                                            \
     return PH7_OK;                                          \
