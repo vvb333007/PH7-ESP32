@@ -4597,7 +4597,7 @@ Synchronize:
  *  the zend engine would allow only simple scalar value.
  *  Example: 
  *   class Test{
- *        public static $myVar = "Hello"."world: ".rand_str(3); //concatenation operation + Function call
+ *        public static ?int $myVar = "Hello"."world: ".rand_str(3); //concatenation operation + Function call
  *   };
  *   var_dump(TEST::myVar);
  *   Refer to the official documentation for more information on the powerful extension
@@ -5473,7 +5473,7 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
       /* End of class body */
       break;
     }
-    if ((pGen->pIn->nType & (PH7_TK_KEYWORD | PH7_TK_DOLLAR)) == 0) {
+    if ((pGen->pIn->nType & (PH7_TK_KEYWORD | PH7_TK_DOLLAR | PH7_TK_OP)) == 0) {
       rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
                                "Unexpected token '%z'. Expecting attribute declaration inside class '%z'",
                                &pGen->pIn->sData, pName);
@@ -5486,22 +5486,44 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
     /* Assume public visibility */
     iProtection = PH7_TKWRD_PUBLIC;
     iAttrflags = 0;
+    
     if (pGen->pIn->nType & PH7_TK_KEYWORD) {
       /* Extract the current keyword */
       nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
       if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
         iProtection = nKwrd;
         pGen->pIn++; /* Jump the visibility token */
-        if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & (PH7_TK_KEYWORD | PH7_TK_DOLLAR)) == 0) {
+        if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & (PH7_TK_KEYWORD | PH7_TK_DOLLAR | PH7_TK_OP)) == 0) {
           rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
-                                   "Unexpected token '%z'. Expecting attribute declaration inside class '%z'",
-                                   &pGen->pIn->sData, pName);
+                                   "Unexpected token '%z'. Expecting attribute declaration inside class '%z', %08x",
+                                   &pGen->pIn->sData, pName,pGen->pIn->nType);
           if (rc == SXERR_ABORT) {
             /* Error count limit reached,abort immediately */
             return SXERR_ABORT;
           }
           goto done;
         }
+
+
+        if (pGen->pIn->sData.zString[0] == '?') {
+          fprintf(stderr,"nullable type attribute\n");
+          iAttrflags |= PH7_CLASS_ATTR_NULLABLE;
+          pGen->pIn++; /* Jump the '?' token */
+          if (pGen->pIn >= pGen->pEnd)  break;
+
+        }
+
+        if (pGen->pIn->nType & PH7_TK_KEYWORD) {
+          nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
+
+          if (nKwrd == PH7_TKWRD_INT || nKwrd == PH7_TKWRD_STRING || nKwrd == PH7_TKWRD_FLOAT || nKwrd == PH7_TKWRD_ARRAY || nKwrd == PH7_TKWRD_OBJECT) {
+            fprintf(stderr,"fixed type attribute\n");
+            iAttrflags |= PH7_CLASS_ATTR_FIXEDTYPE;
+            pGen->pIn++; /* Jump the type */
+            if (pGen->pIn >= pGen->pEnd)  break;
+          }
+        }
+    
         if (pGen->pIn->nType & PH7_TK_DOLLAR) {
           /* Attribute declaration */
           rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
@@ -5511,11 +5533,16 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
             }
             goto done;
           }
+          /* Next statement */
           continue;
         }
-        /* Extract the keyword */
+
+        /* Extract the keyword (static, const etc) */
         nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
       }
+
+
+
       if (nKwrd == PH7_TKWRD_CONST) {
         /* Process constant declaration */
         rc = GenStateCompileClassConstant(&(*pGen), iProtection, iAttrflags, pClass, 0);
@@ -5526,12 +5553,29 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
           goto done;
         }
       } else {
+
         if (nKwrd == PH7_TKWRD_STATIC) {
           /* Static method or attribute,record that */
           iAttrflags |= PH7_CLASS_ATTR_STATIC;
           pGen->pIn++; /* Jump the static keyword */
+
+          /* Jump optional '?' and a type if any */
+          if (pGen->pIn < pGen->pEnd && pGen->pIn->sData.zString[0] == '?') {
+            iAttrflags |= PH7_CLASS_ATTR_NULLABLE;
+            pGen->pIn++; /* Jump the '?' token */
+          }
+
           if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)) {
-            /* Extract the keyword */
+            nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
+            if (nKwrd == PH7_TKWRD_INT || nKwrd == PH7_TKWRD_STRING || nKwrd == PH7_TKWRD_FLOAT || nKwrd == PH7_TKWRD_ARRAY || nKwrd == PH7_TKWRD_OBJECT) {
+              iAttrflags |= PH7_CLASS_ATTR_FIXEDTYPE;
+              pGen->pIn++; /* Jump the type */
+            }
+          }
+
+
+          if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)) {
+
             nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
             if (nKwrd == PH7_TKWRD_PUBLIC || nKwrd == PH7_TKWRD_PRIVATE || nKwrd == PH7_TKWRD_PROTECTED) {
               iProtection = nKwrd;
@@ -5561,6 +5605,7 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
           }
           /* Extract the keyword */
           nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
+
         } else if (nKwrd == PH7_TKWRD_ABSTRACT) {
           /* Abstract method,record that */
           iAttrflags |= PH7_CLASS_ATTR_ABSTRACT;
@@ -5619,7 +5664,14 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
             goto done;
           }
           nKwrd = PH7_TKWRD_FUNCTION;
-        }
+        } else if (nKwrd == PH7_TKWRD_INT || nKwrd == PH7_TKWRD_STRING || nKwrd == PH7_TKWRD_FLOAT || nKwrd == PH7_TKWRD_ARRAY || nKwrd == PH7_TKWRD_OBJECT) {
+          
+          pGen->pIn++;
+          //fprintf(stderr,"fixed type attribute\n");
+          iAttrflags |= PH7_CLASS_ATTR_FIXEDTYPE;
+          continue;
+        } 
+
         if (nKwrd != PH7_TKWRD_FUNCTION && nKwrd != PH7_TKWRD_VAR) {
           rc = PH7_GenCompileError(pGen, E_ERROR, pGen->pIn->nLine,
                                    "Unexpected token '%z',Expecting method declaration inside class '%z'",
@@ -5642,7 +5694,9 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
             goto done;
           }
           /* Attribute declaration */
+            
           rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
+          
         } else {
           /* Process method declaration */
           rc = GenStateCompileClassMethod(&(*pGen), iProtection, iAttrflags, TRUE, pClass);
@@ -5656,6 +5710,7 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
       }
     } else {
       /* Attribute declaration */
+    
       rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
       if (rc != SXRET_OK) {
         if (rc == SXERR_ABORT) {
