@@ -109,6 +109,7 @@ static Keyword aKeywordTable[] = {
   { "as",              "PH7_TKWRD_AS", 1, 5 },
   { "continue",        "PH7_TKWRD_CONTINUE", 1, 0 },
   { "endif",           "PH7_TKWRD_ENDIF", 1, 0 },
+  { "fn",              "PH7_TKWRD_FUNCTION", 1, 0 },
   { "function",        "PH7_TKWRD_FUNCTION", 1, 0 },
   { "endwhile",        "PH7_TKWRD_ENDWHILE", 1, 0 },
   { "while",           "PH7_TKWRD_WHILE", 1, 0 },
