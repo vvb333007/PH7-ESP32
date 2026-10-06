@@ -2745,7 +2745,7 @@ static sxi32 InternFormat(ProcConsumer xConsumer, void *pUserData, const char *z
     { 'i', 10, SXFLAG_SIGNED, SXFMT_RADIX, "0123456789", 0 },
     { 'n', 0, 0, SXFMT_SIZE, 0, 0 },
     { '%', 0, 0, SXFMT_PERCENT, 0, 0 },
-    { 'p', 10, 0, SXFMT_RADIX, "0123456789", 0 }
+    { 'p', 10, 0, SXFMT_RADIX, "0123456789", 0 } 
   };
   int c;                   /* Next character in the format string */
   char *bufpt;             /* Pointer to the conversion buffer */

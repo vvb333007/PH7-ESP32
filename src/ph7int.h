@@ -790,6 +790,13 @@ struct ph7_value {
 #define MEMOBJ_OBJ 0x080       /* Memory value is an object [i.e: class instance] */
 #define MEMOBJ_RES 0x100       /* Memory value is a resource [User private data] */
 #define MEMOBJ_REFERENCE 0x400 /* Memory value hold a reference (64-bit index) of another ph7_value */
+#define MEMOBJ_FIXEDTYPE 0x800    /* TODO: Type is locked and can not be changed.
+                                  This flag is examined by STORE opeartions which store to a typed
+                                  class attribute */
+#define MEMOBJ_NULLABLE 0x1000 /* Memory value is fixed type but can be null */
+
+
+
 /* Mask of all known types */
 #define MEMOBJ_ALL (MEMOBJ_STRING | MEMOBJ_INT | MEMOBJ_REAL | MEMOBJ_BOOL | MEMOBJ_NULL | MEMOBJ_HASHMAP | MEMOBJ_OBJ | MEMOBJ_RES)
 /* Scalar variables
