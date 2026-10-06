@@ -225,7 +225,33 @@ Do fallback only if there is only 1 candidate~~
 
 ~~Implement a nullsafe arrow operator, which loads NULL. Change the behaviour of -> to generate a VM error if operating on null~~
 
+### 21. Compiler intrinsics: add math functions as opcode
 
+This is required in order to minimize expensive OP_CALL operations on FFI math functions:
+abs()       -> OP_ABS
+ceil()      -> OP_CEIL
+floor()     -> OP_FLOOR
+round()     -> OP_ROUND
+sqrt()      -> OP_SQRT
+
+sin()       -> OP_SIN
+cos()       -> OP_COS
+tan()       -> OP_TAN
+asin()      -> OP_ASIN
+acos()      -> OP_ACOS
+atan()      -> OP_ATAN
+
+sinh()      -> OP_SINH
+cosh()      -> OP_COSH
+tanh()      -> OP_TANH
+asinh()     -> OP_ASINH
+acosh()     -> OP_ACOSH
+atanh()     -> OP_ATANH
+
+exp()       -> OP_EXP
+expm1()     -> OP_EXPM1
+log()       -> OP_LOG
+log10()     -> OP_LOG10
 
 
 
