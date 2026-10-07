@@ -3541,10 +3541,13 @@ static sxi32 VmByteCodeExec(
                 }
               } else {
                 sxu32 nOfft;
-                if ((pKey->iFlags & MEMOBJ_INT)) {
+
+                // TODO: ??? BUG: ?
+                if ((pKey->iFlags & MEMOBJ_INT) == 0) {
                   /* Force an int cast */
                   PH7_MemObjToInteger(pKey);
                 }
+
                 nOfft = (sxu32)pKey->x.iVal;
                 if (nOfft < SyBlobLength(&pObj->sBlob) && SyBlobLength(&pTos->sBlob) > 0) {
                   const char *zBlob = (const char *)SyBlobData(&pTos->sBlob);
@@ -4771,7 +4774,7 @@ static sxi32 VmByteCodeExec(
           SyStringInitFromBuf(&s1, SyBlobData(&pNos->sBlob), SyBlobLength(&pNos->sBlob));
           SyStringInitFromBuf(&s2, SyBlobData(&pTos->sBlob), SyBlobLength(&pTos->sBlob));
           rc = SyStringCmp(&s1, &s2, SyMemcmp);
-          if (pInstr->iOp == PH7_OP_NEQ) {
+          if (pInstr->iOp == PH7_OP_SNE) { //BUG:
             rc = rc != 0;
           } else {
             rc = rc == 0;
@@ -5372,6 +5375,19 @@ static sxi32 VmByteCodeExec(
                         fprintf(stderr,"Fixed type conversion %d on %s attr requested\n",pObjAttr->pAttr->iFlags, pObjAttr->pAttr->iFlags & PH7_CLASS_ATTR_STATIC ? "static" : "dynamic");
 #endif
                         pValue->iFlags |= MEMOBJ_FIXEDTYPE;
+                        if (pObjAttr->pAttr->nType == PH7_TKWRD_CALLABLE) {
+                          pValue->iFlags |= MEMOBJ_CALLABLE;
+#if FIXEDTYPELOG
+                          fprintf(stderr,"callable Fixed type propagated to the memobj\n");
+#endif
+                        }
+
+                        if (pObjAttr->pAttr->iFlags & PH7_CLASS_ATTR_NULLABLE) {
+                          pValue->iFlags |= MEMOBJ_NULLABLE;
+#if FIXEDTYPELOG
+                          fprintf(stderr,"nullable Fixed type propagated to the memobj\n");
+#endif
+                        }
                       }
 
                       
