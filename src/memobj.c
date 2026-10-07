@@ -616,16 +616,20 @@ PH7_PRIVATE sxi32 PH7_MemObjCastTo(ph7_value *pNos, sxi32 iFlags, sxi32 nType) {
     /* Types are different: prefer the type of the class attribute 
     */
     ProcMemObjCast xCast;
-    if (nType == PH7_TKWRD_CALLABLE) xCast = PH7_MemObjToCallable; else
-    if (iFlags & MEMOBJ_INT)     xCast = PH7_MemObjToInteger; else
-    if (iFlags & MEMOBJ_STRING)  xCast = PH7_MemObjToString; else
-    if (iFlags & MEMOBJ_REAL)    xCast = PH7_MemObjToReal; else
-    if (iFlags & MEMOBJ_BOOL)    xCast = PH7_MemObjToBool; else
-    if (iFlags & MEMOBJ_HASHMAP) xCast = PH7_MemObjToHashmap; else
-    if (iFlags & MEMOBJ_OBJ)     xCast = PH7_MemObjToObject; else return SXERR_INVALID;
+    /* TODO: nullable */
+    if (iFlags & MEMOBJ_CALLABLE) xCast = PH7_MemObjToCallable; else
+    if (iFlags & MEMOBJ_INT)      xCast = PH7_MemObjToInteger; else
+    if (iFlags & MEMOBJ_STRING)   xCast = PH7_MemObjToString; else
+    if (iFlags & MEMOBJ_REAL)     xCast = PH7_MemObjToReal; else
+    if (iFlags & MEMOBJ_BOOL)     xCast = PH7_MemObjToBool; else
+    if (iFlags & MEMOBJ_HASHMAP)  xCast = PH7_MemObjToHashmap; else
+    if (iFlags & MEMOBJ_OBJ)      xCast = PH7_MemObjToObject; else return SXERR_INVALID;
 
 
     xCast(pNos);
+#if FIXEDTYPELOG
+    fprintf(stderr,"type converted\n");
+#endif
   }
 
   return SXRET_OK;
