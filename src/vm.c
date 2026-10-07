@@ -3542,8 +3542,8 @@ static sxi32 VmByteCodeExec(
               } else {
                 sxu32 nOfft;
 
-                // TODO: ??? BUG: ?
-                if ((pKey->iFlags & MEMOBJ_INT) == 0) {
+   
+                if ((pKey->iFlags & MEMOBJ_INT) == 0) { // BUG:
                   /* Force an int cast */
                   PH7_MemObjToInteger(pKey);
                 }
