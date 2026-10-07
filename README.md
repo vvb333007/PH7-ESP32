@@ -6,7 +6,7 @@
 ### Memory footprint: requires about 100KiB of memory for the Engine plus ~180 KiB per virtual machine; Running PH8 without external RAM is barely possible. Modern ESP32 chips are all equipped with plenty of PSRAM (4..8MiB)
 
 
-### Work in progress. [A roadmap](https://github.com/vvb333007/PH8-ESP32/blob/master/TODO.md)
+### Work in progress. [A roadmap](https://github.com/vvb333007/PH7-ESP32/blob/master/TODO.md)
 ### Lanuage/Engine changes:
 
 
