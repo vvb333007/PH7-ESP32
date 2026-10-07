@@ -1,12 +1,19 @@
-## Briefly:
+## In short
 
-In PH8, declared type is **not a restriction** of the value and **not a check** of its original type, but an instruction for the virtual machine, **to which representation the value should be converted**.
+In PH8, declared types are guarantees, not restrictions. The runtime automatically converts values when necessary to preserve those guarantees.
 
-VM always converts the value to the declared type, when this is possible, and the same rules are used both for function arguments and for return values.
+### PH8 Type Guarantees
 
-`mixed` means no conversion - the value is passed as it is, while nullable types (`?T`) allow `null` to pass without changes.
+ * **Input Guarantee** — the callee trusts its inputs
+  Code inside a function or method can rely on the declared types of its arguments, regardless of what the caller actually passes.
 
-A type error happens not simply because the original value had a *wrong* type, but because the value obtained after conversion cannot be correctly used.
+ * **Output Guarantee** — the caller trusts the result
+Code calling a function or method can rely on the declared return type, regardless of what the function actually produces.
+
+ * **Encapsulated Data-Type Guarantee** — class members trust their sibling properties
+Methods and other members of a class can rely on the declared types of the object's properties. A typed property always contains a value of its declared type, regardless of how the value was assigned.
+
+
 
 ## More details
 
