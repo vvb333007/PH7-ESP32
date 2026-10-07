@@ -428,6 +428,33 @@ PH7_PRIVATE sxi32 PH7_MemObjToString(ph7_value *pObj) {
   }
   return rc;
 }
+
+/*
+ * Convert a ph7_value to a 'callable'.
+ */
+PH7_PRIVATE sxi32 PH7_MemObjToCallable(ph7_value *pObj) {
+
+  sxi32 rc = SXRET_OK;
+  fprintf(stderr,"memobj to callable requested\n");
+
+  if ((pObj->iFlags & (MEMOBJ_STRING|MEMOBJ_HASHMAP)) != 0) {
+    if (PH7_VmIsCallable(pObj->pVm, pObj, FALSE)) {
+      fprintf(stderr,"converted to a callable\n");
+      return rc;
+    }
+  }
+
+  PH7_MemObjRelease(pObj);
+  SyBlobAppend(&pObj->sBlob, "__badcallable", sizeof("__badcallable") - 1);
+  MemObjSetType(pObj, MEMOBJ_STRING);
+
+  fprintf(stderr,"converted to __badcallable\n");
+
+  return rc;
+}
+
+
+
 /*
  * Nullify a ph7_value.In other words invalidate any prior
  * representation.
@@ -561,6 +588,49 @@ PH7_PRIVATE ProcMemObjCast PH7_MemObjCastMethod(sxi32 iFlags) {
   /* NULL cast */
   return PH7_MemObjToNull;
 }
+
+
+/* Cast ph7_value pNos to the type of pObj
+ * This function is used by the VmByteCodeExcec when dealing with a typed class attributes (e.g. public static string $attr;)
+ * In PH8 this type is a compiler hint: when VM executes $class->$attr = 10, it will autoconvert 10 to '10' bofore storing to the 
+ * class member;
+ *
+ * Returns SXERR_INVALID if pNos can not be cast to the type of pObj. This may happen
+ * if pObj is of type 'resource'. Since 'resource' it is usually a raw C pointer, we can
+ * not let type overwrite here (see how and where this function is used, to protect types
+ * of typed object attributes); SXERR_INVALID means that it is impossible to assign pNos to pObj
+ * and keep pObj type intact. This error code should be considered fatal by the VmByteCodeExec()
+ *
+ * Returns SXRET_OK if subsequent
+ */
+PH7_PRIVATE sxi32 PH7_MemObjCastTo(ph7_value *pNos, sxi32 iFlags, sxi32 nType) {
+
+  if ((iFlags & MEMOBJ_NULLABLE) && (pNos->iFlags & MEMOBJ_NULL)) {
+    /* null to nullable -- no conversion
+     * TODO: this not gonna work as wtoring NULL will change the object type
+     *       so subsequent stores will all be discarded */
+  } else if (((iFlags & MEMOBJ_ALL) == (pNos->iFlags & MEMOBJ_ALL)) && (nType != PH7_TKWRD_CALLABLE)) {
+    /* same types -- no conversion */
+    
+  } else {
+    /* Types are different: prefer the type of the class attribute 
+    */
+    ProcMemObjCast xCast;
+    if (nType == PH7_TKWRD_CALLABLE) xCast = PH7_MemObjToCallable; else
+    if (iFlags & MEMOBJ_INT)     xCast = PH7_MemObjToInteger; else
+    if (iFlags & MEMOBJ_STRING)  xCast = PH7_MemObjToString; else
+    if (iFlags & MEMOBJ_REAL)    xCast = PH7_MemObjToReal; else
+    if (iFlags & MEMOBJ_BOOL)    xCast = PH7_MemObjToBool; else
+    if (iFlags & MEMOBJ_HASHMAP) xCast = PH7_MemObjToHashmap; else
+    if (iFlags & MEMOBJ_OBJ)     xCast = PH7_MemObjToObject; else return SXERR_INVALID;
+
+
+    xCast(pNos);
+  }
+
+  return SXRET_OK;
+}
+
 /*
  * Check whether the ph7_value is numeric [i.e: int/float/bool] or looks
  * like a numeric number [i.e: if the ph7_value is of type string.].
@@ -830,9 +900,9 @@ PH7_PRIVATE sxi32 PH7_MemObjStore(ph7_value *pSrc, ph7_value *pDest) {
   } else if (pSrc->iFlags & MEMOBJ_OBJ) {
     /* Increment reference count */
 
-    int i = ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
+    ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
 #if ADDREFLOG
-    fprintf(stderr,"iRef++ (%d) after MemObjStore()\n", i + 1);
+    fprintf(stderr,"iRef++ (%qd) after MemObjStore()\n", ((ph7_class_instance *)pSrc->x.pOther)->iRef);
 #endif
   }
   if (pDest->iFlags & MEMOBJ_HASHMAP) {
@@ -871,9 +941,9 @@ PH7_PRIVATE sxi32 PH7_MemObjLoad(ph7_value *pSrc, ph7_value *pDest) {
     
   } else if (pSrc->iFlags & MEMOBJ_OBJ) {
     /* Increment reference count */
-    int i = ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
+    ((ph7_class_instance *)pSrc->x.pOther)->iRef++;
 #if ADDREFLOG
-    fprintf(stderr,"iRef++ (%d) after MemObjLoad()\n",i + 1);
+    fprintf(stderr,"iRef++ (%qd) after MemObjLoad()\n",((ph7_class_instance *)pSrc->x.pOther)->iRef);
 #endif
   }
   if (SyBlobLength(&pDest->sBlob) > 0) {

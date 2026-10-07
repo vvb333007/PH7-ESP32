@@ -4583,33 +4583,35 @@ Synchronize:
 
 /*
  * complie a class attribute or Properties in the PHP jargon.
- * According to the PHP language reference manual
- *  Properties
- *  Class member variables are called "properties". You may also see them referred
- *  to using other terms such as "attributes" or "fields", but for the purposes
- *  of this reference we will use "properties". They are defined by using one
- *  of the keywords public, protected, or private, followed by a normal variable
- *  declaration. This declaration may include an initialization, but this initialization
- *  must be a constant value--that is, it must be able to be evaluated at compile time
- *  and must not depend on run-time information in order to be evaluated. 
- * Symisc eXtension.
- *  PH7 allow any complex expression to be associated with the attribute while
- *  the zend engine would allow only simple scalar value.
- *  Example: 
- *   class Test{
- *        public static ?int $myVar = "Hello"."world: ".rand_str(3); //concatenation operation + Function call
- *   };
- *   var_dump(TEST::myVar);
- *   Refer to the official documentation for more information on the powerful extension
- *   introduced by the PH7 engine to the OO subsystem.
+ *
+ * iProtection: one of (PH7_CLASS_PROT_PUBLIC, PH7_CLASS_PROT_PROTECTED or PH7_CLASS_PROT_PRIVATE)
+ * iFlags: bitwise ORed PH7_CLASS_ATTR_... flags
+ * nType is one of PH7_TKWRD_(INT, FLOAT, CALLABLE, STRING...) and is used
+ * only if (iFlags & PH7_CLASS_ATTR_FIXEDTYPE) is set
+ *
  */
-static sxi32 GenStateCompileClassAttr(ph7_gen_state *pGen, sxi32 iProtection, sxi32 iFlags, ph7_class *pClass) {
+static sxi32 GenStateCompileClassAttr(ph7_gen_state *pGen, sxi32 iProtection, sxi32 iFlags, sxi32 nType, ph7_class *pClass) {
+
   sxu32 nLine = pGen->pIn->nLine;
+
   ph7_class_attr *pAttr;
   SyString *pName;
   sxi32 rc;
+
   /* Extract visibility level */
   iProtection = GetProtectionLevel(iProtection);
+
+  /* Filter unsupported pseudotypes  */
+  if (iFlags & PH7_CLASS_ATTR_FIXEDTYPE) {
+    if ((nType & PH7_TKWRD_MIXED) != 0) {
+#if FIXEDTYPELOG
+      fprintf(stderr,"CompileClassAttr: type 'mixed', remove fixedtype property\n");
+#endif
+      iFlags &= ~PH7_CLASS_ATTR_FIXEDTYPE;
+      nType = 0;
+    } 
+  }
+
 loop:
   pGen->pIn++; /* Jump the dollar sign */
   if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & (PH7_TK_KEYWORD | PH7_TK_ID)) == 0) {
@@ -4634,13 +4636,22 @@ loop:
     }
     goto Synchronize;
   }
-  /* Allocate a new class attribute */
+  /* Allocate a new class attribute 
+  */
   pAttr = PH7_NewClassAttr(pGen->pVm, pName, nLine, iProtection, iFlags);
   if (pAttr == 0) {
     //PH7_GenCompileError(pGen, E_ERROR, nLine, "Fatal, PH7 engine is running out of memory");
     PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
+  /* Occupy nLine member. */
+  if (nType) {
+    pAttr->nType = nType;
+#if FIXEDTYPELOG
+    fprintf(stderr,"CompileClassAttr: created a fixed-type (%08x) attr\n", nType);
+#endif
+  }
+
   if (pGen->pIn->nType & PH7_TK_EQUAL /*'='*/) {
     SySet *pInstrContainer;
     pGen->pIn++; /*Jump the equal sign */
@@ -4651,7 +4662,7 @@ loop:
      */
     rc = PH7_CompileExpr(&(*pGen), EXPR_FLAG_COMMA_STATEMENT, 0);
     if (rc == SXERR_EMPTY) {
-      rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Attribute '%z': Missing default value", pName);
+      rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Attribute '%z': an expression is expected after '='", pName);
       if (rc == SXERR_ABORT) {
         return SXERR_ABORT;
       }
@@ -5302,6 +5313,7 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
   sxi32 iProtection;
   SySet aInterfaces;
   sxi32 iAttrflags;
+  sxi32 iFixedType;
   SyString *pName;
   sxi32 nKwrd;
   sxi32 rc;
@@ -5486,6 +5498,7 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
     /* Assume public visibility */
     iProtection = PH7_TKWRD_PUBLIC;
     iAttrflags = 0;
+    iFixedType = 0;
     
     if (pGen->pIn->nType & PH7_TK_KEYWORD) {
       /* Extract the current keyword */
@@ -5506,7 +5519,7 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
 
 
         if (pGen->pIn->sData.zString[0] == '?') {
-          fprintf(stderr,"nullable type attribute\n");
+          //fprintf(stderr,"nullable type attribute\n");
           iAttrflags |= PH7_CLASS_ATTR_NULLABLE;
           pGen->pIn++; /* Jump the '?' token */
           if (pGen->pIn >= pGen->pEnd)  break;
@@ -5516,9 +5529,12 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
         if (pGen->pIn->nType & PH7_TK_KEYWORD) {
           nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
 
-          if (nKwrd == PH7_TKWRD_INT || nKwrd == PH7_TKWRD_STRING || nKwrd == PH7_TKWRD_FLOAT || nKwrd == PH7_TKWRD_ARRAY || nKwrd == PH7_TKWRD_OBJECT) {
+          if ((nKwrd & VM_FUNC_RET_MASK) != 0) {
+#if FIXEDTYPELOG
             fprintf(stderr,"fixed type attribute\n");
+#endif
             iAttrflags |= PH7_CLASS_ATTR_FIXEDTYPE;
+            iFixedType = nKwrd;
             pGen->pIn++; /* Jump the type */
             if (pGen->pIn >= pGen->pEnd)  break;
           }
@@ -5526,7 +5542,8 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
     
         if (pGen->pIn->nType & PH7_TK_DOLLAR) {
           /* Attribute declaration */
-          rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
+//1
+          rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, iFixedType, pClass);
           if (rc != SXRET_OK) {
             if (rc == SXERR_ABORT) {
               return SXERR_ABORT;
@@ -5567,8 +5584,12 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
 
           if (pGen->pIn < pGen->pEnd && (pGen->pIn->nType & PH7_TK_KEYWORD)) {
             nKwrd = SX_PTR_TO_INT(pGen->pIn->pUserData);
-            if (nKwrd == PH7_TKWRD_INT || nKwrd == PH7_TKWRD_STRING || nKwrd == PH7_TKWRD_FLOAT || nKwrd == PH7_TKWRD_ARRAY || nKwrd == PH7_TKWRD_OBJECT) {
+            if ((nKwrd & VM_FUNC_RET_MASK) != 0) {
+#if FIXEDTYPELOG
+              fprintf(stderr,"fixed type attribute\n");
+#endif
               iAttrflags |= PH7_CLASS_ATTR_FIXEDTYPE;
+              iFixedType = nKwrd;
               pGen->pIn++; /* Jump the type */
             }
           }
@@ -5594,7 +5615,8 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
           }
           if (pGen->pIn->nType & PH7_TK_DOLLAR) {
             /* Attribute declaration */
-            rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
+//2
+            rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, iFixedType, pClass);
             if (rc != SXRET_OK) {
               if (rc == SXERR_ABORT) {
                 return SXERR_ABORT;
@@ -5667,8 +5689,11 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
         } else if (nKwrd == PH7_TKWRD_INT || nKwrd == PH7_TKWRD_STRING || nKwrd == PH7_TKWRD_FLOAT || nKwrd == PH7_TKWRD_ARRAY || nKwrd == PH7_TKWRD_OBJECT) {
           
           pGen->pIn++;
-          //fprintf(stderr,"fixed type attribute\n");
+#if FIXEDTYPELOG
+          fprintf(stderr,"fixed type attribute\n");
+#endif
           iAttrflags |= PH7_CLASS_ATTR_FIXEDTYPE;
+          iFixedType = nKwrd;
           continue;
         } 
 
@@ -5694,8 +5719,8 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
             goto done;
           }
           /* Attribute declaration */
-            
-          rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
+//3            
+          rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, iFixedType, pClass);
           
         } else {
           /* Process method declaration */
@@ -5710,8 +5735,8 @@ static sxi32 GenStateCompileClass(ph7_gen_state *pGen, sxi32 iFlags) {
       }
     } else {
       /* Attribute declaration */
-    
-      rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, pClass);
+//4    
+      rc = GenStateCompileClassAttr(&(*pGen), iProtection, iAttrflags, iFixedType, pClass);
       if (rc != SXRET_OK) {
         if (rc == SXERR_ABORT) {
           return SXERR_ABORT;

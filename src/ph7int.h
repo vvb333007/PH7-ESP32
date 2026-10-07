@@ -781,14 +781,14 @@ struct ph7_value {
 };
 /* Allowed value types.
  */
-#define MEMOBJ_STRING 0x001    /* Memory value is a UTF-8 string */
-#define MEMOBJ_INT 0x002       /* Memory value is an integer */
-#define MEMOBJ_REAL 0x004      /* Memory value is a real number */
-#define MEMOBJ_BOOL 0x008      /* Memory value is a boolean */
-#define MEMOBJ_NULL 0x020      /* Memory value is NULL */
-#define MEMOBJ_HASHMAP 0x040   /* Memory value is a hashmap aka 'array' in the PHP jargon */
-#define MEMOBJ_OBJ 0x080       /* Memory value is an object [i.e: class instance] */
-#define MEMOBJ_RES 0x100       /* Memory value is a resource [User private data] */
+#define MEMOBJ_STRING    0x001    /* Memory value is a UTF-8 string */
+#define MEMOBJ_INT       0x002       /* Memory value is an integer */
+#define MEMOBJ_REAL      0x004      /* Memory value is a real number */
+#define MEMOBJ_BOOL      0x008      /* Memory value is a boolean */
+#define MEMOBJ_NULL      0x020      /* Memory value is NULL */
+#define MEMOBJ_HASHMAP   0x040   /* Memory value is a hashmap aka 'array' in the PHP jargon */
+#define MEMOBJ_OBJ       0x080       /* Memory value is an object [i.e: class instance] */
+#define MEMOBJ_RES       0x100       /* Memory value is a resource [User private data] */
 #define MEMOBJ_REFERENCE 0x400 /* Memory value hold a reference (64-bit index) of another ph7_value */
 #define MEMOBJ_FIXEDTYPE 0x800    /* TODO: Type is locked and can not be changed.
                                   This flag is examined by STORE opeartions which store to a typed
@@ -1158,13 +1158,12 @@ struct ph7_vm_func_closure_env {
  * Compiler stores return function type (if set) into iFlags field (ORed) when VM_FUNC_RET_TYPE is set: this 
  * is PHP7.x syntax for function return types (e.g. :void or :int)
  *
- * WARNING: VM_FUNC_RET_MASK must not occupy lower byte, where VM_FUNC_ values are stored
+ * WARNING: VM_FUNC_RET_MASK must not occupy lower 9bits, where VM_FUNC_ values are stored
  */
 #define VM_FUNC_RET_MASK \
   (PH7_TKWRD_ARRAY | PH7_TKWRD_BOOL | PH7_TKWRD_INT | \
    PH7_TKWRD_FLOAT | PH7_TKWRD_STRING | PH7_TKWRD_OBJECT | \
    PH7_TKWRD_VOID | PH7_TKWRD_MIXED | PH7_TKWRD_CALLABLE)
-
 
 
 /* Valid types for enums */
@@ -1256,7 +1255,10 @@ struct ph7_class_attr {
   sxi32 iProtection; /* Protection level [i.e: public, private, protected] */
   SySet aByteCode;   /* Compiled attribute body */
   sxu32 nIdx;        /* Attribute index */
-  sxu32 nLine;       /* Line number on which this attribute was defined */
+  union {
+    sxu32 nLine;       /* Line number on which this attribute was defined */
+    sxu32 nType;       /* one of PH7_TKWRD_(INT,FLOAT,STRING..etc), overwrites nLine for typed attributes */
+  };
 };
 /* Attribute configuration */
 #define PH7_CLASS_ATTR_STATIC    0x001 /* Static attribute */
@@ -1266,13 +1268,13 @@ struct ph7_class_attr {
 #define PH7_CLASS_ATTR_ENUM      0x010 /* Used by GenStateCompileEnum() to hint the compiler (..CompileConst) to not require = RVALUE */
 #define PH7_CLASS_ATTR_FIXEDTYPE 0x020 /* Fixed type attribute (assignment will do typecast) */
 #define PH7_CLASS_ATTR_NULLABLE  0x040 /* Fixed type nullable attribute (assignment will do typecast) */
+
+#define PH7_CLASS_ATTR_TYPEMASK  0xffffff00 /* Fixed type attribute: declared type: PH7_TKWRD_INT etc */
+
+
 /* 
  * Each class method is parsed out and stored in an instance of the following
  * structure.
- * PH7 introduced some powerfull extensions to the PHP 5 programming
- * language like function overloading,type hinting,complex default
- * arguments and many more.
- * Please refer to the official documentation for more information.
  */
 struct ph7_class_method {
   ph7_vm_func sFunc; /* Compiled method body */
@@ -1827,6 +1829,7 @@ PH7_PRIVATE sxi32 PH7_MemObjInitFromInt(ph7_vm *pVm, ph7_value *pObj, sxi64 iVal
 PH7_PRIVATE sxi32 PH7_MemObjInitFromBool(ph7_vm *pVm, ph7_value *pObj, sxi32 iVal);
 PH7_PRIVATE sxi32 PH7_MemObjInit(ph7_vm *pVm, ph7_value *pObj);
 PH7_PRIVATE sxi32 PH7_MemObjStringAppend(ph7_value *pObj, const char *zData, sxu32 nLen);
+PH7_PRIVATE int PH7_MemObjCastTo(ph7_value *pTos, sxi32 iFlags, sxi32 nType);
 #if 0
 /* Not used in the current release of the PH7 engine */
 PH7_PRIVATE sxi32 PH7_MemObjStringFormat(ph7_value *pObj,const char *zFormat,va_list ap);
@@ -1853,6 +1856,7 @@ PH7_PRIVATE sxi32 PH7_MemObjIsEmpty(ph7_value *pObj);
 PH7_PRIVATE sxi32 PH7_MemObjToHashmap(ph7_value *pObj);
 PH7_PRIVATE sxi32 PH7_MemObjToObject(ph7_value *pObj);
 PH7_PRIVATE sxi32 PH7_MemObjToString(ph7_value *pObj);
+PH7_PRIVATE sxi32 PH7_MemObjToCallable(ph7_value *pObj);
 PH7_PRIVATE sxi32 PH7_MemObjToNull(ph7_value *pObj);
 PH7_PRIVATE sxi32 PH7_MemObjToReal(ph7_value *pObj);
 PH7_PRIVATE sxi32 PH7_MemObjToInteger(ph7_value *pObj);
@@ -2186,5 +2190,5 @@ int uname(struct utsname *out);
 
 _Static_assert((VM_FUNC_RET_MASK & 0xffffff00) == VM_FUNC_RET_MASK);
 _Static_assert(VM_MAX_NESTING_DEPTH > VM_THROW_RESERVE_NESTING);
-
+_Static_assert((0xfffffe00 & VM_FUNC_RET_MASK) == (0xffffffff & VM_FUNC_RET_MASK));
 

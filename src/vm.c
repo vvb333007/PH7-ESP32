@@ -3440,26 +3440,19 @@ static sxi32 VmByteCodeExec(
               /* Point to the desired memory object */
               pObj = (ph7_value *)SySetAt(&pVm->aMemObj, nIdx);
               if (pObj) {
-                /* Perform the store operation */
-                /* TODO: for typed properties check if types are covertible, covert right operand to the typeof(left)
-                 * and then store. Otherwise member attribute may change its type in _STORE operations
+                /* Perform the store operation
+                 * For typed properties check if types are covertible, covert right operand to the 
+                 * typeof(left) and then store. Otherwise member attribute may change its type in 
+                 * _STORE operations
+                 * TODO: store requested type somewhere in ph7_value so we can autocast types like "callable"
+                 
                  */
-                    if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
-                      if ((pObj->iFlags & MEMOBJ_NULLABLE) && (pTos->iFlags & MEMOBJ_NULL)) {
-                        // null to nullable -- no conversion
-                        // TODO: this not gonna work as wtoring NULL will change the object type
-                        //       so subsequent stores will all be discarded
-                      } else if ((pObj->iFlags & MEMOBJ_ALL) == (pTos->iFlags & MEMOBJ_ALL)) {
-                        // same types -- no conversion
-                      } else {
-                        // Types are different: prefer the type of the class attribute 
-                        //
-                        //fprintf(stderr, "Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pTos), PH7_MemObjTypeDump(pObj));
-                        ProcMemObjCast xCast = PH7_MemObjCastMethod(pObj->iFlags);
-                        xCast(pTos);
-                      }
-                    }
-
+                if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+#if FIXEDTYPELOG
+                  fprintf(stderr, "= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pTos), PH7_MemObjTypeDump(pObj));
+#endif
+                  PH7_MemObjCastTo(pTos,pObj->iFlags,0);
+                }
                 PH7_MemObjStore(pTos, pObj);
               }
             }
@@ -3799,13 +3792,22 @@ static sxi32 VmByteCodeExec(
             pNos->x.iVal = r;
             MemObjSetType(pNos, MEMOBJ_INT);
           }
+
           if (pInstr->iOp == PH7_OP_MUL_STORE) {
             ph7_value *pObj;
+
             if (pTos->nIdx == SXU32_HIGH) {
 
               VM_EXCEPTION_GOTO("__typeerror",11,"'*=': can not assign: expression on the left is a constant [PC: %08x]", pc)
 
             } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
+
+              if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+#if FIXEDTYPELOG
+                fprintf(stderr, "*= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
+#endif
+                PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+              }
               PH7_MemObjStore(pNos, pObj);
             }
           }
@@ -3851,6 +3853,12 @@ static sxi32 VmByteCodeExec(
             VM_EXCEPTION_GOTO("__typeerror",11,"'+=': can not assign: expression on the left is a constant [PC: %08x]", pc)
 
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, nIdx)) != 0) {
+            if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+#if FIXEDTYPELOG
+              fprintf(stderr, "+= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pTos), PH7_MemObjTypeDump(pObj));
+#endif
+              PH7_MemObjCastTo(pTos,pObj->iFlags,0);
+            }
             PH7_MemObjStore(pTos, pObj);
           }
           /* Ticket 1433-35: Perform a stack dup */
@@ -3945,6 +3953,12 @@ static sxi32 VmByteCodeExec(
             VM_EXCEPTION_GOTO("__typeerror",11,"'-=': can not assign: expression on the left is a constant [PC: %08x]", pc)
 
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
+            if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+#if FIXEDTYPELOG
+              fprintf(stderr, "-= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
+#endif
+              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+            }
             PH7_MemObjStore(pNos, pObj);
           }
           VmPopOperand(&pTos, 1);
@@ -4031,6 +4045,12 @@ static sxi32 VmByteCodeExec(
           if (pTos->nIdx == SXU32_HIGH) {
             VM_EXCEPTION_GOTO("__typeerror",11,"'%=': can not assign: expression on the left is a constant [PC: %08x]", pc)
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
+            if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+#if FIXEDTYPELOG
+              fprintf(stderr, "%= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
+#endif
+              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+            }
             PH7_MemObjStore(pNos, pObj);
           }
           VmPopOperand(&pTos, 1);
@@ -4124,6 +4144,12 @@ static sxi32 VmByteCodeExec(
             VM_EXCEPTION_GOTO("__typeerror",11,"'/=': can not assign: expression on the left is a constant [PC: %08x]", pc)
 
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
+            if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+#if FIXEDTYPELOG
+              fprintf(stderr, "/= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
+#endif
+              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+            }
             PH7_MemObjStore(pNos, pObj);
           }
           VmPopOperand(&pTos, 1);
@@ -4167,7 +4193,7 @@ static sxi32 VmByteCodeExec(
           a = pNos->x.iVal;
           b = pTos->x.iVal;
           switch (pInstr->iOp) {
-            case PH7_OP_BOR_STORE:
+            case PH7_OP_BOR_STORE:               // ?
             case PH7_OP_BOR: r = a | b; break;
             case PH7_OP_BXOR_STORE:
             case PH7_OP_BXOR: r = a ^ b; break;
@@ -4234,6 +4260,14 @@ static sxi32 VmByteCodeExec(
           if (pTos->nIdx == SXU32_HIGH) {
             VM_EXCEPTION_GOTO("__typeerror",11,"'|=', '^=' and '&=': can not assign: expression on the left is a constant [PC: %08x]", pc)
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
+
+            if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+#if FIXEDTYPELOG
+              fprintf(stderr, "|^&= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
+#endif
+              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+            }
+
             PH7_MemObjStore(pNos, pObj);
           }
           VmPopOperand(&pTos, 1);
@@ -4330,6 +4364,12 @@ static sxi32 VmByteCodeExec(
             VM_EXCEPTION_GOTO("__typeerror",11,"'<<=' and '>>=':  can not assign: expression on the left is a constant [PC: %08x]", pc)
 
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
+            if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+#if FIXEDTYPELOG
+              fprintf(stderr, "<<= >>= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
+#endif
+              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+            }
             PH7_MemObjStore(pNos, pObj);
           }
           VmPopOperand(&pTos, 1);
@@ -4400,6 +4440,13 @@ static sxi32 VmByteCodeExec(
             VM_EXCEPTION_GOTO("__typeerror",11,"'.=': can not assign: expression on the left is a constant [PC: %08x]", pc)
 
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
+
+            if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+#if FIXEDTYPELOG
+              fprintf(stderr, ".= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pTos), PH7_MemObjTypeDump(pObj));
+#endif
+              PH7_MemObjCastTo(pTos,pObj->iFlags,0);
+            }
             PH7_MemObjStore(pTos, pObj);
           }
           PH7_MemObjStore(pTos, pNos);
@@ -5321,7 +5368,9 @@ static sxi32 VmByteCodeExec(
                        * then we mark our MemObj as TYPE-LOCKED
                       */
                       if (pObjAttr->pAttr->iFlags & PH7_CLASS_ATTR_FIXEDTYPE) {
-                        //fprintf(stderr,"Fixed type conversion %d on %s attr\n",pObjAttr->pAttr->iFlags, pObjAttr->pAttr->iFlags & PH7_CLASS_ATTR_STATIC ? "static" : "dynamic");
+#if FIXEDTYPELOG
+                        fprintf(stderr,"Fixed type conversion %d on %s attr requested\n",pObjAttr->pAttr->iFlags, pObjAttr->pAttr->iFlags & PH7_CLASS_ATTR_STATIC ? "static" : "dynamic");
+#endif
                         pValue->iFlags |= MEMOBJ_FIXEDTYPE;
                       }
 
