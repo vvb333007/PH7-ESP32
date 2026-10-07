@@ -3278,6 +3278,7 @@ static sxi32 VmByteCodeExec(
               nOfft = (sxu32)pIdx->x.iVal;
               if (nOfft >= SyBlobLength(&pTos->sBlob)) {
                 /* Invalid offset,load null */
+                puts("Undefined index in string");
                 PH7_MemObjRelease(pTos);
               } else {
                 const char *zData = (const char *)SyBlobData(&pTos->sBlob);
