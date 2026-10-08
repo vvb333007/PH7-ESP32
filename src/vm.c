@@ -821,7 +821,7 @@ static ph7_vm_func *VmOverload(
 
   /* Put functions expecting the same number of passed arguments */
   while (i < (int)SX_ARRAYSIZE(apSet)) {
-    if (pLink == 0) {
+    if (pLink == NULL) {
       break;
     }
     if ((int)SySetUsed(&pLink->aArgs) == nArg) {
@@ -832,7 +832,7 @@ static ph7_vm_func *VmOverload(
     pLink = pLink->pNextName;
   }
 #ifdef DEVEL
-  if (pLink->pNextName != NULL) {
+  if (pLink != NULL && pLink->pNextName != NULL) {
     fprintf(stderr,"Too many candidates!\n");
   }
 #endif
@@ -943,6 +943,14 @@ static sxi32 VmMountUserClass(
       if (SySetUsed(&pAttr->aByteCode) > 0) {
         /* Initialize attribute default value (any complex expression) */
         VmLocalExec(&(*pVm), &pAttr->aByteCode, pMemObj);
+        // TODO: convert pMemObj to a required type (pAttr->nType) if it is a fixed-type attribute
+        // TODO: otherwise it is legal to declare 'public int $a = 'hello'' and get an attribute with a 'string' type
+      } else {
+        /* Unitialized attribute, record that*/
+        // TODO: Store opcodes always reset MEMOBJ_NEVERSET on every memobj they deal to
+        // TODO: Load opcodes check MEMOBJ_NEVERSET if memobj is of type MEMOBJ_FIXEDTYPE.
+        // TODO: If MEMOBJ_NEVERSET is set, then these "Load" opcodes must throw ann exception
+        pMemObj->iFlags |= MEMOBJ_NEVERSET;
       }
       /* Record attribute index */
       pAttr->nIdx = pMemObj->nIdx;
@@ -1013,9 +1021,18 @@ PH7_PRIVATE sxi32 PH7_VmCreateClassInstanceFrame(
       }
       pVmAttr->nIdx = pMemObj->nIdx;
       if (SySetUsed(&pAttr->aByteCode) > 0) {
-        /* Initialize attribute default value (any complex expression) */
+        /* Initialize attribute default value (any complex expression, exceptions are ignored) */
         VmLocalExec(&(*pVm), &pAttr->aByteCode, pMemObj);
+        // TODO: convert pMemObj to a required type (pAttr->nType) if it is a fixed-type attribute
+        // TODO: otherwise it is legal to declare 'public int $a = 'hello'' and get an attribute with a 'string' type
+      } else {
+        /* Unitialized attribute, record that*/
+        // TODO: Store opcodes always reset MEMOBJ_NEVERSET on every memobj they deal to
+        // TODO: Load opcodes check MEMOBJ_NEVERSET if memobj is of type MEMOBJ_FIXEDTYPE.
+        // TODO: If MEMOBJ_NEVERSET is set, then these "Load" opcodes must throw ann exception
+        pMemObj->iFlags |= MEMOBJ_NEVERSET;
       }
+      // TODO: SHould we set _FIXEDTYPE and friends just here? Not in OP_MEMBER/POP_MEMBER_NS?
       rc = SyHashInsert(&pObj->hAttr, SyStringData(&pAttr->sName), SyStringLength(&pAttr->sName), pVmAttr);
       if (rc != SXRET_OK) {
         VmSlot sSlot;
@@ -3124,6 +3141,7 @@ static sxi32 VmByteCodeExec(
               if (!pInstr->p3) {
                 PH7_MemObjRelease(pTos);
               } else {
+                // TODO: ??? pTos is a string now. A memory leak?
                 MemObjSetType(pTos, MEMOBJ_NULL);
               }
               pTos->nIdx = SXU32_HIGH; /* Mark as constant */
@@ -3452,7 +3470,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
                   fprintf(stderr, "= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pTos), PH7_MemObjTypeDump(pObj));
 #endif
-                  PH7_MemObjCastTo(pTos,pObj->iFlags,0);
+                  PH7_MemObjCastTo(pTos,pObj->iFlags);
                 }
                 PH7_MemObjStore(pTos, pObj);
               }
@@ -3810,7 +3828,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
                 fprintf(stderr, "*= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
 #endif
-                PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+                PH7_MemObjCastTo(pNos,pObj->iFlags);
               }
               PH7_MemObjStore(pNos, pObj);
             }
@@ -3861,7 +3879,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
               fprintf(stderr, "+= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pTos), PH7_MemObjTypeDump(pObj));
 #endif
-              PH7_MemObjCastTo(pTos,pObj->iFlags,0);
+              PH7_MemObjCastTo(pTos,pObj->iFlags);
             }
             PH7_MemObjStore(pTos, pObj);
           }
@@ -3961,7 +3979,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
               fprintf(stderr, "-= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
 #endif
-              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+              PH7_MemObjCastTo(pNos,pObj->iFlags);
             }
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4053,7 +4071,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
               fprintf(stderr, "%= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
 #endif
-              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+              PH7_MemObjCastTo(pNos,pObj->iFlags);
             }
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4152,7 +4170,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
               fprintf(stderr, "/= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
 #endif
-              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+              PH7_MemObjCastTo(pNos,pObj->iFlags);
             }
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4269,7 +4287,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
               fprintf(stderr, "|^&= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
 #endif
-              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+              PH7_MemObjCastTo(pNos,pObj->iFlags);
             }
 
             PH7_MemObjStore(pNos, pObj);
@@ -4372,7 +4390,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
               fprintf(stderr, "<<= >>= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
 #endif
-              PH7_MemObjCastTo(pNos,pObj->iFlags,0);
+              PH7_MemObjCastTo(pNos,pObj->iFlags);
             }
             PH7_MemObjStore(pNos, pObj);
           }
@@ -4449,7 +4467,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
               fprintf(stderr, ".= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pTos), PH7_MemObjTypeDump(pObj));
 #endif
-              PH7_MemObjCastTo(pTos,pObj->iFlags,0);
+              PH7_MemObjCastTo(pTos,pObj->iFlags);
             }
             PH7_MemObjStore(pTos, pObj);
           }
