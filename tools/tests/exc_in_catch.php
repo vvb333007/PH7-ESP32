@@ -23,5 +23,9 @@ try {
 
 }
 
+$a = 1;
+
+$b = $a ?: 10;
+
 echo 'Still alive!'.PHP_EOL;
 ?>
