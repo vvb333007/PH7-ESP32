@@ -1,33 +1,46 @@
 <?php
 
-function test(callable $arg): ?callable {
-  $arg();
-  return $arg;
-}
-
-function test2(?callable $arg): callable {
+function test(callable $arg): callable {
 
   return 1;
 }
 
+function test2(?callable $arg) {
+
+}
+aaa:
+
 $passed = 0;
+
+test2('test');
+echo 'PASSED STEP 1 of 3'.PHP_EOL;
+$passed++;
 
 try {
 
-  test(null);
-  echo 'Huh?'.PHP_EOL;
+  $z = test('test');
+  $z();
+  echo 'FAILED STEP 2 of 3'.PHP_EOL;
 
-} catch(Throwable $t) {
+} catch(Error $t) {
+
   global $passed;
+
   echo $t->getMessage().PHP_EOL;
+
+  echo 'PASSED STEP 2 of 3'.PHP_EOL;
   $passed++;
-  echo 'PASSED STEP 1 of 2'.PHP_EOL;
 }
+
+echo 'PASSED STEP 3 of 3'.PHP_EOL;
 $passed++;
-echo 'PASSED STEP 2 of 2'.PHP_EOL;
-if ($passed == 2)
-  echo 'PASSED!'.PHP_EOL;
+
+
+if ($passed == 3)
+  echo 'PASSED ALL TESTS!'.PHP_EOL;
 else
   echo 'FAILED!'.$passed.PHP_EOL;
+
+goto aaa;
 
 ?>

@@ -7,28 +7,43 @@ function test(?callable $arg): callable {
 }
 
 $passed = 0;
-  $a = test(null);
-  $a(1,2,3);
-
 
 try {
 
-  $a = test(null);
+//  test(null);
+  $a = (callable)1;
   $a(1,2,3);
-  echo 'FAILED!'.PHP_EOL;
+  echo 'FAILED STEP 1 of 4'.PHP_EOL;
   die();
 
 } catch(Throwable $t) {
   global $passed;
   echo $t->getMessage().PHP_EOL;
   $passed++;
-  echo 'PASSED STEP 1 of 2'.PHP_EOL;
+  echo 'PASSED STEP 1 of 4'.PHP_EOL;
 }
 $passed++;
-echo 'PASSED STEP 2 of 2'.PHP_EOL;
-if ($passed == 2)
-  echo 'PASSED!'.PHP_EOL;
+echo 'PASSED STEP 2 of 4'.PHP_EOL;
+
+try {
+
+  $a = test(null);
+  $a(1,2,3);
+  echo 'FAILED STEP 3 of 4'.PHP_EOL;
+  die();
+
+} catch(Throwable $t) {
+  global $passed;
+  echo $t->getMessage().PHP_EOL;
+  $passed++;
+  echo 'PASSED STEP 3 of 4'.PHP_EOL;
+}
+$passed++;
+echo 'PASSED STEP 4 of 4'.PHP_EOL;
+if ($passed == 4)
+  echo 'PASSED ALL TESTS!'.PHP_EOL;
 else
   echo 'FAILED!'.$passed.PHP_EOL;
+
 
 ?>
