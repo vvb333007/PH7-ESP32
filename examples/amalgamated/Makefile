@@ -1,0 +1,38 @@
+# 
+# 
+.RECIPEPREFIX := >
+
+CC      := gcc
+OBJDIR  := .
+
+CFLAGS  := -Wall -Wextra -O3 -MMD -MP -DPH7_ENABLE_THREADS=0 -DPH7_ENABLE_MATH_FUNC=1 -I../../src
+COMMON_SRC := amalgam.c
+
+INTER_SRC := $(COMMON_SRC) ph7_interp.c
+INTER_OBJ := $(patsubst %.c,$(OBJDIR)/%.o,$(INTER_SRC))
+
+TARGETS := inter
+
+.PHONY: all
+
+all: $(TARGETS)
+
+inter: $(INTER_OBJ)
+>$(CC) $(CFLAGS)  $^ -o $@
+
+
+$(OBJDIR)/%.o: %.c | $(OBJDIR)
+>$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJDIR):
+>mkdir -p $(OBJDIR)
+
+clean:
+>rm -f *.[od]
+
+
+
+
+
+
+
