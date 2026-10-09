@@ -961,11 +961,9 @@ static sxi32 VmMountUserClass(
         // TODO: convert pMemObj to a required type (pAttr->nType) if it is a fixed-type attribute
         // TODO: otherwise it is legal to declare 'public int $a = 'hello'' and get an attribute with a 'string' type
       } else {
-        /* Unitialized attribute, record that*/
-        // TODO: Store opcodes always reset MEMOBJ_NEVERSET on every memobj they deal to
-        // TODO: Load opcodes check MEMOBJ_NEVERSET if memobj is of type MEMOBJ_FIXEDTYPE.
-        // TODO: If MEMOBJ_NEVERSET is set, then these "Load" opcodes must throw ann exception
-        pMemObj->iFlags |= MEMOBJ_NEVERSET;
+        /* Unitialized static attribute, add a hint type along with NULL */
+        if (pAttr->iFlags & PH7_CLASS_ATTR_FIXEDTYPE)
+          pMemObj->iFlags = (MEMOBJ_NULL | PH7_MemObjKeywordToType(pAttr->nType));
       }
       /* Record attribute index */
       pAttr->nIdx = pMemObj->nIdx;
@@ -1042,10 +1040,9 @@ PH7_PRIVATE sxi32 PH7_VmCreateClassInstanceFrame(
         // TODO: otherwise it is legal to declare 'public int $a = 'hello'' and get an attribute with a 'string' type
       } else {
         /* Unitialized attribute, record that*/
-        // TODO: Store opcodes always reset MEMOBJ_NEVERSET on every memobj they deal to
-        // TODO: Load opcodes check MEMOBJ_NEVERSET if memobj is of type MEMOBJ_FIXEDTYPE.
-        // TODO: If MEMOBJ_NEVERSET is set, then these "Load" opcodes must throw ann exception
-        pMemObj->iFlags |= MEMOBJ_NEVERSET;
+        // TODO: This is a hack. MemObj is not designed to have NULL & string types at the same time
+        if (pAttr->iFlags & PH7_CLASS_ATTR_FIXEDTYPE)
+          pMemObj->iFlags = (MEMOBJ_NULL | PH7_MemObjKeywordToType(pAttr->nType));
       }
       // TODO: SHould we set _FIXEDTYPE and friends just here? Not in OP_MEMBER/POP_MEMBER_NS?
       rc = SyHashInsert(&pObj->hAttr, SyStringData(&pAttr->sName), SyStringLength(&pAttr->sName), pVmAttr);
@@ -5525,7 +5522,7 @@ static sxi32 VmByteCodeExec(
                           //Fixed type but NULL == nullable. Recover the type.
                           if (pValue->iFlags & MEMOBJ_NULL) {
                             //puts("Restoring nullable type");
-                              // TODO: XXX: WRONG. === and !== operators will fail
+
                             pValue->iFlags &= ~(MEMOBJ_ALL);
                             pValue->iFlags |= PH7_MemObjKeywordToType(pObjAttr->pAttr->nType);
                             // Restore 

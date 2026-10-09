@@ -1079,7 +1079,10 @@ PH7_PRIVATE sxi32 PH7_MemObjCmp(ph7_value *pObj1, ph7_value *pObj2, int bStrict,
     /* Strict comparisons with === */
     // NOTE: do not move these extra flags to MEMOBJ_AUX: it was not tested and may break 
     //       typed property handling invariants. Or may be not - i didn't test it
-    //  TODO:
+    //
+    if ((pObj1->iFlags & MEMOBJ_NULL) && (pObj1->iFlags & MEMOBJ_NULL))
+      return 0;
+    
     iF1 = pObj1->iFlags & ~(MEMOBJ_AUX|MEMOBJ_NULLABLE|MEMOBJ_CALLABLE|MEMOBJ_FIXEDTYPE);
     iF2 = pObj2->iFlags & ~(MEMOBJ_AUX|MEMOBJ_NULLABLE|MEMOBJ_CALLABLE|MEMOBJ_FIXEDTYPE);
     if (iF1 != iF2) {
