@@ -15,7 +15,7 @@
  * Copyright (C) 2004-2013 Sergey Lyubka.
  * Copyright (C) 2013 Cesanta Software Limited.
  * Copyright (C) 2025 Aquefir Consulting LLC.
- * Copyright (C) 2026 Viacheslav Logunov (bug fixes)
+ * Copyright (C) 2026 Viacheslav Logunov (bug fixes, pcre-like compatibility syntax extensions)
  * Released under GNU General Public License v2
 
  *

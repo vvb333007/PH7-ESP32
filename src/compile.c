@@ -4644,7 +4644,9 @@ loop:
     PH7_GenCompileOOM(pGen);
     return SXERR_ABORT;
   }
-  /* Occupy nLine member. */
+  /* Occupy nLine member. 
+   * TODO: refactor as we loose line number
+  */
   if (nType) {
     pAttr->nType = nType;
 #if FIXEDTYPELOG

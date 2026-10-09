@@ -1003,11 +1003,11 @@ PH7_PRIVATE char *SyMemBackendStrDup(SyMemBackend *pBackend, const char *zSrc, s
   return zDest;
 }
 PH7_PRIVATE sxi32 SyBlobInitFromBuf(SyBlob *pBlob, void *pBuffer, sxu32 nSize) {
-#if defined(UNTRUST)
+//#if defined(UNTRUST)
   if (pBlob == 0 || pBuffer == 0 || nSize < 1) {
     return SXERR_EMPTY;
   }
-#endif
+//#endif
   pBlob->pBlob = pBuffer;
   pBlob->mByte = nSize;
   pBlob->nByte = 0;

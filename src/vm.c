@@ -13,6 +13,7 @@
 
 /* BUG: if an anonymous function, defined in a class method uses 'use($this)' as a capture list
         then $this receives one extra iRef and thus never dies , creating a leak
+Right now the PH7_VmPurgeClassInstances() is called when script is finished
 <?php
 
 class Test {
@@ -49,6 +50,7 @@ static const char *VmInstrToString(sxi32 nOp);
 PH7_PRIVATE int PH7_VmIsCallable(ph7_vm *pVm, ph7_value *pValue, int CallInvoke);
 PH7_PRIVATE sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nBytes, const char *zFormat, ...);
 
+
 /* Runtime exception thrower, to be used in VmByteCodeExec() only */
 #define VM_EXCEPTION_GOTO(fname_, flen_, fmt_, ... ) \
             { \
@@ -84,7 +86,9 @@ PH7_PRIVATE sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nBytes, const 
 
 
 
-
+/* Unrecoverable error has happened, other than out-of-memory event
+ * A message is sent to the ErrorConsumer and execution is aborted
+*/
 #define VM_FATAL_GOTO( Msg_, ... ) \
   do { \
     VmErrorFormat(pVm, PH7_CTX_ERR, Msg_, __VA_ARGS__ ); \
@@ -92,6 +96,17 @@ PH7_PRIVATE sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nBytes, const 
   } while(0)
 
 
+/* Handy macros to throw messages: formatted and not
+ * Those are not formatted are easier for the engine to process.
+ * _F is for "Formatted"
+ */
+#define VM_ERROR_F( Msg_, ... )   VmErrorFormat(pVm, PH7_CTX_ERR, Msg_, __VA_ARGS__ )
+#define VM_WARNING_F( Msg_, ... ) VmErrorFormat(pVm, PH7_CTX_WARNING, Msg_, __VA_ARGS__ )
+#define VM_NOTICE_F( Msg_, ... )  VmErrorFormat(pVm, PH7_CTX_NOTICE, Msg_, __VA_ARGS__ )
+
+#define VM_ERROR( Msg_ )   PH7_VmThrowError(pVm, 0, PH7_CTX_ERR, Msg_)
+#define VM_WARNING( Msg_ ) PH7_VmThrowError(pVm, 0, PH7_CTX_WARNING, Msg_)
+#define VM_NOTICE( Msg_ )  PH7_VmThrowError(pVm, 0, PH7_CTX_NOTICE, Msg_)
 
 
 
@@ -113,7 +128,7 @@ PH7_PRIVATE sxi32 PH7_VmThrow(ph7_vm *pVm, const char *zName, int nBytes, const 
 #ifdef UNTRUST
 #  define STACK_UNDERFLOW_GOTO(Name_) \
           do { \
-            if ((Name_) < pStack) { \
+            if ((Name_) < pStack) \
               goto Abort; \
           } while( 0 );
 #else
@@ -1108,6 +1123,46 @@ PH7_PRIVATE ph7_value *VmReserveMemObj(ph7_vm *pVm, sxu32 *pIndex) {
   pObj = (ph7_value *)SySetPeek(&pVm->aMemObj);
   return pObj;
 }
+
+
+
+/* Destroy all class instances to initiate destructors. There are
+ * some scenarios when class instances survive script termination. 
+ * Not a memory leak, because it will be all freed eventually on VM release, 
+ * but destructors are not called. In embedded this may result in a locked resources/bus etc
+ * so we are force destructors here by repeadetely unreferencing all class instances that are left
+ * in a VM objects pool (pVm->aMemObj)
+ *
+ */
+PH7_PRIVATE void PH7_VmPurgeClassInstances(ph7_vm *pVm) {
+
+  sxi32 Index;
+
+  
+  if (0 < (Index = SySetUsed(&pVm->aMemObj))) {
+    
+    ph7_value *pObj = (ph7_value *)SySetBasePtr(&pVm->aMemObj);
+
+    do {
+      
+      /* VM is being destroyed, but there are references to the object preventing its release
+       */
+      if ((pObj->iFlags & MEMOBJ_OBJ) != 0) {
+
+        while (((ph7_class_instance *)pObj->x.pOther)->iRef > 1)
+          PH7_ClassInstanceUnref(((ph7_class_instance *)pObj->x.pOther));
+
+        PH7_MemObjRelease(pObj);
+      }
+      pObj++;
+
+    } while (--Index);
+  }
+}
+
+
+
+
 /* Forward declaration */
 static sxi32 VmEvalChunk(ph7_vm *pVm, ph7_context *pCtx, SyString *pChunk, int iFlags, int bTrueReturn);
 /*
@@ -1116,6 +1171,39 @@ static sxi32 VmEvalChunk(ph7_vm *pVm, ph7_context *pCtx, SyString *pChunk, int i
  */
 #define PH7_BUILTIN_LIB \
   "class Throwable {" \
+  "" \
+  "  protected $message = 'Unknown';" \
+  "  protected $code = 0;" \
+  "  protected $file;" \
+  "  protected $line;" \
+  "  protected $trace;" \
+  "  protected $previous;" \
+  "" \
+  "  public function __construct(?string $message = null," \
+  "                                  int $code = 0," \
+  "                              ?string $file = __FILE__," \
+  "                                  int $line = __LINE__ ) {" \
+  "" \
+  "    if( isset($message) ) {" \
+  "      $this->message = $message;" \
+  "    }" \
+  "" \
+  "    $this->code = $code;" \
+  "    $this->file = $file;" \
+  "    $this->line = $line;" \
+  "    $this->trace = debug_backtrace();" \
+  "  }" \
+  "" \
+  "  public function getMessage() { return $this->message; }" \
+  "  public function getCode() { return $this->code; }" \
+  "  public function getFile() { return $this->file; }" \
+  "  public function getLine() { return $this->line; }" \
+  "  public function getTrace(){ return $this->trace; }" \
+  "  public function getTraceAsString() { return debug_string_backtrace(); }" \
+  "  public function getPrevious() { return null; }" \
+  "  public function __toString() { return $this->file.' '.$this->line.' '.$this->code.' '.$this->message; }" \
+  "}" \
+  "class Exception {" \
   "" \
   "  protected $message = 'Unknown';" \
   "  protected $code = 0;" \
@@ -1577,8 +1665,11 @@ PH7_PRIVATE sxi32 PH7_VmInit(
   pVm->nMagic = PH7_VM_INIT;
 
   /* Compile the built-in library */
+//#ifdef NOSTDLIB
+//#else
   SyStringInitFromBuf(&sBuiltin, PH7_BUILTIN_LIB, sizeof(PH7_BUILTIN_LIB) - 1);
   VmEvalChunk(&(*pVm), 0, &sBuiltin, PH7_PHP_ONLY, FALSE);
+//#endif
   
   /* Reset the code generator */
   PH7_ResetCodeGenerator(&(*pVm), pEngine->xConf.xErr, pEngine->xConf.pErrData);
@@ -1610,7 +1701,9 @@ PH7_PRIVATE sxi32 PH7_VmBlobConsumer(
 }
 
 #define VM_STACK_GUARD 16
-/* TODO: this is a hotpath. Refactor.
+/* TODO: Operand stack allocated and freed frequently. We need a custom allocator here for fixed-size chunks
+ * as opstack consist of a fixed size elements (ph7_value)
+ *
  * Allocate a new operand stack so that we can start executing
  * our compiled PHP program.
  * Return a pointer to the operand stack (array of ph7_values)
@@ -2646,9 +2739,8 @@ static sxi32 VmByteCodeExec(
     VM_EXCEPTION_GOTO("__genericfn", 11, "Call nesting soft limit reached. [PC: %08x]", pc);
 
   } else if (pVm->nRecursionDepth > (pVm->nMaxDepth)) {
-
-    PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"Call nesting limit reached. Aborted.");  
-
+    /* Hard limit */
+    VM_ERROR("Call nesting hard limit reached, execution aborted.");  
     goto Abort;
   }
 
@@ -2709,25 +2801,35 @@ static sxi32 VmByteCodeExec(
             if (nType != 0) {
               /* Only do conversion when result is not NULL */
               if ((pResult->iFlags & MEMOBJ_NULL) == 0) {
+                sxi32 rc = SXRET_OK;
                 /* Convert to appropriate type */
-
+                // TODO: check return type and if it is not convertible - throw an exception
+                // TODO: this code is executed when function has a nullable return type. In that case there were
+                // TODO: CVT_ emitted before return statement, and conversion was handed to OP_DONE
                 if (nType & PH7_TKWRD_INT) {
-                  PH7_MemObjToInteger(pResult);
+                  rc = PH7_MemObjToInteger(pResult);
                 } else if (nType & PH7_TKWRD_FLOAT) {
-                  PH7_MemObjToReal(pResult);
+                  rc = PH7_MemObjToReal(pResult);
                 } else if (nType & PH7_TKWRD_OBJECT) {
                   /* Convert to a stdClass, if it is not a class */
-                  PH7_MemObjToObject(pResult);
+                  rc = PH7_MemObjToObject(pResult);
                 } else if (nType & PH7_TKWRD_STRING) {
-                  PH7_MemObjToString(pResult);
+                  rc = PH7_MemObjToString(pResult);
                 } else if (nType & PH7_TKWRD_BOOL) {
-                  PH7_MemObjToBool(pResult);
+                  rc = PH7_MemObjToBool(pResult);
+                } else if (nType & PH7_TKWRD_CALLABLE) {
+                  rc = PH7_MemObjToCallable(pResult);
                 } else if (nType & PH7_TKWRD_ARRAY) {
-                  PH7_MemObjToHashmap(pResult);
+                  rc = PH7_MemObjToHashmap(pResult);
                 } else {
                   /* No auto cast */
                 }
-
+                if (rc != SXRET_OK) {
+                  //puts("exception thrown!");
+                  VM_EXCEPTION_GOTO("__typeerror", 11, "'return': can not convert value to a desired type [PC: %08x]\n", pc)
+                  //UNREACHED
+                  goto Abort;
+                }
               }
             }
             
@@ -2777,7 +2879,10 @@ static sxi32 VmByteCodeExec(
          */
         if (pInstr->iP2 != 0) {
           pVm->iExitStatus = pInstr->iP2;
-          PH7_VmThrowError(&(*pVm), 0, PH7_CTX_ERR,"Return from a never returning function is detected. Aborted.");
+          /* Returning from a :never is considered a programmer's 
+          *  bug, not a runtime bug, so no exception here
+          */
+          VM_ERROR("a 'return' from a ':never' returning function is detected. execution aborted.");
         }
 
         goto Abort;
@@ -2889,6 +2994,7 @@ static sxi32 VmByteCodeExec(
 
         if ((pTos->iFlags & MEMOBJ_INT) == 0) {
           PH7_MemObjToInteger(pTos);
+          // TODO: if conversion was unsuccesfull: throw an exception
         }
         /* Invalidate any prior representation */
         MemObjSetType(pTos, MEMOBJ_INT);
@@ -2918,6 +3024,8 @@ static sxi32 VmByteCodeExec(
         STACK_UNDERFLOW_GOTO(pTos);
 
         if ((pTos->iFlags & MEMOBJ_STRING) == 0) {
+          /* TODO: not convertible? throw an exception */
+
           PH7_MemObjToString(pTos);
         }
         break;
@@ -2933,13 +3041,16 @@ static sxi32 VmByteCodeExec(
 
         if ((pTos->iFlags & (MEMOBJ_STRING|MEMOBJ_HASHMAP)) == 0 ||
             (PH7_VmIsCallable(pVm, pTos, FALSE) == 0)) { 
-
-          /* No exception here to make it symmetrical to function args */
-          //VM_EXCEPTION_GOTO("__typeerror", 11, "Can not convert value to a callable. [PC: %08x]\n", pc)
+#if TYPEEXCEPTION
+          /* callable is a sensitive type and we want diagnostics early */
+          VM_EXCEPTION_GOTO("__typeerror", 11, "Can not convert value to a callable. [PC: %08x]\n", pc)
+#else
           /* Replace callable value with a string object referring a poisoned function :
              callable is a critical point so we can not it be in an inconsistent state.
           */
           VM_REPLACE_FUNC_NAME("__badcallable");
+          VM_WARNING_F("Can not convert value to a callable. [PC: %08x]\n", pc);
+#endif
         }
         break;
 
@@ -2989,11 +3100,11 @@ static sxi32 VmByteCodeExec(
         STACK_UNDERFLOW_GOTO(pTos);
 
         /* Force a hashmap cast */
-        rc = PH7_MemObjToHashmap(pTos);
-        if (rc != SXRET_OK) {
-          /* Not so fatal,emit a simple warning */
-          //PH7_VmThrowError(&(*pVm), 0, PH7_CTX_WARNING, "PH7 engine is running out of memory while performing an array cast");
-          VM_OOM_GOTO("Can not cast to array ( out of memory )");
+        if ((pTos->iFlags & MEMOBJ_HASHMAP) == 0) {
+          rc = PH7_MemObjToHashmap(pTos);
+          if (rc != SXRET_OK) {
+            VM_OOM_GOTO("Can not cast to array ( out of memory )");
+          }
         }
         break;
       /*
@@ -3006,8 +3117,12 @@ static sxi32 VmByteCodeExec(
         STACK_UNDERFLOW_GOTO(pTos);
 
         if ((pTos->iFlags & MEMOBJ_OBJ) == 0) {
+#if TYPEEXCEPTION
+          VM_EXCEPTION_GOTO("__typeerror",11,"can not convert a scalar to an object [PC: %08x]", pc)
+#else
           /* Force a 'stdClass()' cast */
           PH7_MemObjToObject(pTos);
+#endif
         }
         break;
       /*
@@ -3296,7 +3411,7 @@ static sxi32 VmByteCodeExec(
               nOfft = (sxu32)pIdx->x.iVal;
               if (nOfft >= SyBlobLength(&pTos->sBlob)) {
                 /* Invalid offset,load null */
-                puts("Undefined index in string");
+                //puts("Undefined index in string");
                 PH7_MemObjRelease(pTos);
               } else {
                 const char *zData = (const char *)SyBlobData(&pTos->sBlob);
@@ -3470,6 +3585,7 @@ static sxi32 VmByteCodeExec(
 #if FIXEDTYPELOG
                   fprintf(stderr, "= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pTos), PH7_MemObjTypeDump(pObj));
 #endif
+                  //pObj->iFlags |= MEMOBJ_NULLABLE; TODO: propagate NULLABLE
                   PH7_MemObjCastTo(pTos,pObj->iFlags);
                 }
                 PH7_MemObjStore(pTos, pObj);
@@ -3820,6 +3936,8 @@ static sxi32 VmByteCodeExec(
 
             if (pTos->nIdx == SXU32_HIGH) {
 
+              // 1 operand is on the stack. will be released later
+              //VmPopOperand(&pTos, 1);
               VM_EXCEPTION_GOTO("__typeerror",11,"'*=': can not assign: expression on the left is a constant [PC: %08x]", pc)
 
             } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
@@ -3872,6 +3990,7 @@ static sxi32 VmByteCodeExec(
           /* Peform the store operation */
           if (nIdx == SXU32_HIGH) {
 
+            // 1 operand is on stack. will be popped out by the Abort: or Exception: code
             VM_EXCEPTION_GOTO("__typeerror",11,"'+=': can not assign: expression on the left is a constant [PC: %08x]", pc)
 
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, nIdx)) != 0) {
@@ -3971,7 +4090,7 @@ static sxi32 VmByteCodeExec(
             MemObjSetType(pNos, MEMOBJ_INT);
           }
           if (pTos->nIdx == SXU32_HIGH) {
-
+            // 1 operand is on stack. will be popped out by the Abort: or Exception: code
             VM_EXCEPTION_GOTO("__typeerror",11,"'-=': can not assign: expression on the left is a constant [PC: %08x]", pc)
 
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
@@ -4067,7 +4186,7 @@ static sxi32 VmByteCodeExec(
           if (pTos->nIdx == SXU32_HIGH) {
             VM_EXCEPTION_GOTO("__typeerror",11,"'%=': can not assign: expression on the left is a constant [PC: %08x]", pc)
           } else if ((pObj = (ph7_value *)SySetAt(&pVm->aMemObj, pTos->nIdx)) != 0) {
-            if (pObj->iFlags & MEMOBJ_FIXEDTYPE) {
+            if (pObj->iFlags & MEMOBJ_FIXEDTYPE) { //TODO check if it is not 'int'
 #if FIXEDTYPELOG
               fprintf(stderr, "%= Typecasting for fixed type %s->%s\n",PH7_MemObjTypeDump(pNos), PH7_MemObjTypeDump(pObj));
 #endif
@@ -4962,7 +5081,7 @@ static sxi32 VmByteCodeExec(
             //VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Fatal PH7 engine is runnig out of memory");
 
             //goto Abort;
-            VM_OOM_GOTO("Can not create a new function frame ( out of memory )");
+            VM_OOM_GOTO("Can not create a new exception frame ( out of memory )");
           }
           /* Mark the special frame */
           pFrame->iFlags |= VM_FRAME_EXCEPTION;
@@ -5402,11 +5521,25 @@ static sxi32 VmByteCodeExec(
                         }
 
                         if (pObjAttr->pAttr->iFlags & PH7_CLASS_ATTR_NULLABLE) {
+                          
+                          //Fixed type but NULL == nullable. Recover the type.
+                          if (pValue->iFlags & MEMOBJ_NULL) {
+                            //puts("Restoring nullable type");
+                              // TODO: XXX: WRONG. === and !== operators will fail
+                            pValue->iFlags &= ~(MEMOBJ_ALL);
+                            pValue->iFlags |= PH7_MemObjKeywordToType(pObjAttr->pAttr->nType);
+                            // Restore 
+//                            if ((pValue->iFlags & (MEMOBJ_ALL)) == 0)
+                              pValue->iFlags |= MEMOBJ_NULL;
+                          }
                           pValue->iFlags |= MEMOBJ_NULLABLE;
+
 #if FIXEDTYPELOG
                           fprintf(stderr,"nullable Fixed type propagated to the memobj\n");
 #endif
                         }
+
+
                       }
 
                       
@@ -5964,6 +6097,7 @@ static sxi32 VmByteCodeExec(
            
 
              /* Create a new VM frame  */
+            // TODO: pFrame leaks on exception
             rc = VmEnterFrame(&(*pVm), pVmFunc, pThis, &pFrame);
             if (rc != SXRET_OK) {
               /* Pop given arguments */
@@ -5976,6 +6110,7 @@ static sxi32 VmByteCodeExec(
               VM_OOM_GOTO("Can not call a function ( out of memory )");
               break;
             }
+
             if ((pVmFunc->iFlags & VM_FUNC_CLASS_METHOD) && pThis) {
               /* Install the '$this' variable */
               static const SyString sThis = { "this", sizeof("this") - 1 };
@@ -6000,10 +6135,12 @@ static sxi32 VmByteCodeExec(
                     PH7_MemObjInit(&(*pVm), pObj);
                     if (SySetUsed(&pStatic->aByteCode) > 0) {
                       /* Evaluate initialization expression (Any complex expression) */
+                      // TODO: propagate return code and exceptions if any
                       VmLocalExec(&(*pVm), &pStatic->aByteCode, pObj);
                     }
                     pObj->nIdx = pStatic->nIdx;
                   } else {
+                    // TODO: FATAL
                     continue;
                   }
                 }
@@ -6031,7 +6168,7 @@ static sxi32 VmByteCodeExec(
                 /* Make sure the given arguments are of the correct type.
                  * 'callable' is not a real type, so it is checked here, as an argument attribute
                 */
-#if 1
+
                 if ((aFormalArg[n].iFlags & VM_FUNC_ARG_CALLABLE) != 0) {
 
                   if ( ((aFormalArg[n].iFlags & VM_FUNC_ARG_NULLABLE) != 0) &&
@@ -6046,13 +6183,18 @@ static sxi32 VmByteCodeExec(
                       * we convert the value to a built-in callable which throws exception when
                       * called. This is where PH8 differs from Zend
                       */
+#if TYPEEXCEPTION
+                      VmLeaveFrame(pVm);
+                      VM_EXCEPTION_GOTO("__typeerror", 11, "'%z()': arg(%u): a valid callable is expected [PC: %08x]\n",&pVmFunc->sName,n, pc)
+#else
                       PH7_MemObjRelease(pArg);
-                      SyBlobAppend(&pArg->sBlob, "__badcallable", sizeof("__badcallable") - 1);\
-                      MemObjSetType(pArg, MEMOBJ_STRING); \
+                      SyBlobAppend(&pArg->sBlob, "__badcallable", sizeof("__badcallable") - 1);
+                      MemObjSetType(pArg, MEMOBJ_STRING);
+#endif
                     }
                   }
                 }
-#endif
+
     
                 if (aFormalArg[n].nType > 0) {
                   if (aFormalArg[n].nType == SXU32_HIGH) {
@@ -6071,11 +6213,15 @@ static sxi32 VmByteCodeExec(
                             (((pArg->iFlags & MEMOBJ_NULL) != 0) && ((aFormalArg[n].iFlags & VM_FUNC_ARG_NULLABLE) == 0))) {
 
   
-                          //BUG: VM_EXCEPTION_GOTO("__typeerror", 11, "FATAL: '%z()': argument %u must be an object of type '%z'. [PC: %08x]\n", &pVmFunc->sName, n + 1, pName, pc)
-                          //VM_EXCEPTION_GOTO("__typeerror", 11, "FATAL: '%z()': argument %u must be an object of type '%z'. [PC: %08x]\n", &pVmFunc->sName, n + 1, pName, pc)
+                          /* Scalar value for object arguemnt: WARNING+NULL or exception? */
+#if TYPEEXCEPTION
+                          VmLeaveFrame(pVm);
+                          VM_EXCEPTION_GOTO("__typeerror", 11, "FATAL: '%z()': argument %u must be an object of type '%z'. [PC: %08x]\n", &pVmFunc->sName, n + 1, pName, pc)
+#else
                           
                           VmErrorFormat(&(*pVm), PH7_CTX_NOTICE,"'%z()': expects 'class %z' not a scalar or null, converted to a stdClass", &pVmFunc->sName, pName);
                           PH7_MemObjToObject(pArg);
+#endif
                           
                           
                         }
@@ -6083,11 +6229,14 @@ static sxi32 VmByteCodeExec(
                         ph7_class_instance *pThis = (ph7_class_instance *)pArg->x.pOther;
                         /* Make sure the object is an instance of the given class */
                         if (!VmInstanceOf(pThis->pClass, pClass)) {
-
-                          //BUG:VM_EXCEPTION_GOTO("__typeerror", 11, "FATAL: '%z()': argument %u must be of type '%z'. [PC: %08x]\n", &pVmFunc->sName, n + 1, pName, pc)
-                          
+                          /* Incompatible object to object argument: WARNING+NULL or exception? */
+#if TYPEEXCEPTION
+                          VmLeaveFrame(pVm);
+                          VM_EXCEPTION_GOTO("__typeerror", 11, "'%z()': expects 'class %z' not 'class %z'", &pVmFunc->sName, pName,&pThis->pClass->sName);
+#else
                           VmErrorFormat(&(*pVm), PH7_CTX_NOTICE,"'%z()': expects 'class %z' not 'class %z'", &pVmFunc->sName, pName,&pThis->pClass->sName);
                           //PH7_MemObjRelease(pArg);
+#endif
                         }
                       }
                     }
@@ -6102,9 +6251,19 @@ static sxi32 VmByteCodeExec(
                     }
                     if (bConv) {
                       /* auto cast arg */
+                      sxi32 rc;
                       ProcMemObjCast xCast = PH7_MemObjCastMethod(aFormalArg[n].nType);
                       /* Cast to the desired type */
-                      xCast(pArg);
+                      rc = xCast(pArg);
+                      if (rc != SXRET_OK) {
+                        rc = SXRET_OK;
+#if TYPEEXCEPTION
+                        VmLeaveFrame(pVm);
+                        VM_EXCEPTION_GOTO("__typeerror", 11, "Can not convert value to a desired type. [PC: %08x]\n", pc)
+#else
+                        VM_WARNING_F("Conversion result is unreliable. [PC: %08x]\n", pc);
+#endif
+                      }
                     }
                   }
                 }
@@ -6211,6 +6370,8 @@ static sxi32 VmByteCodeExec(
             PH7_MemObjRelease(pTos);
             pTos = &pTos[-pInstr->iP1];
             /* Allocate a new operand stack and evaluate the function body */
+            // TODO: CITO: pFrameStack leaks on exceptions
+            // TODO: CITO: A frame leaks on handled exception (frame is entered but not left)
             pFrameStack = VmNewOperandStack(&(*pVm), SySetUsed(&pVmFunc->aByteCode));
             if (pFrameStack == 0) {
               /* Raise exception: Out of memory */
@@ -6247,6 +6408,7 @@ static sxi32 VmByteCodeExec(
                   if (n == aSlot[i].nIdx) {
                     pObj = (ph7_value *)SySetAt(&pVm->aMemObj, n);
                     if (pObj && (pObj->iFlags & (MEMOBJ_NULL | MEMOBJ_OBJ | MEMOBJ_HASHMAP | MEMOBJ_RES)) == 0) {
+                      // In ZendPHP8 it is just a fallback to pass by value, without any notice
                       VM_FATAL_GOTO("in function '%z': returning a referene to a local variable is not permitted",&pVmFunc->sName);
                     }
                     n = SXU32_HIGH;
@@ -6255,6 +6417,7 @@ static sxi32 VmByteCodeExec(
                 }
               } else {
                 if ((pTos->iFlags & (MEMOBJ_HASHMAP | MEMOBJ_OBJ | MEMOBJ_NULL | MEMOBJ_RES)) == 0) {
+                  // In ZendPHP8 it is just a notice + fallback to pass by value
                   VM_FATAL_GOTO("in function '%z': returning a reference to a constant expression is not permitted", &pVmFunc->sName);
                 }
               }
@@ -6459,7 +6622,7 @@ Exception:
 #if DEVEL
   puts("Exception");
 #endif
-  SySetRelease(&aArg);
+//  SySetRelease(&aArg);
   while (pTos >= pStack) {
     PH7_MemObjRelease(pTos);
     pTos--;

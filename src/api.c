@@ -897,6 +897,11 @@ int ph7_vm_exec(ph7_vm *pVm, int *pExitStatus) {
   /* Leave VM mutex */
   SyMutexLeave(sMPGlobal.pMutexMethods, pVm->pMutex); /* NO-OP if sMPGlobal.nThreadingLevel != PH7_THREAD_LEVEL_MULTI */
 #endif
+
+  /* If there are class instances still left after GC, force removal and destructor calling */
+  /* TODO: what about reuse? */
+  PH7_VmPurgeClassInstances(pVm);
+
   /* Execution result */
   return rc;
 }

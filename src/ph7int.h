@@ -12,6 +12,10 @@
 
 #pragma once
 
+#ifndef TYPEEXCEPTION
+#   define TYPEEXCEPTION 0
+#endif
+
 /* If user didn't specify ENABLE_THREADS and MATH_FUNC - set them to default (OFF)*/
 #ifndef PH7_ENABLE_THREADS
 #  define PH7_ENABLE_THREADS 0
@@ -792,12 +796,14 @@ struct ph7_value {
 
 #define MEMOBJ_REFERENCE 0x400 /* Memory value hold a reference (64-bit index) of another ph7_value */
 
-/* Used by typed object properties (e.g. `public int $a = 1;`)*/
-#define MEMOBJ_FIXEDTYPE 0x800 /* Type is locked and can not be changed.
-                                  This flag is examined by STORE opeartions which store to a typed
-                                  class attribute */
+/* Temporary runtime flags.
+ * Used by typed object properties (e.g. `public int $a = 1;`)
+*/
+#define MEMOBJ_FIXEDTYPE 0x800 /* Type is locked and can not be changed. This flag is set by PH7_OP_MEMBER/PH7_OP_MEMBERNS opcodes to signal that attribute can not change its type
+                                  This flag is examined by STORE opeartions which store to a typed class attribute */
 #define MEMOBJ_NULLABLE 0x1000 /* Locked type can be null */
 #define MEMOBJ_CALLABLE 0x2000 /* Locked type 'callable' */
+#define MEMOBJ_NEVERSET 0x4000 /* Typed class property was never initialized (e.g. `public int $a;`)*/
 
 
 
@@ -1833,7 +1839,8 @@ PH7_PRIVATE sxi32 PH7_MemObjInitFromInt(ph7_vm *pVm, ph7_value *pObj, sxi64 iVal
 PH7_PRIVATE sxi32 PH7_MemObjInitFromBool(ph7_vm *pVm, ph7_value *pObj, sxi32 iVal);
 PH7_PRIVATE sxi32 PH7_MemObjInit(ph7_vm *pVm, ph7_value *pObj);
 PH7_PRIVATE sxi32 PH7_MemObjStringAppend(ph7_value *pObj, const char *zData, sxu32 nLen);
-PH7_PRIVATE int PH7_MemObjCastTo(ph7_value *pTos, sxi32 iFlags, sxi32 nType);
+PH7_PRIVATE int PH7_MemObjCastTo(ph7_value *pTos, sxi32 iFlags);
+PH7_PRIVATE sxi32 PH7_MemObjKeywordToType(sxi32 nKkwrd);
 #if 0
 /* Not used in the current release of the PH7 engine */
 PH7_PRIVATE sxi32 PH7_MemObjStringFormat(ph7_value *pObj,const char *zFormat,va_list ap);
@@ -1896,6 +1903,7 @@ PH7_PRIVATE sxi32 PH7_VmInit(ph7_vm *pVm, ph7 *pEngine);
 PH7_PRIVATE sxi32 PH7_VmConfigure(ph7_vm *pVm, sxi32 nOp, va_list ap);
 PH7_PRIVATE sxi32 PH7_VmByteCodeExec(ph7_vm *pVm);
 PH7_PRIVATE sxi32 PH7_VmRelease(ph7_vm *pVm);
+PH7_PRIVATE void  PH7_VmPurgeClassInstances(ph7_vm *pVm);
 PH7_PRIVATE sxi32 PH7_VmReset(ph7_vm *pVm);
 PH7_PRIVATE sxi32 PH7_VmMakeReady(ph7_vm *pVm);
 PH7_PRIVATE sxu32 PH7_VmInstrLength(ph7_vm *pVm);

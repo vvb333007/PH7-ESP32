@@ -500,7 +500,8 @@ PH7_PRIVATE ph7_class_instance *PH7_NewClassInstance(ph7_vm *pVm, ph7_class *pCl
   if (pNew == 0) {
     return 0;
   }
-  /* Associate a private VM frame with this class instance */
+  /* Associate a private VM frame with this class instance, instantiate class attributes
+  */
   rc = PH7_VmCreateClassInstanceFrame(&(*pVm), pNew);
   if (rc != SXRET_OK) {
     SyMemBackendPoolFree(&pVm->sAllocator, pNew);
