@@ -826,8 +826,8 @@ static int HashmapFindValue(
     pVal = HashmapExtractNodeValue(pEntry);
     if (pVal) {
       if ((pVal->iFlags | pNeedle->iFlags) & MEMOBJ_NULL) {
-        sxi32 iF1 = pVal->iFlags & ~MEMOBJ_AUX;
-        sxi32 iF2 = pNeedle->iFlags & ~MEMOBJ_AUX;
+        sxi32 iF1 = pVal->iFlags & ~(MEMOBJ_AUX|MEMOBJ_NULLABLE|MEMOBJ_CALLABLE|MEMOBJ_FIXEDTYPE);
+        sxi32 iF2 = pNeedle->iFlags & ~(MEMOBJ_AUX|MEMOBJ_NULLABLE|MEMOBJ_CALLABLE|MEMOBJ_FIXEDTYPE);
         if (iF1 == iF2) {
           /* NULL values are equals */
           if (ppNode) {
