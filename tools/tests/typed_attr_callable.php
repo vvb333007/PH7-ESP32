@@ -1,9 +1,10 @@
 <?php
 
 class Test {
+
   public ?string $a = '';
   public static int $b = 0;
-  public ?string $wrong = null;
+  public ?int $wrong = null;
   public ?callable $c = 'echo';
   public callable $d;
   public function t(?string $z) {
@@ -17,12 +18,14 @@ $cl = new Test();
 var_dump($cl->wrong);
 $cl->wrong = null;
 var_dump($cl->wrong);
-$cl->wrong = 'Hello';
+$cl->wrong = '77';
 var_dump($cl->wrong);
-$cl->wrong = null;
+$cl->wrong = 77;
 var_dump($cl->wrong);
-$cl->wrong = 99;
+$cl->wrong = 99.7;
 var_dump($cl->wrong);
+
+exit;
 
 
 $arr = array($cl, 't');
