@@ -839,7 +839,7 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceCmp(ph7_class_instance *pLeft, ph7_class_inst
   while ((pEntry = SyHashGetNextEntry(&pLeft->hAttr)) != 0 && (pEntry2 = SyHashGetNextEntry(&pRight->hAttr)) != 0) {
     VmClassAttr *p1 = (VmClassAttr *)pEntry->pUserData;
     VmClassAttr *p2 = (VmClassAttr *)pEntry2->pUserData;
-    /* Compare only non-static attribute */
+    /* Compare only non-static attribute */                                       
     if ((p1->pAttr->iFlags & (PH7_CLASS_ATTR_CONSTANT | PH7_CLASS_ATTR_STATIC)) == 0) {
       ph7_value *pL, *pR;
       pL = ExtractClassAttrValue(pLeft->pVm, p1);
@@ -1001,6 +1001,59 @@ PH7_PRIVATE sxi32 PH7_ClassInstanceCallMagicMethod(
   }
   return rc;
 }
+
+
+
+
+PH7_PRIVATE sxi32 PH7_CallMagicMethod(
+  ph7_vm *pVm,               /* VM that own all this stuff */
+  ph7_class *pClass,         /* Target class */
+  ph7_class_instance *pThis, /* Target object */
+  const char *zMethod,       /* Magic method name [i.e: __toString()]*/
+  sxu32 nByte,               /* zMethod length*/
+  const SyString *pAttrName, /* Attribute name, i.e. argument to the magic method */
+  ph7_value *pValue          /* Function return value */
+) {
+  ph7_value *apArg[2] = { 0, 0 };
+  ph7_class_method *pMeth;
+  ph7_value sAttr; /* cc warning */
+  sxi32 rc;
+  int nArg;
+  /* Make sure the magic method is available */
+  /* TODO: precache all magic methods*/
+  pMeth = PH7_ClassExtractMethod(&(*pClass), zMethod, nByte);
+  if (pMeth == 0) {
+    /* No such method,return immediately */
+    return SXERR_NOTFOUND;
+  }
+  nArg = 0;
+
+  /* Copy arguments */
+  if (pAttrName) {
+    PH7_MemObjInitFromString(pVm, &sAttr, pAttrName);
+    sAttr.nIdx = SXU32_HIGH; /* Mark as constant */
+    apArg[0] = &sAttr;
+    nArg = 1;
+  }
+  /* Call the magic method now */
+  rc = PH7_VmCallClassMethod(pVm, &(*pThis), pMeth, pValue, nArg, apArg);
+  /* Clean up */
+  if (pAttrName) {
+    PH7_MemObjRelease(&sAttr);
+  }
+  return rc;
+}
+
+
+
+
+
+
+
+
+
+
+
 /*
  * Extract the value of a class instance [i.e: Object in the PHP jargon].
  * This function is simply a wrapper on ExtractClassAttrValue().

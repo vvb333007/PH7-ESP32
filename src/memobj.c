@@ -105,7 +105,7 @@ static sxi64 MemObjStringToInt(ph7_value *pObj) {
  * Return SXRET_OK if the magic method is available and have been
  * successfully called. Any other return value indicates failure.
  */
-static sxi32 MemObjCallClassCastMethod(
+sxi32 MemObjCallClassCastMethod(
   ph7_vm *pVm,               /* VM that trigger the invocation */
   ph7_class_instance *pThis, /* Target class instance [i.e: Object] */
   const char *zMethod,       /* Magic method name [i.e: __toString] */

@@ -5443,21 +5443,25 @@ static sxi32 VmByteCodeExec(
                   pMeth = PH7_ClassExtractMethod(pClass, sName.zString, sName.nByte);
                 }
 
+                // Replace the method name with __call. This changes the __call and __callStatic semantics:
+                // __call() receives all original arguments as, but the name of the called function is in
+                // a special constant CALLED_NAME
+                /*
+                  public function __call($arg1, $arg2, $arg3) {
+                    switch( CALLED_NAME ) {
+                      case 'die': die($arg1);
+                      case 'bye': echo $arg1.PHP_EOL; die($arg2);
+                    }
+                  }
+                */
                 if (pMeth == 0) {
-                  /* TODO: May be we can just replace unresolved call to a "__call" if it exists? 
-                     TODO: i.e. if pMeth is NULL, we just try to extract "__call" method and if it was successfull, then we are done
-                     TODO: why PH7 authors call their magic method right from here is a question
-                      MemObjCallClassCastMethod(pVm,pThis->pClass, pThis, "__call", sizeof("__call") - 1, pResult);
-                   */
                   pMeth = PH7_ClassExtractMethod(pClass, "__call", sizeof("__call") - 1 );
+                  // TODO: pVm->iFailedName = Name of the failed method
+                  
                 }
 
                 if (pMeth == 0) {
-
-//                  if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__call", sizeof("__call") - 1, &sName)) {
-                    VM_EXCEPTION_GOTO("__unknownfn", 11, "Undefined class method '%z->%z(...)' call at [PC: %08x]\n", &pClass->sName,&sName, pc)
-                    /* Unreachable but just in case */
-  //                }
+                  VM_EXCEPTION_GOTO("__unknownfn", 11, "Undefined class method '%z->%z(...)' call at [PC: %08x]\n", &pClass->sName,&sName, pc)
                   VM_REPLACE_FUNC_NAME("__nullsafe");
                 } else {
                   /* Push real method name on the stack */
@@ -5482,25 +5486,43 @@ static sxi32 VmByteCodeExec(
 
                   }
                 }
+#if 1
+                // TODO: commented out because it is not done yet.
+                // compiler needs an update to emit public $__get; everytime it compiles __get() magic method for a class
 
+                if (pObjAttr == NULL) {
+                  // find a reference to an existing 'magic' property (special property named 'public __get;')
+                  // This one is inserted by a compiler whenever it finds a definition of the __get() magic method
+                  // so we naturally have a pObjAttr to use as a scratchpad to implement __get() call
+                  //
+                  // Locate pObjAttr which is assotiated with  '$this->$__get'. Call __get() on it 
+                  // to save the __get() result. Update stack so it is a value of __get variable
+                  // is on stack now
+                  int bExcept = 1;
+                  pEntry = SyHashGet(&pThis->hAttr, (const void *)"__get", sizeof("__get")-1);
+                  if (pEntry) {
 
+                    pObjAttr = (VmClassAttr *)pEntry->pUserData;
+                    if (pObjAttr) {
+                      ph7_value *pValue = (ph7_value *)SySetAt(&pVm->aMemObj, pObjAttr->nIdx);
+                      if (pValue) {
+
+                        // call __get() and install the result value straight to the object pointed by pObjAttr
+                        //
+                        if (SXRET_OK == PH7_CallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName, pValue)) {
+                          bExcept = 0;
+                        }
+                      }
+                    }
+                  }
+                  if (bExcept) {
+                    // Exception: __get attr is not found, but must be inserted by the compiler
+                    VM_EXCEPTION_GOTO("__unknownat", 11, "Undefined class attribute '%z->%z(...)' access at [PC: %08x]\n", &pClass->sName,&sName, pc)
+                  }
+                }
+#endif
                 /* Pop the attribute name */
                 VmPopOperand(&pTos, 1);
-
-                if (pObjAttr == 0) {
-                  //VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class attribute '%z->%z',PH7 is loading NULL",&pClass->sName, &sName);
-                 
-                  /* Call the __get magic method if available */
-                  /* TODO: add flags to pClass: HAS_GET, HAS_SET, HAS_CALL, HAS_CALLSTATIC, etc
-                   * which are inherited via 'extends' construct. These flags are used by CallMagicMethod
-                   * to skip method lookup when we know there are none.
-                   * 
-                  */
-                  if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName)) {
-                     VM_EXCEPTION_GOTO("__unknownfn", 11, "Undefined class attribute '%z->%z(...)' access at [PC: %08x]\n", &pClass->sName,&sName, pc)
-                  }
-
-                }
                 /* TICKET 1433-49: Deffer garbage collection until attribute loading.
          * This is due to the following case:
          *     (new TestClass())->foo;
@@ -5515,6 +5537,8 @@ static sxi32 VmByteCodeExec(
 
                   ph7_value *pValue = 0; /* cc warning */
                   /* Check attribute access */
+                  /* TODO: override checks for __get and __gets attributes so we can declare them private
+                  */
                   if (VmClassMemberAccess(&(*pVm), pClass, &pObjAttr->pAttr->sName, pObjAttr->pAttr->iProtection, TRUE)) {
 
                     /* Load attribute */
@@ -5588,6 +5612,7 @@ static sxi32 VmByteCodeExec(
  */
               if (pInstr->iOp == PH7_OP_MEMBER) {
 
+                // Create member name to display
                 if (pTos->iFlags & MEMOBJ_STRING) {
                   SyStringInitFromBuf(&sName, (const char *)SyBlobData(&pTos->sBlob), SyBlobLength(&pTos->sBlob));
                 } else {
@@ -5673,6 +5698,7 @@ static sxi32 VmByteCodeExec(
                   
                   if (pMeth == NULL) {
                     pMeth = PH7_ClassExtractMethod(pClass, "__callStatic", sizeof("__callStatic") - 1 );
+                    // TODO: install called method name into PHP_CALLED constant
                   }
 
                   if (pMeth == 0 || (pMeth->iFlags & PH7_CLASS_ATTR_ABSTRACT)) {
@@ -5680,11 +5706,9 @@ static sxi32 VmByteCodeExec(
 //                    /* Abstract method is just a definition, no real code */
                       VM_EXCEPTION_GOTO("__unknownat", 11, "Can not invoke abstract method '%z:%z'. at [PC: %08x]\n", &pClass->sName,&sName, pc)
                     } else {
-
-                      /* call __callStatic magic method. If method is not implemented - throw an exception */
-                      if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, 0, "__callStatic", sizeof("__callStatic") - 1, &sName)) {
+//                      if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, 0, "__callStatic", sizeof("__callStatic") - 1, &sName)) {
                         VM_EXCEPTION_GOTO("__unknownat", 11, "Undefined class static method '%z::%z(...)' call at [PC: %08x]\n", &pClass->sName,&sName, pc)
-                      }
+//                      }
                     }
 
                     /* We only can get here if user script has ignored exceptions via set_exception_handler() mechanism
@@ -5708,15 +5732,39 @@ static sxi32 VmByteCodeExec(
                   if (sName.nByte > 0) {
                     pAttr = PH7_ClassExtractAttribute(pClass, sName.zString, sName.nByte);
                   }
-                  if (pAttr == 0) {
-                    /* No such attribute,load null */
-//                    VmErrorFormat(&(*pVm), PH7_CTX_ERR, "Undefined class attribute '%z::%z',PH7 is loading NULL",                                  &pClass->sName, &sName);
-                    /* Call the __get magic method if available */
-//                    PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, 0, "__get", sizeof("__get") - 1, &sName);
-                    if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName)) {
-                      VM_EXCEPTION_GOTO("__unknownat", 11, "Undefined class attribute '%z->%z(...)' access. [PC: %08x]\n", &pClass->sName,&sName, pc)
+
+
+                  /* No such STATIC attribute 
+                  * Lets try to locate __get() method and call it. 
+                  */
+                  if (pAttr == NULL) {
+                    
+                    int bExcept = 1;
+
+                    /* Does ::__gets exist? If yes - then we probably have __get() method as well
+                     * Method __get() always come along with public static $__gets; variable which is 
+                     * added by the compiler once it sees method __get() definition
+                    */
+                    pAttr = PH7_ClassExtractAttribute(pClass, "__gets", sizeof("__gets")-1);
+
+                    if (pAttr != NULL) {
+                      ph7_value *pValue = (ph7_value *)SySetAt(&pVm->aMemObj, pAttr->nIdx);
+                      if (pValue) {
+                        /* call __get() if it exists and install the result value straight to 
+                         * the object pointed by pValue i.e. to the global aMemObj table
+                         */
+                        if (SXRET_OK == PH7_CallMagicMethod(&(*pVm), pClass, pThis, "__get", sizeof("__get") - 1, &sName, pValue)) {
+                          bExcept = 0;
+                        }
+                      }
+                    }
+                    if (bExcept) {
+                      /* We did our best but.. */
+                      VM_EXCEPTION_GOTO("__unknownat", 11, "Undefined class attribute '%z::%z(...)' access at [PC: %08x]\n", &pClass->sName,&sName, pc)
                     }
                   }
+
+
                   /* Pop the attribute name from the stack */
                   if (!pInstr->p3) {
                     VmPopOperand(&pTos, 1);
@@ -5984,6 +6032,10 @@ static sxi32 VmByteCodeExec(
               PH7_MemObjStore(&sResult, pTos);
               PH7_MemObjRelease(&sResult);
             } else {
+
+              ph7_value pValue;
+              PH7_MemObjInit(pVm, &pValue);
+  
               /* class name as function: invoke magic __invoke() call
                */
               if (pTos->iFlags & MEMOBJ_OBJ) {
@@ -5992,7 +6044,7 @@ static sxi32 VmByteCodeExec(
                    Raise an exception if __invoke() is not available
                    TODO: propagate return value and copy it to the stack
                 */
-                if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pThis->pClass, pThis, "__invoke", sizeof("__invoke") - 1, NULL)) {
+                if (SXRET_OK != PH7_CallMagicMethod(&(*pVm), pThis->pClass, pThis, "__invoke", sizeof("__invoke") - 1, NULL, &pValue)) {
                   VM_EXCEPTION_GOTO("__unknownat", 11, "'__invoke()' magic method is not implemented by class '%z'. at [PC: %08x]\n", &pThis->pClass->sName, pc)
                 }
 
@@ -6006,6 +6058,9 @@ static sxi32 VmByteCodeExec(
               }
               /* Assume a null return value so that the program continue it's execution normally */
               PH7_MemObjRelease(pTos);
+              if ((pValue.iFlags & MEMOBJ_NULL) == 0)
+                PH7_MemObjStore(&pValue,pTos);
+              PH7_MemObjRelease(&pValue);
             }
             break;
           }

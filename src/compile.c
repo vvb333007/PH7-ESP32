@@ -4372,6 +4372,18 @@ static sxi32 PH7_CompileFunction(ph7_gen_state *pGen) {
   nLine = pGen->pIn->nLine;
   /* Jump the function name */
   pGen->pIn++;
+
+  /*  TODO:
+      if name is __get() then add two class attributes as well
+      private $__get;
+      private static $__gets;
+
+      via PH7_NewClassAttr(pGen->pVm, pName, nLine, iProtection, iFlags) and
+          PH7_ClassInstallAttr(pClass, pAttr);
+      These 'hidden' class attributes are required fot __get() magic method to work and be able to return value
+      as these hidden attributes are used as a scratchpad area during __get() call
+  */
+
   if (pGen->pIn >= pGen->pEnd || (pGen->pIn->nType & PH7_TK_LPAREN) == 0) {
     /* Syntax error */
     rc = PH7_GenCompileError(pGen, E_ERROR, nLine, "Expected '(' after function name '%z'", pName);
@@ -4517,7 +4529,6 @@ loop:
     sxi32 nAutoValue = 0;  // Fallback
     if (pAutoValue != NULL) {
       nAutoValue = *pAutoValue;
-      /* TODO: make aoutcounter aware of last numeric value set and start from there+1*/
       *pAutoValue = nAutoValue + 1; 
     }
 
@@ -4582,7 +4593,7 @@ Synchronize:
 }
 
 /*
- * complie a class attribute or Properties in the PHP jargon.
+ * complie a class attribute (static or dynamic) or Properties in the PHP jargon.
  *
  * iProtection: one of (PH7_CLASS_PROT_PUBLIC, PH7_CLASS_PROT_PROTECTED or PH7_CLASS_PROT_PRIVATE)
  * iFlags: bitwise ORed PH7_CLASS_ATTR_... flags
