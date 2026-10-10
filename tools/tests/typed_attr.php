@@ -6,10 +6,12 @@ class Test {
   public static bool $zzz;
   public ?string $a;
   public static int $b;
+  public function func() {
+    return new static;
+  }
 }
-//aaa:
-$cl = new Test();
 
+$cl = new Test;
 
 $cl->a = 1;
 if ($cl->a === 1)

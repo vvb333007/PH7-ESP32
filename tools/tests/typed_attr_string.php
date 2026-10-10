@@ -15,7 +15,7 @@ if (!is_null($cl->d))
   die('Nullable rejects null');
 
 $cl->c = 11;
-if (!is_string($cl->d))
+if ($cl->c !== '11')
   die('Type mutated');
 
 $cl->c = null;
@@ -23,8 +23,8 @@ if (!is_null($cl->d))
   die('Nullable rejects null');
 
 $cl->c = 'strlen';
-if (!is_string($cl->d))
-  die('Nullable rejects null');
+if ($cl->c !== 'strlen')
+  die('Nullable rejects string');
 
 echo 'TEST 1 PASSED'.PHP_EOL;
 

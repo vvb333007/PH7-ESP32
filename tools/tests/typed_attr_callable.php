@@ -1,10 +1,10 @@
 <?php
 
 class Test {
-
   public ?string $a = '';
   public static int $b = 0;
-  public ?int $wrong = null;
+  public object $z;
+
   public ?callable $c = 'echo';
   public callable $d;
   public function t(?string $z) {
@@ -15,33 +15,38 @@ class Test {
 //aaa:
 $cl = new Test();
 
-var_dump($cl->wrong);
-$cl->wrong = null;
-var_dump($cl->wrong);
-$cl->wrong = '77';
-var_dump($cl->wrong);
-$cl->wrong = 77;
-var_dump($cl->wrong);
-$cl->wrong = 99.7;
-var_dump($cl->wrong);
-
-exit;
-
 
 $arr = array($cl, 't');
 
 $cl->c = null;
-if (isset($cl->c))
-  die 'Nullable failed to accept null';
+if (!is_null($cl->c))
+  die ('Nullable failed to accept null');
+
+$cl->c = null;
+if ($cl->c !== null)
+  die ('!== operator fails on a nullable');
+else
+  if ($cl->c === null) {
+  } else
+    die ('=== operator fails on a nullable');
 
 $cl->c = 11;
-if ($cl->c != '__badcallable') {
+if ($cl->c !== '__badcallable') {
   die('A bad callable is expected but got ['.$cl->c.']');
 }
 
+
+if ($cl->c === null)
+  die ('=== operator fails on a nullable');
+else
+  if ($cl->c !== null) {
+  } else
+    die ('!== operator fails on a nullable');
+
+
 $cl->c = null;
-if (isset($cl->c))
-  die 'Nullable failed to accept null';
+if ($cl->c !== null)
+  die('Nullable failed to accept null');
 
 
 $cl->c = 'strlen';
@@ -59,11 +64,11 @@ if ($cl->d != '__badcallable') {
 
 $cl->d = 1;
 if ($cl->d == 1)
-  die 'Uninitialized class callable attribute accepts a number!';
+  die('Uninitialized class callable attribute accepts a number!');
 
 $cl->d = null;
 if (!isset($cl->d))
-  die 'Non-nullable callable accepts null!';
+  die('Non-nullable callable accepts null!');
 
 if ($cl->d != '__badcallable') {
   die('__badcallable is expected but got ['.$cl->d.']');
