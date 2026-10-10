@@ -13,10 +13,24 @@
 
 /* BUG: if an anonymous function, defined in a class method uses 'use($this)' as a capture list
         then $this receives one extra iRef and thus never dies , creating a leak
-Right now the PH7_VmPurgeClassInstances() is called when script is finished
+
+        Right now the PH7_VmPurgeClassInstances() is called when script is finished
+        forcefully unreferencing all class instances to call destructors. 
+
+        As a consequence of this, class destructors are not allowed to use their class members
+        if these members are referenced objects
+
+        class Test {
+          public $a;  // $a - is an object
+          public function __destruct() {
+            // accessing $this->a here MAY be dangerous if this destructor is called
+            // as a part of the class purging: the class $a references MAY be dead by the time
+            // this destructor is called.
+          }
+        }
 <?php
 
-class Test {
+
 
 
     public function method(): callable {
@@ -5428,18 +5442,23 @@ static sxi32 VmByteCodeExec(
                   /* Extract the target method */
                   pMeth = PH7_ClassExtractMethod(pClass, sName.zString, sName.nByte);
                 }
+
                 if (pMeth == 0) {
-                  /* Try to call magic and throw an exception if magic is not implemented by the class
-                     Propagate error from ClassInstanceCallMagicMethod() so we can check if __call() was actually called.
-                     TODO: we need all args to the __call and to the __callStatic , not just only name
-                  */
+                  /* TODO: May be we can just replace unresolved call to a "__call" if it exists? 
+                     TODO: i.e. if pMeth is NULL, we just try to extract "__call" method and if it was successfull, then we are done
+                     TODO: why PH7 authors call their magic method right from here is a question
+                      MemObjCallClassCastMethod(pVm,pThis->pClass, pThis, "__call", sizeof("__call") - 1, pResult);
+                   */
+                  pMeth = PH7_ClassExtractMethod(pClass, "__call", sizeof("__call") - 1 );
+                }
 
-                  if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__call", sizeof("__call") - 1, &sName)) {
+                if (pMeth == 0) {
+
+//                  if (SXRET_OK != PH7_ClassInstanceCallMagicMethod(&(*pVm), pClass, pThis, "__call", sizeof("__call") - 1, &sName)) {
                     VM_EXCEPTION_GOTO("__unknownfn", 11, "Undefined class method '%z->%z(...)' call at [PC: %08x]\n", &pClass->sName,&sName, pc)
-                  }
-                  /* Unreachable but just in case */
+                    /* Unreachable but just in case */
+  //                }
                   VM_REPLACE_FUNC_NAME("__nullsafe");
-
                 } else {
                   /* Push real method name on the stack */
                   PH7_MemObjRelease(pTos);
@@ -5651,6 +5670,11 @@ static sxi32 VmByteCodeExec(
                     /* Extract the target method */
                     pMeth = PH7_ClassExtractMethod(pClass, sName.zString, sName.nByte);
                   }
+                  
+                  if (pMeth == NULL) {
+                    pMeth = PH7_ClassExtractMethod(pClass, "__callStatic", sizeof("__callStatic") - 1 );
+                  }
+
                   if (pMeth == 0 || (pMeth->iFlags & PH7_CLASS_ATTR_ABSTRACT)) {
                     if (pMeth) {
 //                    /* Abstract method is just a definition, no real code */
@@ -14120,6 +14144,7 @@ static int vm_builtin_xml_parse(ph7_context *pCtx, int nArg, ph7_value **apArg) 
   int nByte;
   if (nArg < 2 || !ph7_value_is_resource(apArg[0]) || !ph7_value_is_string(apArg[1])) {
     /* Missing/Ivalid arguments,return FALSE */
+    //puts("Err1");
     ph7_result_bool(pCtx, 0);
     return PH7_OK;
   }
@@ -14127,11 +14152,13 @@ static int vm_builtin_xml_parse(ph7_context *pCtx, int nArg, ph7_value **apArg) 
   pEngine = (ph7_xml_engine *)ph7_value_to_resource(apArg[0]);
 
   if (IS_INVALID_XML_ENGINE(pEngine)) {
+    //puts("Err2");
     /* Corrupt engine,return FALSE */
     ph7_result_bool(pCtx, 0);
     return PH7_OK;
   }
   if (pEngine->iNest > 0) {
+    //puts("Err3");
     /* This can happen when the user callback call xml_parse() again 
      * in it's body which is forbidden.
      */
@@ -14166,6 +14193,7 @@ static int vm_builtin_xml_parse(ph7_context *pCtx, int nArg, ph7_value **apArg) 
   pEngine->iNest--;
   /* Return the parse result */
   ph7_result_int(pCtx, pEngine->iErrCode == SXML_ERROR_NONE ? 1 : 0);
+//fprintf(stderr,"engine err code is %d\n",pEngine->iErrCode);
   return PH7_OK;
 }
 /*

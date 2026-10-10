@@ -5619,11 +5619,7 @@ PH7_PRIVATE sxi32 PH7_HashmapDump(SyBlob *pOut, ph7_hashmap *pMap, int ShowType,
   for (i = 0; i < nTab; i++) {
     SyBlobAppend(&(*pOut), " ", sizeof(char));
   }
-//  if (ShowType)  {
-//    SyBlobAppend(&(*pOut), ")", sizeof(char));
-//  }
-
-  SyBlobAppend(&(*pOut), "}", sizeof(char));
+  SyBlobAppend(&(*pOut), ShowType ? "}":")", sizeof(char));
   
   return rc;
 }

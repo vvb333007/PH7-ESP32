@@ -4102,17 +4102,19 @@ static sxi32 ProcessXML(SyXMLParser *pParse, SySet *pTagStack, SySet *pWorker) {
   /* Start processing */
   if (pParse->xStartDoc && (SXERR_ABORT == pParse->xStartDoc(pParse->pUserData))) {
     /* User callback request an operation abort */
+    //puts("1--abort");    
     return SXERR_ABORT;
   }
   /* Reset the loop cursor */
   SySetResetCursor(pTokenSet);
   /* Extract the current token */
   while (SXRET_OK == (SySetGetNextEntry(&(*pTokenSet), (void **)&pToken))) {
+
     SyZero(&sEntry, sizeof(SyXMLRawStrNS));
     SyZero(&sNs, sizeof(SyXMLRawStr));
     SySetInit(&sEntry.sNSset, pParse->pAllocator, sizeof(SyHashEntry *));
     sEntry.nLine = sNs.nLine = pToken->nLine;
-    //printf("Token type %08x\r\n",(unsigned int )pToken->nType);
+    printf("Token type %08x\r\n",(unsigned int )pToken->nType);
     switch (pToken->nType) {
       case SXML_TOK_DOCTYPE:
         if (SySetUsed(pTagStack) > 1 || bGotTag) {
@@ -4143,12 +4145,16 @@ static sxi32 ProcessXML(SyXMLParser *pParse, SySet *pTagStack, SySet *pWorker) {
           }
         }
         /* Invoke the supplied callback if any */
+
         if (pParse->xRaw) {
           TokenToXMLString(pToken, &sEntry);
+
           rc = pParse->xRaw((SyXMLRawStr *)&sEntry, pParse->pUserData);
           if (rc == SXERR_ABORT) {
+            //puts("5");    
             return SXERR_ABORT;
           }
+
         }
         break;
       case SXML_TOK_PI:
@@ -4381,29 +4387,38 @@ PH7_PRIVATE sxi32 SyXMLProcess(SyXMLParser *pParser, const char *zInput, sxu32 n
   SySetInit(&sWorker, pParser->pAllocator, sizeof(SyXMLRawStr));     /* Tag container */
   SySetInit(&sTagStack, pParser->pAllocator, sizeof(SyXMLRawStrNS)); /* Tag stack */
   /* Tokenize the entire input */
+//  puts("tokenizing");
   rc = SyLexTokenizeInput(&pParser->sLex, zInput, nByte, 0, 0, 0);
   if (rc == SXERR_ABORT) {
+  //  puts("failed to tokenize input");
     /* Tokenize callback request an operation abort */
     return SXERR_ABORT;
   }
+//  puts("tokenized");
   if (SySetUsed(&pParser->sToken) < 1) {
     /* Nothing to process [i.e: white spaces] */
+//    puts("nothing to process");
     rc = SXRET_OK;
   } else {
     /* Process XML Tokens */
-    
+//    puts("before processxml");    
     rc = ProcessXML(&(*pParser), &sTagStack, &sWorker);
+//    puts("after processxml");    
     
     if (pParser->nFlags & SXML_ENABLE_NAMESPACE) {
+  //    puts("namespace");    
       if (SySetUsed(&sTagStack) > 0) {
+    //    puts("tagstack");    
         SyXMLRawStrNS *pEntry;
         SyHashEntry **apEntry;
         sxu32 n;
         SySetResetCursor(&sTagStack);
         while (SySetGetNextEntry(&sTagStack, (void **)&pEntry) == SXRET_OK) {
+      //    puts("1111");    
           /* Release namespace entries */
           apEntry = (SyHashEntry **)SySetBasePtr(&pEntry->sNSset);
           for (n = 0; n < SySetUsed(&pEntry->sNSset); ++n) {
+        //    puts("222");    
             SyMemBackendFree(pParser->pAllocator, apEntry[n]->pUserData);
           }
           SySetRelease(&pEntry->sNSset);

@@ -512,6 +512,7 @@ static sxi32 ExprVerifyNodes(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 
       iBraces--;
     } else if (apNode[i]->pStart->nType & PH7_TK_COLON) {
       /* Not a ternary operator? */
+      /**/
       if (iQuesty <= 0) {
         rc = PH7_GenCompileError(&(*pGen), E_ERROR, apNode[i]->pStart->nLine, "Syntax error: Unexpected token ':'");
         if (rc != SXERR_ABORT) {
@@ -1418,7 +1419,7 @@ static sxi32 ExprMakeTree(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 nTo
         }
         if (iRight >= nToken || iLeft < 0 || !NODE_ISTERM(iRight) || !NODE_ISTERM(iLeft)) {
           /* Syntax error */
-          rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': Missing/Invalid operand", &pNode->pOp->sOp);
+          rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': Missing/Invalid operand (1)", &pNode->pOp->sOp);
           if (rc != SXERR_ABORT) {
             rc = SXERR_SYNTAX;
           }
@@ -1560,7 +1561,7 @@ static sxi32 ExprMakeTree(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 nTo
       }
       if (iLeft < 0 || iRight < 0 || !NODE_ISTERM(iRight) || !NODE_ISTERM(iLeft)) {
         /* Syntax error */
-        rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': Missing/Invalid operand", &pNode->pOp->sOp);
+        rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': Missing/Invalid operand (2)", &pNode->pOp->sOp);
         if (rc != SXERR_ABORT) {
           rc = SXERR_SYNTAX;
         }
@@ -1600,7 +1601,7 @@ static sxi32 ExprMakeTree(ph7_gen_state *pGen, ph7_expr_node **apNode, sxi32 nTo
         }
         if (iRight >= nToken || iLeft < 0 || !NODE_ISTERM(iRight) || !NODE_ISTERM(iLeft)) {
           /* Syntax error */
-          rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': Missing/Invalid operand", &pNode->pOp->sOp);
+          rc = PH7_GenCompileError(pGen, E_ERROR, pNode->pStart->nLine, "'%z': Missing/Invalid operand (3)", &pNode->pOp->sOp);
           if (rc != SXERR_ABORT) {
             rc = SXERR_SYNTAX;
           }
