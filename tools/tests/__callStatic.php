@@ -1,8 +1,10 @@
 <?php
 
 class Proxy {
-    public static function __callStatic($name, $args):string {
-      return 'Works!';
+    public $__get;
+    public static function __callStatic($a):string {
+      var_dump(func_num_args());
+      return 'Works! '.$a;
     }
 }
 
